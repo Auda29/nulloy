@@ -2,7 +2,7 @@
 
 Stand: 6. September 2026
 
-Status: Phase 0 weitgehend durchgeführt; offene Abnahme siehe [Prüfprotokoll](PHASE0_REPORT.md)
+Status: Phase 0 abgeschlossen; Nachweise und bekannte Ausgangsfehler siehe [Prüfprotokoll](PHASE0_REPORT.md)
 
 Repository: [Auda29/nulloy](https://github.com/Auda29/nulloy)
 
@@ -66,10 +66,10 @@ Versionen von Compiler, Qt, CMake, Bibliotheken und später Rust werden mit Bezu
 - [x] Eine getrennte Testinstallation und Kopien von Einstellungen, Playlists und Testmedien vorbereiten. Die täglich verwendete Installation bleibt die Vergleichsbasis. Die unbeabsichtigte Positionsänderung wurde nach Rückmeldung des Nutzers zurückgesetzt; alle 102 geschützten Originaldateien stimmen mit der Sicherung überein.
 - [x] Originalquellcode mit dokumentierter Werkzeugkette bauen; Qt 5.15 als Migrationsbasis prüfen. Historische Build-Probleme und die Hilfsschritte im Prüfprotokoll dokumentieren.
 - [x] Vorhandene Tests ausführen und Ergebnisse festhalten. Zwei bestehende Playlist-Testfehler sind reproduziert.
-- [ ] Referenzbilder und Bedienabläufe erfassen: Hauptfenster, Menüs, Dialoge, Hover-/Pressed-Zustände, maximiert, Vollbild und veränderte Fenstergröße.
+- [x] Referenzbilder und Bedienabläufe erfassen: Hauptfenster, Menüs, Dialoge, Hover-/Pressed-Zustände, maximiert, Vollbild und veränderte Fenstergröße. Button-Zustände sind zusätzlich über die unveränderten Originalgrafiken und ihre CSS-Zuordnung referenziert.
 - [x] Falls installierte Version und untersuchter Commit abweichen, die Unterschiede festhalten und die Referenz für jedes betroffene Verhalten bestimmen. Installiertes 0.9.9 ist die Bedienreferenz; Master ist die technische Basis.
 
-Referenzbilder sind vorhanden. Die sechs Sprungbefehle für ±5, ±30 und ±100 Sekunden sowie Play/Pause und Titelwechsel wurden an der Testkopie geprüft. Die persönlichen Kernabläufe sind bestätigt und erste Start-/Ende-/Waveform-Zeiten gemessen. Einzel- und Mehrfach-Drops in leere und vorhandene Playlists bestehen den ergänzten Qt-Integrationstest. Ein echter Explorer-Drop und ein Live-Pressed-Zustand bleiben als GUI-Nachweise offen; die originalen Pressed-Assets und ihre CSS-Zuordnung wurden gesichert.
+Referenzbilder sind vorhanden. Die sechs Sprungbefehle für ±5, ±30 und ±100 Sekunden sowie Play/Pause und Titelwechsel wurden an der Testkopie geprüft. Die persönlichen Kernabläufe sind bestätigt und erste Start-/Ende-/Waveform-Zeiten gemessen. Einzel- und Mehrfach-Drops in leere und vorhandene Playlists bestehen den ergänzten Qt-Integrationstest. Der Nutzer hat den echten Explorer-Mehrfach-Drop erfolgreich durchgeführt; die hinzugefügten Einträge sind in der gespeicherten Playlist nachgewiesen. Für Normal-, Hover- und Pressed-Zustände liegen 21 unveränderte Originalgrafiken mit Zuordnung, Prüfsummen und lokaler Referenzgalerie vor.
 
 **Abnahme:** Quellcodebasis, ausführbare Referenz, Werkzeugkette und Testprofil sind dokumentiert. Der aktive Skin und die persönlichen Kernabläufe sind bekannt. Noch offene Build-Blocker sind ausdrücklich benannt.
 
@@ -185,7 +185,7 @@ Jede Phase endet mit einem dokumentierten Commit und einem kurzen Prüfprotokoll
 | Erste Rust-Komponente und Art der Anbindung | Phase 5 |
 | Linux-/macOS-Paketierung, endgültiger Name und spätere Funktionen | Nach Windows-Migrationsetappe |
 
-Als Nächstes werden die offenen Punkte der Phase-0-Abnahme abgeschlossen. Anschließend wird der Qt-6-Skin-Prototyp zum ersten technischen Entscheidungspunkt. Erst dessen Ergebnisse erlauben eine belastbare Aufwandsplanung. Dieser Plan enthält daher keine festen Terminzusagen.
+Der nächste Umsetzungsschritt ist der Qt-6-Skin-Prototyp aus Phase 1. Er beginnt mit dem persönlich verwendeten Slim-Skin. Erst dessen Ergebnisse erlauben eine belastbare Aufwandsplanung. Dieser Plan enthält daher keine festen Terminzusagen.
 
 ## 8. Quellen
 

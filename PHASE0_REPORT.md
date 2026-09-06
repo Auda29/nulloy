@@ -1,6 +1,6 @@
 # Phase 0: Vergleichsbasis und Build-Befunde
 
-Stand: 6. September 2026. Status: technische Bestandsaufnahme und ergänzende Messungen durchgeführt. Persönliche Kernabläufe sind bestätigt, Originaleinstellungen wiederhergestellt. Die vollständige Abnahme ist wegen der unten beschriebenen GUI-Nachweise noch offen.
+Stand: 6. September 2026. Status: Phase 0 abgeschlossen. Vergleichsbasis, Build, Tests und erste Zeitmessungen sind dokumentiert. Persönliche Kernabläufe und der manuelle Mehrfach-Drop sind bestätigt; die Originaleinstellungen sind wiederhergestellt. Bekannte Ausgangsfehler und Grenzen der Nachweise stehen ausdrücklich im Bericht.
 
 ## Quellstand und Vergleichsentscheidung
 
@@ -130,7 +130,7 @@ Alle genannten Dateien liegen privat unter `.phase0/screenshots`. Die zugehörig
 | Vollbild | `15-fullscreen-visible` zeigt die tatsächlich sichtbare Vollbildansicht; ältere Aufnahme `08-fullscreen` wegen eingeblendeter Taskleiste nicht für einen pixelgenauen Vergleich verwenden |
 | Maximiert / wiederhergestellt / verkleinert | `09-maximized-testcopy`, `12-restored`, `13-resized` |
 | Play-Hover | `10-play-hover` |
-| Pressed-Grafiken | Originale Slim-0.9-Assets unter `.phase0/reference/slim-0.9-assets`; kein belastbares Live-Bild des gesamten gedrückten Fensters |
+| Button-Zustände | 21 originale Normal-/Hover-/Pressed-Grafiken unter `.phase0/reference/slim-0.9-assets`; zugehörige Galerie `.phase0/reference/BUTTON_REFERENCE.html` und versionierte Prüfsummen |
 | Waveform-Klick während Pause | `14-waveform-click-paused`; Slider verändert, Zeittext nicht unmittelbar aktualisiert |
 | Leertaste und pausierter Sprung | `16-space-shortcut` zeigt Pause bei 0:31; `17-shift-right-paused` weiterhin 0:31; `18-resumed-after-jump` laufende Wiedergabe bei 0:42. Play/Pause ist damit beobachtet, die exakte Sprungweite wegen verstrichener Zeit zwischen Aktionen nicht gemessen. |
 | Master-Build | `20-upstream-built-main`, `21-upstream-built-after-play` |
@@ -154,7 +154,9 @@ Die Abweichungen liegen innerhalb der sekundengenauen Anzeige und asynchronen UI
 
 V stoppt die Wiedergabe und setzt den Slider an den Anfang. Der Zeittext zeigt zunächst noch die vorherige Position. X startet danach wieder am Titelanfang; C pausiert. Die Aufnahmen `24-stop-key`, `25-play-x-after-stop` und `26-pause-c` halten diese Zustände fest. Zusammen mit dem vorherigen Leertastentest sind damit die konfigurierten Grundbefehle geprüft.
 
-Die sieben vorhandenen Pressed-Bilder sowie Form und Skript sind zusätzlich über [SHA-256](docs/phase0/pressed-assets.json) identifiziert. Die CSS-Zuordnungen stehen direkt in der gesicherten `form.ui`; das Skript wechselt im Spielzustand auf `pause-press.png`. Die verfügbare App-Steuerung bietet keinen gehaltenen Mausdruck. Deshalb bleibt die Live-Aufnahme eines gedrückten Buttons als klar begrenzte Lücke offen, während die unveränderten Bildressourcen als statische Vergleichsbasis vorliegen.
+Die sieben vorhandenen Pressed-Bilder sowie Form und Skript sind zusätzlich über [SHA-256](docs/phase0/pressed-assets.json) identifiziert. Die CSS-Zuordnungen stehen direkt in der gesicherten `form.ui`; das Skript wechselt im Spielzustand auf `pause-press.png`. Die vollständige [Zustandsreferenz](docs/phase0/button-reference-manifest.json) umfasst 21 originale PNG-Dateien. Die lokale Galerie `.phase0/reference/BUTTON_REFERENCE.html` zeigt sie ohne Bildänderungen in natürlicher Größe nebeneinander und nennt Urheber und Lizenz.
+
+Eine zusätzliche Live-Gesamtfensteraufnahme mit gehaltenem Mausdruck wurde zuvor zu streng als eigenes Abschlusskriterium geführt. Der Migrationsplan verlangt Referenzbilder der Zustände. Dafür liegen die tatsächlich verwendeten Originalgrafiken mit ihrer nachgewiesenen Skin-Zuordnung vor. Die Galerie ist ausdrücklich kein Live-Screenshot und belegt keine Ereignisfolge unter Qt 6. Dessen tatsächliches Hover-/Pressed-Verhalten bleibt Bestandteil der vorgesehenen Skin- und Laufzeitvergleiche in Phase 1 und 3.
 
 ## Persönliche Kernabläufe: Drop und Geschwindigkeit
 
@@ -164,7 +166,7 @@ Der neue [Qt-Integrationstest](tests/testFileDrop.cpp) schickt externe `text/uri
 
 Alle vier Fälle bestehen. QtTest meldet einschließlich Initialisierung und Abschluss **6 bestanden, 0 fehlgeschlagen**, siehe [Testergebnis](docs/phase0/testFileDrop.txt). Das ist ein gezielter neuer Referenztest gegen den gebauten Master auf Qt 5.15.19. Die zwei unveränderten Upstream-Testprogramme und ihre bereits dokumentierten Fehler bleiben davon getrennt.
 
-Der tatsächliche Explorer-Drop in die installierte 0.9.9-Kopie konnte durch die App-Steuerung nicht ausgeführt werden. Das Werkzeug lehnt ein Drag-Ziel außerhalb des Quellfensters beziehungsweise über einem anderen Prozess ab. Es erfolgte kein erfolgreicher Drop; die Testplaylist enthält weiterhin zwei Einträge. Ein interner Qt-Eventtest belegt nicht den vollständigen Windows-OLE-Weg. Die zwei Testdateien und die Testkopie sind für einen manuellen Nachweis vorbereitet.
+Die App-Steuerung konnte den tatsächlichen Explorer-Drop nicht selbst ausführen, weil sie Drag-Ziele außerhalb des Quellfensters beziehungsweise über einem anderen Prozess ablehnt. Der Nutzer führte den vorbereiteten Mehrfach-Drop anschließend in der 0.9.9-Testkopie durch und bestätigte den Erfolg. Nach dem Schließen enthält die gespeicherte Playlist sechs Einträge, `reference-1.mp3` und `reference-2.mp3` jeweils dreimal. Zuvor waren zwei Einträge vorhanden. Damit sind hinzugefügte Dateien und ihre Persistenz belegt. Die Anzahl der einzelnen Drag-Gesten wurde nicht aufgezeichnet. Der [manuelle Nachweis](docs/phase0/manual-drop-verification.json) hält Bestätigung, gespeicherte Einträge und Playlist-Prüfsumme fest. Dieser Nachweis ergänzt den Qt-Test um die tatsächliche Bedienung über Explorer.
 
 Für die Wiederholung des zusätzlichen Tests werden `tests/testFileDrop.cpp` und `tests/testFileDrop.pro` aus diesem Arbeitsstand in das `tests`-Verzeichnis eines über `build-baseline.ps1` vorbereiteten Builds kopiert. Mit derselben dokumentierten MSYS2-Umgebung dort `qmake-qt5 testFileDrop.pro -o Makefile.FileDrop` und `mingw32-make -f Makefile.FileDrop -j4` ausführen. Danach aus dem Build-Hauptverzeichnis `testFileDrop.exe -o 'filedrop-result.txt,txt'` starten. Die bestehenden WAV-Fixtures und das GStreamer-Testplugin mit `fakesink` werden weiterverwendet. Der ursprüngliche Baseline-Helfer exportiert bewusst den festgelegten Upstream-Commit und enthält diesen später ergänzten Test daher nicht automatisch.
 
@@ -195,7 +197,7 @@ Vor einer Migrationsabnahme werden dieselben Messpunkte mit mehreren Wiederholun
 
 Quellbasis, laufende Originalkopie, Toolchain, Testprofil und bestehende Fehler sind dokumentiert. Die nächste technische Etappe bleibt der Qt-6-Skin-Prototyp mit Slim als erster Referenz. Ein vollständiger Rust-Rewrite wurde nicht beschlossen.
 
-Vor dem vollständigen Abschluss von Phase 0 bleiben der echte Explorer-Mehrfach-Drop und die Live-Pressed-Aufnahme als GUI-Nachweise offen. Die persönlichen Prioritäten und die Wiederherstellung der Originalposition sind erledigt. Die zwei vorhandenen Testfehler und die Auffälligkeit im Master-Build dürfen als ausdrücklich bekannte Ausgangsfehler in die nächsten Phasen übernommen werden. Sie gelten nicht als erfolgreiche Funktionsabnahme.
+Die Abnahmekriterien von Phase 0 sind erfüllt. Die zwei vorhandenen Testfehler und die Auffälligkeit im Master-Build werden als ausdrücklich bekannte Ausgangsfehler in die nächsten Phasen übernommen. Das ist keine Freigabe eines neuen Player-Releases. Die Referenz bleibt die installierte Version 0.9.9; die nächste Arbeit ist der Qt-6-Skin-Prototyp.
 
 ### Abnahmeprüfung gegen den Plan
 
@@ -207,8 +209,8 @@ Vor dem vollständigen Abschluss von Phase 0 bleiben der echte Explorer-Mehrfach
 | Getrennte Installation, Profil-, Playlist- und Medienkopien | `.phase0/reference`, `.phase0/private`, `.phase0/media`; Wiederherstellungsnachweis | Erfüllt; Originaldateien wieder vollständig hashgleich |
 | Originalcode mit dokumentierter Toolchain bauen | Erfolgreicher Erstbuild und Wiederholung über Build-Helfer; 340 Dateien bytegleich zum Archiv | Erfüllt mit dokumentierten Windows-Workarounds |
 | Vorhandene Tests ausführen | Zwei Testprogramme, unabhängiger Neubuild mit denselben Ergebnissen | Erfüllt; zwei Baseline-Fehler offen dokumentiert |
-| UI-Zustände und Bedienabläufe erfassen | Screenshots, Shortcut-Messungen, Original-Pressed-Assets, ergänzter Qt-Drop-Test | Echter Explorer-Drop und Live-Pressed-Aufnahme offen |
+| UI-Zustände und Bedienabläufe erfassen | Screenshots, Shortcut-Messungen, 21 Original-Buttonbilder mit Skin-Zuordnung, ergänzter Qt-Drop-Test und bestätigter Explorer-Drop | Erfüllt; Ressourcenreferenz und Live-Nachweise sind getrennt gekennzeichnet |
 | Abweichung zwischen Installation und Commit bewerten | Vergleich mit Tag 0.9.9; Bedienreferenz ausdrücklich festgelegt | Erfüllt |
 | Persönliche Kernabläufe bekannt | Vom Nutzer ausdrücklich genannt; Drop-Test und erste Geschwindigkeitsmessungen ergänzt | Erfüllt |
 
-Die Restpunkte rechtfertigen keine Behauptung, Phase 0 sei bereits vollständig abgeschlossen. Der letzte lokale Commit ist ein gesicherter Arbeitsstand.
+Die vorhandenen Build-Workarounds, Baseline-Testfehler, Metadatenauffälligkeit und Messgrenzen bleiben im Bericht erhalten. Sie werden bei späteren Vergleichen nicht stillschweigend als behobene Fehler oder erfolgreiche Release-Abnahme behandelt.
