@@ -1,0 +1,25 @@
+********* Start testing of TestPlaylistWidget *********
+Config: Using QtTest library 5.15.19, Qt 5.15.19 (x86_64-little_endian-llp64 shared (dynamic) release build; by GCC 16.1.0), windows 11
+QDEBUG : TestPlaylistWidget::initTestCase() found container "GStreamer" :
+QDEBUG : TestPlaylistWidget::initTestCase() * PlaybackEngine
+QDEBUG : TestPlaylistWidget::initTestCase() * WaveformBuilder
+QDEBUG : TestPlaylistWidget::initTestCase() found container "TagLib" :
+QDEBUG : TestPlaylistWidget::initTestCase() * TagReader
+QDEBUG : TestPlaylistWidget::initTestCase() * CoverReader
+QDEBUG : TestPlaylistWidget::initTestCase() registering plugin: "NPlaybackEngineGStreamer"
+QDEBUG : TestPlaylistWidget::initTestCase() registering plugin: "NWaveformBuilderGstreamer"
+QDEBUG : TestPlaylistWidget::initTestCase() registering plugin: "NTagReaderTaglib"
+QDEBUG : TestPlaylistWidget::initTestCase() registering plugin: "NCoverReaderTaglib"
+PASS   : TestPlaylistWidget::initTestCase()
+FAIL!  : TestPlaylistWidget::testPlaylistRemoval() Compared values are not the same
+   Actual   (m_playlistWidget->count()): 10
+   Expected (9)                        : 9
+testPlaylistWidget.cpp(83) : failure location
+PASS   : TestPlaylistWidget::testAutoPlay()
+FAIL!  : TestPlaylistWidget::testRepeat() Compared values are not the same
+   Actual   (m_playlistWidget->count()): 10
+   Expected (1)                        : 1
+testPlaylistWidget.cpp(211) : failure location
+PASS   : TestPlaylistWidget::cleanupTestCase()
+Totals: 3 passed, 2 failed, 0 skipped, 0 blacklisted, 1777ms
+********* Finished testing of TestPlaylistWidget *********

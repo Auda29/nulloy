@@ -1,0 +1,30 @@
+{
+    "architecture": "x86_64",
+    "os": "Windows 11 Version 2009",
+    "platform": "windows",
+    "qtRuntime": "5.15.19",
+    "screens": [
+        {
+            "devicePixelRatio": 1,
+            "height": 1080,
+            "logicalDpi": 110,
+            "name": "\\\\.\\DISPLAY1",
+            "primary": true,
+            "refreshRate": 144,
+            "width": 1920,
+            "x": 0,
+            "y": 0
+        },
+        {
+            "devicePixelRatio": 1,
+            "height": 1080,
+            "logicalDpi": 110,
+            "name": "\\\\.\\DISPLAY2",
+            "primary": false,
+            "refreshRate": 75,
+            "width": 1920,
+            "x": 1920,
+            "y": 0
+        }
+    ]
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "tree": "built-source",
+    "upstreamFiles": 340,
+    "changedOrMissing": []
+  },
+  {
+    "tree": "working-tree",
+    "upstreamFiles": 340,
+    "changedOrMissing": [
+      ".gitignore"
+    ]
+  }
+]
