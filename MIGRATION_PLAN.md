@@ -14,6 +14,8 @@ Wir modernisieren Nulloys technischen Unterbau und schaffen eine Grundlage für 
 
 Das umfasst Layout, Farben, Icons, Skins, Waveform-Darstellung, Menüs, Dialoge, Tastenkürzel, Drag-and-drop und Fensterverhalten. Auch die bisherige Auswahl an Ansichten und Einstellungen bleibt erhalten. Technische Änderungen an UI-Code sind zulässig, wenn sie dieses Verhalten erhalten.
 
+Die vom Nutzer bestätigten Kernabläufe sind das Einfügen neuer Tracks per Drag-and-drop, ausdrücklich auch mehrerer Dateien gleichzeitig, schnelles Öffnen und Schließen sowie schnelles Laden der Waveform. Diese Abläufe haben Vorrang bei den Migrationsvergleichen. Start, Ende und Waveform mit beziehungsweise ohne vorhandenen Nulloy-Cache werden getrennt gemessen. Erste Referenzwerte stehen im Phase-0-Protokoll.
+
 Die erste Etappe endet mit einer unter Windows nutzbaren 64-Bit-Version auf Qt 6 und CMake. Danach erproben wir eine abgegrenzte Rust-Komponente hinter der bestehenden Qt-/C++-Oberfläche. Ein vollständiger Rewrite ist kein beschlossenes Ziel.
 
 Nicht Teil dieser Etappe sind ein Redesign, neue Funktionen, ein neues Skin-Format, ein Austausch der Audio-Engine oder die gleichzeitige Veröffentlichung für alle Betriebssysteme. Name und Branding werden separat entschieden. Linux- und macOS-Code bleiben Bestandteil des Projekts.
@@ -61,13 +63,13 @@ Versionen von Compiler, Qt, CMake, Bibliotheken und später Rust werden mit Bezu
 - [x] Fork in den lokalen Projektordner übernehmen und vorhandene Dokumente erhalten.
 - [x] `origin` auf den eigenen Fork und `upstream` auf `nulloy/nulloy` setzen. Upstream-Historie bewahren; Arbeitszweige unter `codex/` verwenden.
 - [x] Installierte Nulloy-Version, aktiven Skin, Einstellungen, Backend, Windows-Version und DPI-Skalierung feststellen. Keine dieser Angaben aus dokumentierten Defaults ableiten.
-- [x] Eine getrennte Testinstallation und Kopien von Einstellungen, Playlists und Testmedien vorbereiten. Die täglich verwendete Installation bleibt die Vergleichsbasis. Die unbeabsichtigte Änderung ihrer gespeicherten Position ist im Prüfprotokoll dokumentiert und noch zu klären.
+- [x] Eine getrennte Testinstallation und Kopien von Einstellungen, Playlists und Testmedien vorbereiten. Die täglich verwendete Installation bleibt die Vergleichsbasis. Die unbeabsichtigte Positionsänderung wurde nach Rückmeldung des Nutzers zurückgesetzt; alle 102 geschützten Originaldateien stimmen mit der Sicherung überein.
 - [x] Originalquellcode mit dokumentierter Werkzeugkette bauen; Qt 5.15 als Migrationsbasis prüfen. Historische Build-Probleme und die Hilfsschritte im Prüfprotokoll dokumentieren.
 - [x] Vorhandene Tests ausführen und Ergebnisse festhalten. Zwei bestehende Playlist-Testfehler sind reproduziert.
 - [ ] Referenzbilder und Bedienabläufe erfassen: Hauptfenster, Menüs, Dialoge, Hover-/Pressed-Zustände, maximiert, Vollbild und veränderte Fenstergröße.
 - [x] Falls installierte Version und untersuchter Commit abweichen, die Unterschiede festhalten und die Referenz für jedes betroffene Verhalten bestimmen. Installiertes 0.9.9 ist die Bedienreferenz; Master ist die technische Basis.
 
-Referenzbilder sind vorhanden. Die sechs Sprungbefehle für ±5, ±30 und ±100 Sekunden sowie Play/Pause und Titelwechsel wurden an der Testkopie geprüft. Ein Live-Pressed-Zustand bleibt offen; die originalen Pressed-Assets und ihre CSS-Zuordnung wurden gesichert. Die persönliche Priorisierung der Kernabläufe und der Umgang mit der veränderten Originalposition benötigen noch eine Antwort des Nutzers.
+Referenzbilder sind vorhanden. Die sechs Sprungbefehle für ±5, ±30 und ±100 Sekunden sowie Play/Pause und Titelwechsel wurden an der Testkopie geprüft. Die persönlichen Kernabläufe sind bestätigt und erste Start-/Ende-/Waveform-Zeiten gemessen. Einzel- und Mehrfach-Drops in leere und vorhandene Playlists bestehen den ergänzten Qt-Integrationstest. Ein echter Explorer-Drop und ein Live-Pressed-Zustand bleiben als GUI-Nachweise offen; die originalen Pressed-Assets und ihre CSS-Zuordnung wurden gesichert.
 
 **Abnahme:** Quellcodebasis, ausführbare Referenz, Werkzeugkette und Testprofil sind dokumentiert. Der aktive Skin und die persönlichen Kernabläufe sind bekannt. Noch offene Build-Blocker sind ausdrücklich benannt.
 
@@ -175,7 +177,7 @@ Jede Phase endet mit einem dokumentierten Commit und einem kurzen Prüfprotokoll
 
 | Entscheidung | Zeitpunkt |
 |---|---|
-| Aktive Nulloy-Version, Skin, externe Skins, Backend und persönliche Kernabläufe | Phase 0 |
+| Aktive Nulloy-Version, Skin, Backend und persönliche Kernabläufe | In Phase 0 festgestellt und vom Nutzer priorisiert; siehe Prüfprotokoll |
 | Qt-Version, Compiler, Bibliotheksversionen und unterstützte Windows-Versionen | Phase 1 |
 | Genaue Lösung für Skript-Kompatibilität und Skin-Ressourcen | Phase 1 |
 | Grenzen für Screenshot- und Leistungstoleranzen | Nach Baseline, vor jeweiliger Migration |

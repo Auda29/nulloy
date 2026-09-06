@@ -1,6 +1,6 @@
 # Phase 0: Vergleichsbasis und Build-Befunde
 
-Stand: 6. September 2026. Status: technische Bestandsaufnahme durchgeführt, Abschluss noch offen. Zur vollständigen Abnahme fehlen die Bestätigung der persönlichen Kernabläufe und die Entscheidung zur Wiederherstellung der unten beschriebenen Originaleinstellung.
+Stand: 6. September 2026. Status: technische Bestandsaufnahme und ergänzende Messungen durchgeführt. Persönliche Kernabläufe sind bestätigt, Originaleinstellungen wiederhergestellt. Die vollständige Abnahme ist wegen der unten beschriebenen GUI-Nachweise noch offen.
 
 ## Quellstand und Vergleichsentscheidung
 
@@ -32,7 +32,7 @@ Die [Integritätsprüfung](docs/phase0/source-integrity.json) vergleicht alle 34
 
 Die Anzeigeangaben stammen aus einer ausgeführten Qt-Abfrage, siehe [Messwerte](docs/phase0/display-environment.json) und [Probe](tools/phase0/display-probe.cpp). Device-Pixel-Ratio 1 bedeutet hier nicht, dass Windows auf 100 % steht. Ältere Profile unter anderen Pfaden wurden gefunden, aber nicht als aktive Konfiguration verwendet.
 
-Aus der Konfiguration ergeben sich als zu prüfende Abläufe das Öffnen lokaler Audiodateien, Playlist-Wiederherstellung, Play/Pause, Waveform-Seeking und die drei Sprungweiten. Die persönliche Gewichtung dieser Abläufe ist noch nicht vom Nutzer bestätigt. Die Belegung umfasst unter anderem X/C/Leertaste für Play/Pause, V für Stop, Z/B für vorherigen/nächsten Titel sowie F11 für Vollbild.
+Der Nutzer nennt ausdrücklich das Einfügen neuer Tracks per Drag-and-drop, auch mehrerer gleichzeitig, schnelles Öffnen und Schließen sowie schnelles Laden der Waveform als wichtigste Abläufe. Zusätzlich ergeben sich aus der Konfiguration Playlist-Wiederherstellung, Play/Pause und die drei Sprungweiten. Die Belegung umfasst unter anderem X/C/Leertaste für Play/Pause, V für Stop, Z/B für vorherigen/nächsten Titel sowie F11 für Vollbild.
 
 ## Getrennte Referenz und Datenschutz
 
@@ -42,15 +42,13 @@ In der Testkopie sind Einzelinstanz und immer im Vordergrund ausgeschaltet, der 
 
 Der gesamte Ordner `.phase0` ist von Git ausgeschlossen. Er enthält persönliche Titel, Pfade, Profile, Medien, Screenshots und vollständige lokale Logs. Diese Inhalte gehören nicht in einen öffentlichen Commit. Die Dateien unter `docs/phase0` enthalten technische Nachweise ohne die persönliche Playlist.
 
-### Offener Vorfall an der Originalinstallation
+### Wiederhergestellte Originalinstallation
 
 Ein Startversuch über die App-Steuerung öffnete unerwartet auch das registrierte Originalprogramm statt ausschließlich der angegebenen Kopie. Danach wurde jede weitere Testinstanz über den vollständigen Dateipfad gestartet und das Fenster anhand seines Prozesspfads geprüft.
 
 Der anschließende Vergleich von 102 geschützten Originaldateien zeigte genau eine Abweichung: In `Nulloy.cfg` änderte sich `PlaylistRow=47, 0.202023` zu `PlaylistRow=47, 0`. Die restlichen geprüften Dateien waren unverändert. Sicherung und Hashliste liegen unter `.phase0/private`.
 
-Die abschließende Hashkontrolle nach Schließen der Testkopie bestätigt dieselbe einzelne Dateiabweichung. Beide Testanwendungen sind geschlossen; die Originalinstanz ist weiterhin geöffnet.
-
-Die Originalinstanz wurde nicht zwangsweise beendet und ihre Konfiguration nicht blind zurückgeschrieben. Es ist noch offen, ob der Nutzer sie zwischenzeitlich selbst bedient hat. Die Rückfrage dazu bleibt erforderlich, damit eine Wiederherstellung keine neueren Nutzereingaben überschreibt. Bis zur Klärung wird die Originalumgebung ausdrücklich nicht als unverändert abgenommen.
+Der Nutzer bestätigte anschließend, den Player während der Tests nicht selbst bedient zu haben. Vor der Wiederherstellung war das Original bereits beendet; die Konfiguration entsprach weiterhin exakt der zuvor festgestellten Abweichung. Die gesicherte Originalkonfiguration wurde zurückkopiert. Die anschließende Prüfung bestätigt **102 von 102 Dateien ohne Abweichung**, siehe [Wiederherstellungsnachweis](docs/phase0/original-restoration.json). Der Vorfall ist damit behoben. Weitere Prüfungen verwenden ausschließlich die getrennte Kopie.
 
 ## Werkzeugkette und Build
 
@@ -158,11 +156,46 @@ V stoppt die Wiedergabe und setzt den Slider an den Anfang. Der Zeittext zeigt z
 
 Die sieben vorhandenen Pressed-Bilder sowie Form und Skript sind zusätzlich über [SHA-256](docs/phase0/pressed-assets.json) identifiziert. Die CSS-Zuordnungen stehen direkt in der gesicherten `form.ui`; das Skript wechselt im Spielzustand auf `pause-press.png`. Die verfügbare App-Steuerung bietet keinen gehaltenen Mausdruck. Deshalb bleibt die Live-Aufnahme eines gedrückten Buttons als klar begrenzte Lücke offen, während die unveränderten Bildressourcen als statische Vergleichsbasis vorliegen.
 
+## Persönliche Kernabläufe: Drop und Geschwindigkeit
+
+### Einzel- und Mehrfach-Drop
+
+Der neue [Qt-Integrationstest](tests/testFileDrop.cpp) schickt externe `text/uri-list`-Daten durch DragEnter-, DragMove- und Drop-Events an das echte Playlist-Widget. Er prüft jeweils einen beziehungsweise zwei Tracks in einer leeren und einer bereits vorhandenen Playlist. Dateipfade mit Leerzeichen und Umlaut, Reihenfolge, erhaltene bestehende Einträge und weiter vorhandene Quelldateien gehören zu den Prüfungen.
+
+Alle vier Fälle bestehen. QtTest meldet einschließlich Initialisierung und Abschluss **6 bestanden, 0 fehlgeschlagen**, siehe [Testergebnis](docs/phase0/testFileDrop.txt). Das ist ein gezielter neuer Referenztest gegen den gebauten Master auf Qt 5.15.19. Die zwei unveränderten Upstream-Testprogramme und ihre bereits dokumentierten Fehler bleiben davon getrennt.
+
+Der tatsächliche Explorer-Drop in die installierte 0.9.9-Kopie konnte durch die App-Steuerung nicht ausgeführt werden. Das Werkzeug lehnt ein Drag-Ziel außerhalb des Quellfensters beziehungsweise über einem anderen Prozess ab. Es erfolgte kein erfolgreicher Drop; die Testplaylist enthält weiterhin zwei Einträge. Ein interner Qt-Eventtest belegt nicht den vollständigen Windows-OLE-Weg. Die zwei Testdateien und die Testkopie sind für einen manuellen Nachweis vorbereitet.
+
+Für die Wiederholung des zusätzlichen Tests werden `tests/testFileDrop.cpp` und `tests/testFileDrop.pro` aus diesem Arbeitsstand in das `tests`-Verzeichnis eines über `build-baseline.ps1` vorbereiteten Builds kopiert. Mit derselben dokumentierten MSYS2-Umgebung dort `qmake-qt5 testFileDrop.pro -o Makefile.FileDrop` und `mingw32-make -f Makefile.FileDrop -j4` ausführen. Danach aus dem Build-Hauptverzeichnis `testFileDrop.exe -o 'filedrop-result.txt,txt'` starten. Die bestehenden WAV-Fixtures und das GStreamer-Testplugin mit `fakesink` werden weiterverwendet. Der ursprüngliche Baseline-Helfer exportiert bewusst den festgelegten Upstream-Commit und enthält diesen später ergänzten Test daher nicht automatisch.
+
+### Erste Zeitmessungen der installierten Referenzkopie
+
+Gemessen wurde die unveränderte x86-Anwendung 0.9.9 mit ihrem mitgelieferten Qt 5.15.2. Testdatei war `reference-1.mp3`, 3:19 Minuten, 7.993.594 Bytes, 320 kbit/s und 44,1 kHz. Es gab je einen Lauf mit leerem und vorhandenem Nulloy-Waveform-Cache. Der Windows-Dateicache wurde nicht geleert. Die Ergebnisse sind erste Referenzwerte, keine belastbaren Perzentile oder Aussagen über alle Medien und Playlistgrößen.
+
+| Messpunkt | Leerer Nulloy-Cache | Vorhandener Nulloy-Cache |
+|---|---:|---:|
+| Startaufruf bis Windows-Eingabebereitschaft | 568 ms | 505 ms |
+| Startaufruf bis neue, nicht leere Peaks-Datei | 1.465 ms | Nicht anwendbar, Datei vorhanden |
+| Schließaufruf über die App-Steuerung bis Prozessende | 186 ms | 234 ms |
+
+Die [Rohwerte](docs/phase0/reference-timings.json) enthalten UTC-Zeitpunkte und Messdefinitionen. Der [Messhelfer](tools/phase0/measure-reference.ps1) arbeitet ausschließlich mit der privaten Referenzkopie und sichert deren alten Peaks-Cache vor einer Kaltmessung. Beispiele:
+
+```powershell
+.\tools\phase0\measure-reference.ps1 -RunName eigener-kaltlauf -ColdWaveform
+.\tools\phase0\measure-reference.ps1 -RunName eigener-warmlauf
+```
+
+Die Kopie muss vor jedem Lauf geschlossen sein. Nach Erscheinen der Messwerte wird sie innerhalb von 60 Sekunden normal über ihre Oberfläche geschlossen, damit der Helfer das Prozessende protokollieren kann. Die Zeit des tatsächlichen Schließaufrufs muss zusätzlich erfasst werden; sie ist kein vom Helfer ausgelöster automatischer Klick.
+
+`WaitForInputIdle` beweist keine vollständig gezeichnete Oberfläche. Die Peaks-Datei ist ein Näherungswert für die abgeschlossene Berechnung, kein Frame-Zeitstempel. Der betreffende Cache-Code ist zwischen Tag 0.9.9 und dem untersuchten Master unverändert und speichert nur abgeschlossene Peaks. Die erzeugte Datei wurde zusätzlich erfolgreich dekomprimiert; deklarierte und tatsächliche Nutzdatenlänge betragen jeweils 17.295 Bytes. `27-cold-waveform` und `28-warm-waveform` zeigen danach die vollständige Waveform. Die Schließzeiten enthalten den Aufrufweg der App-Steuerung und sind deshalb keine isolierten internen Shutdown-Zeiten.
+
+Vor einer Migrationsabnahme werden dieselben Messpunkte mit mehreren Wiederholungen, längeren Tracks und einer repräsentativen großen Playlist verglichen. Nulloy-Cache, Windows-Dateicache und laufende Waveform-Berechnung beim Beenden müssen getrennt betrachtet werden. Die heutigen Einzelmessungen legen noch keine verbindliche Regressionstoleranz fest.
+
 ## Abschlusskriterien und nächste Entscheidung
 
 Quellbasis, laufende Originalkopie, Toolchain, Testprofil und bestehende Fehler sind dokumentiert. Die nächste technische Etappe bleibt der Qt-6-Skin-Prototyp mit Slim als erster Referenz. Ein vollständiger Rust-Rewrite wurde nicht beschlossen.
 
-Vor dem vollständigen Abschluss von Phase 0 bleiben die persönlichen Kernabläufe zu bestätigen, die Live-Pressed-Aufnahme zu ergänzen sowie die Änderung der Originalposition mit dem Nutzer zu klären. Die zwei vorhandenen Testfehler und die Auffälligkeit im Master-Build dürfen als ausdrücklich bekannte Ausgangsfehler in die nächsten Phasen übernommen werden. Sie gelten nicht als erfolgreiche Funktionsabnahme.
+Vor dem vollständigen Abschluss von Phase 0 bleiben der echte Explorer-Mehrfach-Drop und die Live-Pressed-Aufnahme als GUI-Nachweise offen. Die persönlichen Prioritäten und die Wiederherstellung der Originalposition sind erledigt. Die zwei vorhandenen Testfehler und die Auffälligkeit im Master-Build dürfen als ausdrücklich bekannte Ausgangsfehler in die nächsten Phasen übernommen werden. Sie gelten nicht als erfolgreiche Funktionsabnahme.
 
 ### Abnahmeprüfung gegen den Plan
 
@@ -171,11 +204,11 @@ Vor dem vollständigen Abschluss von Phase 0 bleiben die persönlichen Kernablä
 | Lokale Arbeitskopie, vollständige Historie, Dokumente erhalten | Git-Branch und Quellstand; Plan und Bericht versioniert | Erfüllt |
 | origin, upstream, codex-Arbeitsbranch | Lokale Git-Konfiguration | Erfüllt |
 | Installierte Version, Skin, Profil, Backend, Windows, DPI | Tatsächliche Installation, Profilkopie, GUI und Display-Probe | Erfüllt |
-| Getrennte Installation, Profil-, Playlist- und Medienkopien | `.phase0/reference`, `.phase0/private`, `.phase0/media` | Kopien erstellt; unbeabsichtigte Änderung der Originalposition noch ungeklärt |
+| Getrennte Installation, Profil-, Playlist- und Medienkopien | `.phase0/reference`, `.phase0/private`, `.phase0/media`; Wiederherstellungsnachweis | Erfüllt; Originaldateien wieder vollständig hashgleich |
 | Originalcode mit dokumentierter Toolchain bauen | Erfolgreicher Erstbuild und Wiederholung über Build-Helfer; 340 Dateien bytegleich zum Archiv | Erfüllt mit dokumentierten Windows-Workarounds |
 | Vorhandene Tests ausführen | Zwei Testprogramme, unabhängiger Neubuild mit denselben Ergebnissen | Erfüllt; zwei Baseline-Fehler offen dokumentiert |
-| UI-Zustände und Bedienabläufe erfassen | Screenshots, Shortcut-Messungen, Original-Pressed-Assets | Live-Pressed-Aufnahme offen |
+| UI-Zustände und Bedienabläufe erfassen | Screenshots, Shortcut-Messungen, Original-Pressed-Assets, ergänzter Qt-Drop-Test | Echter Explorer-Drop und Live-Pressed-Aufnahme offen |
 | Abweichung zwischen Installation und Commit bewerten | Vergleich mit Tag 0.9.9; Bedienreferenz ausdrücklich festgelegt | Erfüllt |
-| Persönliche Kernabläufe bekannt | Aus Einstellungen abgeleitete Abläufe geprüft | Persönliche Priorisierung noch nicht bestätigt |
+| Persönliche Kernabläufe bekannt | Vom Nutzer ausdrücklich genannt; Drop-Test und erste Geschwindigkeitsmessungen ergänzt | Erfüllt |
 
 Die Restpunkte rechtfertigen keine Behauptung, Phase 0 sei bereits vollständig abgeschlossen. Der letzte lokale Commit ist ein gesicherter Arbeitsstand.

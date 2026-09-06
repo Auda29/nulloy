@@ -1,0 +1,30 @@
+[
+  {
+    "RunName": "cold-1",
+    "ColdNulloyWaveformCache": true,
+    "OSFileCacheCleared": false,
+    "StartIssuedUtc": "2026-09-06T16:26:58.4925937Z",
+    "ProcessId": 35396,
+    "InputIdle": true,
+    "StartToInputIdleMs": 568.3065,
+    "StartToNonemptyPeaksFileMs": 1465.1757,
+    "ExitUtc": "2026-09-06T16:27:37.9073833Z",
+    "Note": "InputIdle is not first paint. Peaks-file timing is a cache-completion proxy, not a rendered-frame timestamp. Close through the normal UI within 60 seconds.",
+    "CloseIssuedUtc": "2026-09-06T16:27:37.721Z",
+    "CloseDispatchToExitMs": 186.3833
+  },
+  {
+    "RunName": "warm-1",
+    "ColdNulloyWaveformCache": false,
+    "OSFileCacheCleared": false,
+    "StartIssuedUtc": "2026-09-06T16:27:53.9781268Z",
+    "ProcessId": 18048,
+    "InputIdle": true,
+    "StartToInputIdleMs": 505.2995,
+    "StartToNonemptyPeaksFileMs": null,
+    "ExitUtc": "2026-09-06T16:28:50.36537Z",
+    "Note": "InputIdle is not first paint. Peaks-file timing is a cache-completion proxy, not a rendered-frame timestamp. Close through the normal UI within 60 seconds.",
+    "CloseIssuedUtc": "2026-09-06T16:28:50.131Z",
+    "CloseDispatchToExitMs": 234.37
+  }
+]
