@@ -137,10 +137,45 @@ Alle genannten Dateien liegen privat unter `.phase0/screenshots`. Die zugehörig
 | Leertaste und pausierter Sprung | `16-space-shortcut` zeigt Pause bei 0:31; `17-shift-right-paused` weiterhin 0:31; `18-resumed-after-jump` laufende Wiedergabe bei 0:42. Play/Pause ist damit beobachtet, die exakte Sprungweite wegen verstrichener Zeit zwischen Aktionen nicht gemessen. |
 | Master-Build | `20-upstream-built-main`, `21-upstream-built-after-play` |
 
-`09-maximized` ohne Zusatz `testcopy` zeigt versehentlich die Originalinstanz. Diese Aufnahme ist keine Testreferenz und darf nicht als solche verglichen werden. Die Sprungversuche `04-*` und `11-jump5` belegen keine erfolgreiche exakte 5-Sekunden-Änderung. Der sichtbare Zeittext blieb im pausierten Zustand unverändert. Eine vollständige Prüfung der Tastenkürzel steht damit aus.
+`09-maximized` ohne Zusatz `testcopy` zeigt versehentlich die Originalinstanz. Diese Aufnahme ist keine Testreferenz und darf nicht als solche verglichen werden. Die frühen Sprungversuche `04-*` und `11-jump5` sind durch die nachfolgenden Messungen ergänzt, ohne den unveränderten Zeittext während Pause als Fehler zu bewerten.
+
+### Ergänzende Shortcut-Messungen
+
+Alle sechs Sprungbefehle wurden anschließend während laufender Wiedergabe an der getrennten 0.9.9-Kopie geprüft. Die [Beobachtungen](docs/phase0/shortcut-observations.json) enthalten die sichtbaren Zeiten vor und nach dem Tastendruck sowie die dazwischen vergangene Wandzeit. Aus der Positionsänderung abzüglich Wandzeit ergeben sich folgende Werte:
+
+| Befehl | Erwarteter Sprung | Beobachteter Sprung, gerundet |
+|---|---:|---:|
+| Shift + Rechts | +5 s | +4,2 s |
+| Rechts | +30 s | +29,7 s |
+| Strg + Links | −100 s | −100,6 s |
+| Strg + Rechts | +100 s | +99,3 s |
+| Links | −30 s | −30,3 s |
+| Shift + Links | −5 s | −4,6 s |
+
+Die Abweichungen liegen innerhalb der sekundengenauen Anzeige und asynchronen UI-Abfrage. Dies bestätigt Richtung und Größenordnung der konfigurierten Sprünge, keine samplegenaue Seek-Präzision. B wechselt zur zweiten Testdatei, Z zurück zur ersten; die Bilder `22-next-key` und `23-prev-key` belegen die Titelwechsel.
+
+V stoppt die Wiedergabe und setzt den Slider an den Anfang. Der Zeittext zeigt zunächst noch die vorherige Position. X startet danach wieder am Titelanfang; C pausiert. Die Aufnahmen `24-stop-key`, `25-play-x-after-stop` und `26-pause-c` halten diese Zustände fest. Zusammen mit dem vorherigen Leertastentest sind damit die konfigurierten Grundbefehle geprüft.
+
+Die sieben vorhandenen Pressed-Bilder sowie Form und Skript sind zusätzlich über [SHA-256](docs/phase0/pressed-assets.json) identifiziert. Die CSS-Zuordnungen stehen direkt in der gesicherten `form.ui`; das Skript wechselt im Spielzustand auf `pause-press.png`. Die verfügbare App-Steuerung bietet keinen gehaltenen Mausdruck. Deshalb bleibt die Live-Aufnahme eines gedrückten Buttons als klar begrenzte Lücke offen, während die unveränderten Bildressourcen als statische Vergleichsbasis vorliegen.
 
 ## Abschlusskriterien und nächste Entscheidung
 
 Quellbasis, laufende Originalkopie, Toolchain, Testprofil und bestehende Fehler sind dokumentiert. Die nächste technische Etappe bleibt der Qt-6-Skin-Prototyp mit Slim als erster Referenz. Ein vollständiger Rust-Rewrite wurde nicht beschlossen.
 
-Vor dem vollständigen Abschluss von Phase 0 bleiben die persönlichen Kernabläufe zu bestätigen, die offenen UI-Aufnahmen und Shortcut-Prüfungen zu vervollständigen sowie die Änderung der Originalposition mit dem Nutzer zu klären. Die zwei vorhandenen Testfehler und die Auffälligkeit im Master-Build dürfen als ausdrücklich bekannte Ausgangsfehler in die nächsten Phasen übernommen werden. Sie gelten nicht als erfolgreiche Funktionsabnahme.
+Vor dem vollständigen Abschluss von Phase 0 bleiben die persönlichen Kernabläufe zu bestätigen, die Live-Pressed-Aufnahme zu ergänzen sowie die Änderung der Originalposition mit dem Nutzer zu klären. Die zwei vorhandenen Testfehler und die Auffälligkeit im Master-Build dürfen als ausdrücklich bekannte Ausgangsfehler in die nächsten Phasen übernommen werden. Sie gelten nicht als erfolgreiche Funktionsabnahme.
+
+### Abnahmeprüfung gegen den Plan
+
+| Anforderung aus Phase 0 | Nachweis | Stand |
+|---|---|---|
+| Lokale Arbeitskopie, vollständige Historie, Dokumente erhalten | Git-Branch und Quellstand; Plan und Bericht versioniert | Erfüllt |
+| origin, upstream, codex-Arbeitsbranch | Lokale Git-Konfiguration | Erfüllt |
+| Installierte Version, Skin, Profil, Backend, Windows, DPI | Tatsächliche Installation, Profilkopie, GUI und Display-Probe | Erfüllt |
+| Getrennte Installation, Profil-, Playlist- und Medienkopien | `.phase0/reference`, `.phase0/private`, `.phase0/media` | Kopien erstellt; unbeabsichtigte Änderung der Originalposition noch ungeklärt |
+| Originalcode mit dokumentierter Toolchain bauen | Erfolgreicher Erstbuild und Wiederholung über Build-Helfer; 340 Dateien bytegleich zum Archiv | Erfüllt mit dokumentierten Windows-Workarounds |
+| Vorhandene Tests ausführen | Zwei Testprogramme, unabhängiger Neubuild mit denselben Ergebnissen | Erfüllt; zwei Baseline-Fehler offen dokumentiert |
+| UI-Zustände und Bedienabläufe erfassen | Screenshots, Shortcut-Messungen, Original-Pressed-Assets | Live-Pressed-Aufnahme offen |
+| Abweichung zwischen Installation und Commit bewerten | Vergleich mit Tag 0.9.9; Bedienreferenz ausdrücklich festgelegt | Erfüllt |
+| Persönliche Kernabläufe bekannt | Aus Einstellungen abgeleitete Abläufe geprüft | Persönliche Priorisierung noch nicht bestätigt |
+
+Die Restpunkte rechtfertigen keine Behauptung, Phase 0 sei bereits vollständig abgeschlossen. Der letzte lokale Commit ist ein gesicherter Arbeitsstand.

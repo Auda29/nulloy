@@ -67,7 +67,7 @@ Versionen von Compiler, Qt, CMake, Bibliotheken und später Rust werden mit Bezu
 - [ ] Referenzbilder und Bedienabläufe erfassen: Hauptfenster, Menüs, Dialoge, Hover-/Pressed-Zustände, maximiert, Vollbild und veränderte Fenstergröße.
 - [x] Falls installierte Version und untersuchter Commit abweichen, die Unterschiede festhalten und die Referenz für jedes betroffene Verhalten bestimmen. Installiertes 0.9.9 ist die Bedienreferenz; Master ist die technische Basis.
 
-Referenzbilder sind vorhanden. Vollständige Shortcut-Prüfung und ein Live-Pressed-Zustand sind noch offen; die originalen Pressed-Assets wurden gesichert. Die persönliche Priorisierung der Kernabläufe und der Umgang mit der veränderten Originalposition benötigen noch eine Antwort des Nutzers.
+Referenzbilder sind vorhanden. Die sechs Sprungbefehle für ±5, ±30 und ±100 Sekunden sowie Play/Pause und Titelwechsel wurden an der Testkopie geprüft. Ein Live-Pressed-Zustand bleibt offen; die originalen Pressed-Assets und ihre CSS-Zuordnung wurden gesichert. Die persönliche Priorisierung der Kernabläufe und der Umgang mit der veränderten Originalposition benötigen noch eine Antwort des Nutzers.
 
 **Abnahme:** Quellcodebasis, ausführbare Referenz, Werkzeugkette und Testprofil sind dokumentiert. Der aktive Skin und die persönlichen Kernabläufe sind bekannt. Noch offene Build-Blocker sind ausdrücklich benannt.
 
