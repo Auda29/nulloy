@@ -21,6 +21,8 @@
 #include "ui_form.h"
 #endif
 
+class QUiLoader;
+
 class NMainWindow : public QDialog
 {
     Q_OBJECT
@@ -55,11 +57,15 @@ private:
 #ifdef Q_OS_WIN
     bool m_framelessShadow;
     void updateFramelessShadow();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;
+#else
     bool nativeEvent(const QByteArray &eventType, void *message, long *result);
+#endif
 #endif
 
 public:
-    NMainWindow(const QString &uiFile = "", QWidget *parent = 0);
+    NMainWindow(const QString &uiFile = "", QWidget *parent = 0, QUiLoader *skinUiLoader = nullptr);
     ~NMainWindow();
     bool isOnTop();
 #ifdef Q_OS_WIN

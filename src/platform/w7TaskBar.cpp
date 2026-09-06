@@ -21,7 +21,11 @@
 #include <windows.h>
 
 #include <QIcon>
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+#include <QImage>
+#else
 #include <QtWin>
+#endif
 
 #if defined(__GNUC__)
 // mingw fails to define this
@@ -72,7 +76,11 @@ bool NW7TaskBar::isEnabled() const
     return _enabled;
 }
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+bool NW7TaskBar::nativeEvent(const QByteArray &eventType, void *message, qintptr *result)
+#else
 bool NW7TaskBar::nativeEvent(const QByteArray &eventType, void *message, long *result)
+#endif
 {
     Q_UNUSED(eventType);
     MSG *msg = reinterpret_cast<MSG *>(message);
@@ -137,7 +145,11 @@ void NW7TaskBar::setOverlayIcon(const QIcon &icon, const QString &text)
 
     HICON hIcon = NULL;
     if (!icon.isNull())
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+        hIcon = icon.pixmap(icon.availableSizes().first().width()).toImage().toHICON();
+#else
         hIcon = QtWin::toHICON(icon.pixmap(icon.availableSizes().first().width()));
+#endif
 
     wchar_t *wText = 0;
     wText = new wchar_t[text.length() + 1];

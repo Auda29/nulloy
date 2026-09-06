@@ -21,7 +21,6 @@
 #ifndef _N_NO_SKINS_
 #include <QUiLoader>
 
-#include "skinFileSystem.h"
 #endif
 
 #ifdef Q_OS_WIN
@@ -36,8 +35,13 @@
 #endif
 
 #include <QApplication>
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+#include <QScreen>
+#else
 #include <QDesktopWidget>
+#endif
 #include <QEvent>
+#include <QFile>
 #include <QIcon>
 #include <QLayout>
 #include <QTime>
@@ -45,7 +49,7 @@
 
 #define RESIZE_BORDER 5
 
-NMainWindow::NMainWindow(const QString &uiFile, QWidget *parent) : QDialog(parent)
+NMainWindow::NMainWindow(const QString &uiFile, QWidget *parent, QUiLoader *skinUiLoader) : QDialog(parent)
 {
 #ifdef Q_OS_WIN
     m_framelessShadow = false;
@@ -57,7 +61,7 @@ NMainWindow::NMainWindow(const QString &uiFile, QWidget *parent) : QDialog(paren
     QUiLoader loader;
     QFile formFile(uiFile);
     formFile.open(QIODevice::ReadOnly);
-    QWidget *form = loader.load(&formFile);
+    QWidget *form = (skinUiLoader ? skinUiLoader : &loader)->load(&formFile);
     formFile.close();
 
     QVBoxLayout *layout = new QVBoxLayout;
@@ -66,8 +70,10 @@ NMainWindow::NMainWindow(const QString &uiFile, QWidget *parent) : QDialog(paren
     setLayout(layout);
     setStyleSheet(form->styleSheet());
     form->setStyleSheet("");
+    delete form;
 #else
     Q_UNUSED(uiFile)
+    Q_UNUSED(skinUiLoader)
     ui.setupUi(this);
 #endif
 
@@ -148,8 +154,10 @@ void NMainWindow::show()
 {
     if (isMaximized()) {
         showMaximized();
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
         setGeometry(QApplication::desktop()->availableGeometry());
         showMaximized();
+#endif
     } else {
         showNormal();
     }
@@ -158,16 +166,27 @@ void NMainWindow::show()
 void NMainWindow::toggleMaximize()
 {
     if (isMaximized()) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+        // Native window state notifications can clear these during showNormal().
+        const QSize normalSize = m_unmaximizedSize;
+        const QPoint normalPos = m_unmaximizedPos;
+        showNormal();
+        if (normalSize.isValid()) {
+            resize(normalSize);
+            move(normalPos);
+        }
+#else
         showNormal();
         resize(m_unmaximizedSize);
         move(m_unmaximizedPos);
+#endif
         m_unmaximizedPos = QPoint();
         m_unmaximizedSize = QSize();
     } else {
         m_unmaximizedPos = pos();
         m_unmaximizedSize = size();
         showMaximized();
-#ifdef Q_OS_WIN
+#if defined(Q_OS_WIN) && QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
         setGeometry(QApplication::desktop()->availableGeometry());
         showMaximized();
 #endif
@@ -372,7 +391,11 @@ void NMainWindow::mouseMoveEvent(QMouseEvent *event)
                     break;
             }
             QSize min = QLayout::closestAcceptableSize(this, g.size());
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+            QRect desk = screen()->availableGeometry();
+#else
             QRect desk = QApplication::desktop()->availableGeometry(this);
+#endif
             if (min.width() > g.width() || min.height() > g.height() || desk.left() > g.left() ||
                 desk.right() < g.right() || desk.top() > g.top() || desk.bottom() < g.bottom()) {
                 switch (m_resizeSection) {
@@ -450,9 +473,15 @@ void NMainWindow::wheelEvent(QWheelEvent *event)
 {
     QDialog::wheelEvent(event);
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    if (event->angleDelta().y()) {
+        emit scrolled(event->angleDelta().y());
+    }
+#else
     if (event->orientation() == Qt::Vertical) {
         emit scrolled(event->delta());
     }
+#endif
 }
 
 void NMainWindow::showPlaybackControls(bool enable)
@@ -515,7 +544,11 @@ void NMainWindow::updateFramelessShadow()
     show();
 }
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+bool NMainWindow::nativeEvent(const QByteArray &eventType, void *message, qintptr *result)
+#else
 bool NMainWindow::nativeEvent(const QByteArray &eventType, void *message, long *result)
+#endif
 {
     MSG *msg = reinterpret_cast<MSG *>(message);
     if (msg->message == WM_DWMCOMPOSITIONCHANGED) {

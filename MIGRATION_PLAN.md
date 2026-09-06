@@ -75,13 +75,15 @@ Referenzbilder sind vorhanden. Die sechs Sprungbefehle für ±5, ±30 und ±100 
 
 ### Phase 1: Qt-6-Machbarkeit für Skins nachweisen
 
-- [ ] Alle QtScript-Nutzungen und privaten Qt-APIs im gesamten Quellcode inventarisieren.
-- [ ] Einen kleinen Qt-6-Testaufbau für die vorhandenen UI-Formulare und eigenen Widgets erstellen.
-- [ ] `QJSEngine` mit den benötigten Globals, Signalen, Enums, Prototyp-Funktionen und Wertumwandlungen erproben. Auch `print`, Bildmasken, Font-Laden und Ressourcenpfade berücksichtigen.
-- [ ] Den aktiven Skin zuerst prüfen; anschließend Native, Slim, Silver und Metro sowie tatsächlich verwendete externe Skins.
-- [ ] Einen Ersatz für das private Skin-Dateisystem über öffentliche Qt-APIs untersuchen. Verzeichnisse, `.nzs`-Pakete, relative CSS-Pfade und dynamisch erzeugte Bilder müssen weiter funktionieren.
-- [ ] QtSingleApplication, Qxt-Hotkeys, QtIOCompressor und Windows-Integration auf konkrete Qt-6-/x64-Blocker prüfen.
-- [ ] Zielversionen und Compiler anhand dieses Nachweises festlegen; Ergebnisse und offene Einschränkungen in einer kurzen Architekturentscheidung dokumentieren.
+- [x] Alle QtScript-Nutzungen und privaten Qt-APIs im gesamten Quellcode inventarisieren.
+- [x] Einen kleinen Qt-6-Testaufbau für die vorhandenen UI-Formulare und eigenen Widgets erstellen.
+- [x] `QJSEngine` mit den benötigten Globals, Signalen, Enums, Prototyp-Funktionen und Wertumwandlungen erproben. Auch `print`, Bildmasken, Font-Laden und Ressourcenpfade berücksichtigen.
+- [x] Den aktiven Skin zuerst prüfen; anschließend Native, Slim, Silver und Metro sowie tatsächlich verwendete externe Skins.
+- [x] Einen Ersatz für das private Skin-Dateisystem über öffentliche Qt-APIs untersuchen. Verzeichnisse, `.nzs`-Pakete, relative CSS-Pfade und dynamisch erzeugte Bilder müssen weiter funktionieren.
+- [x] QtSingleApplication, Qxt-Hotkeys, QtIOCompressor und Windows-Integration auf konkrete Qt-6-/x64-Blocker prüfen.
+- [x] Zielversionen und Compiler anhand dieses Nachweises festlegen; Ergebnisse und offene Einschränkungen in einer kurzen Architekturentscheidung dokumentieren.
+
+Nachweis: [Phase-1-Bericht](PHASE1_REPORT.md) und [Architekturentscheidung](docs/phase1/DECISION.md). Qt 6.11.2 mit GCC 16.2.0 baut die vorhandenen Widgets. Vier Testsuiten bestehen unter Windows, einschließlich der kopierten 0.9.9-Skins und des Datei-Drop-Tests. HiDPI-Vergleich, vollständige Menüs, echte Audiobackends und Player-Leistungsmessungen bleiben Teil der vollständigen Migration.
 
 **Abnahme:** Die kritischen Skin-Funktionen laufen im Qt-6-Testaufbau ohne beabsichtigte optische oder funktionale Änderung. Für verbleibende Abhängigkeiten liegt ein konkreter Migrationsweg vor.
 

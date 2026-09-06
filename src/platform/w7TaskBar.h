@@ -42,7 +42,11 @@ public:
 
     static NW7TaskBar *instance();
     void setWindow(QWidget *window);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result);
+#else
     bool nativeEvent(const QByteArray &eventType, void *message, long *result);
+#endif
     bool isEnabled() const;
 
 public slots:

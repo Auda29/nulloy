@@ -50,13 +50,15 @@ private:
     (c::staticMetaObject.enumerator(c::staticMetaObject.indexOfEnumerator(#e)).keyToValue(k))
 #define ENUMERATOR(c, e) (c::staticMetaObject.enumerator(c::staticMetaObject.indexOfEnumerator(#e)))
 
-#ifndef Q_MOC_RUN
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0) || !defined(Q_MOC_RUN)
 namespace N
 #else
 class N
 #endif
 {
-#if defined(Q_MOC_RUN)
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    Q_NAMESPACE
+#elif defined(Q_MOC_RUN)
     Q_GADGET
     Q_ENUMS(Tag)
     Q_ENUMS(PlaybackState)
@@ -163,7 +165,14 @@ public:
     };
     // clang-format on
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    Q_ENUM_NS(Tag)
+    Q_ENUM_NS(PlaybackState)
+    Q_ENUM_NS(PluginType)
+    Q_ENUM_NS(CompositionMode)
+#else
     extern const QMetaObject staticMetaObject;
+#endif
 }; // namespace N
 
 #endif
