@@ -1,8 +1,11 @@
 # Migrationsplan für den Nulloy-Fork
 
-Stand: 6. September 2026  
-Status: Phase 0 weitgehend durchgeführt; offene Abnahme siehe [Prüfprotokoll](PHASE0_REPORT.md)  
-Repository: [Auda29/nulloy](https://github.com/Auda29/nulloy)  
+Stand: 6. September 2026
+
+Status: Phase 0 weitgehend durchgeführt; offene Abnahme siehe [Prüfprotokoll](PHASE0_REPORT.md)
+
+Repository: [Auda29/nulloy](https://github.com/Auda29/nulloy)
+
 Untersuchte Quellcodebasis: [`f4eddff8be2538526f3019f57f56c68db3c8c267`](https://github.com/Auda29/nulloy/tree/f4eddff8be2538526f3019f57f56c68db3c8c267)
 
 ## 1. Ziel und verbindliche Grenzen
