@@ -111,10 +111,16 @@
       "duplicate_search_evidence": "duplicate-search.json",
       "implementation_policy": "Kein GitHub-Write durch Audit. Nur bei freigegebenem reproduzierbarem Stabilisierungsscope ein separater PR pro Implementierungsissue; covered/defer/platform bleiben Dokumentation.",
       "delivery": {
-        "state": "Reproduktion ausstehend",
-        "prs": [],
-        "tests": [],
-        "limitations": "Keine vollständige Windows-Paketabnahme in diesem Linux-Audit; statischer Codebefund bzw. benannte isolierte Probe ist kein veröffentlichter Fix. Exaktes HID/Kopfhörermodell und OS fehlen; simulierte Qt-/WM_HOTKEY-Ereignisse ersetzen Hardware nicht."
+        "state": "Bewertung dokumentiert; Hardware-/OS-Reproduktion blockiert",
+        "prs": [
+          "https://github.com/Auda29/nulloy/pull/20"
+        ],
+        "tests": "Statische Prüfung vorhandener Belegungen und nativer Hotkey-Pfade; ausdrücklich kein Hardware-/WM_HOTKEY-Lauf",
+        "limitations": [
+          "Reporter nennt OS, Geräte und Belegungen nicht; physische Kopfhörer-/Bluetooth-/Win32-Zustellung hier nicht verfügbar. Lokale Qt-Ereignisse wären kein Ersatz."
+        ],
+        "next_test": "Siehe docs/upstream/262.md: Geräte-/OS-Daten erheben; lokale/globale Belegungen, native Events, genau eine Aktion und System-/Player-Lautstärke getrennt prüfen.",
+        "original_issue_closed": false
       }
     },
     {
@@ -167,12 +173,12 @@
       "duplicate_search_evidence": "duplicate-search.json",
       "implementation_policy": "Kein GitHub-Write durch Audit. Nur bei freigegebenem reproduzierbarem Stabilisierungsscope ein separater PR pro Implementierungsissue; covered/defer/platform bleiben Dokumentation.",
       "delivery": {
-        "state": "Test-PR offen, Draft; ursprüngliches Issue nicht pauschal geschlossen",
+        "state": "Test-PR integriert; ursprüngliches Issue nicht pauschal geschlossen",
         "prs": [
           "https://github.com/Auda29/nulloy/pull/19"
         ],
         "head_sha": "647f47b5d05919cc41e888e9f83cbb2457776e05",
-        "pr_state": "OPEN",
+        "pr_state": "MERGED",
         "tests": {
           "baseline": "100 rapid alternating-media/near-end seek/back/pause/resume iterations,699 actual output buffers109stream starts, complete final recovery EOS;3QtTest passes",
           "sensitivity": "deliberately holding play at PAUSED failed real progress assertion; reverted",
@@ -396,7 +402,7 @@
       "duplicate_search_evidence": "duplicate-search.json",
       "implementation_policy": "Kein GitHub-Write durch Audit. Nur bei freigegebenem reproduzierbarem Stabilisierungsscope ein separater PR pro Implementierungsissue; covered/defer/platform bleiben Dokumentation.",
       "delivery": {
-        "state": "Korrektur-PR offen, Draft; ursprüngliches Issue nicht pauschal geschlossen",
+        "state": "Korrektur als Draft; native Abnahme bzw. IPC-/Policy-Nachweis offen",
         "prs": [
           "https://github.com/Auda29/nulloy/pull/15"
         ],
@@ -767,12 +773,12 @@
       "duplicate_search_evidence": "duplicate-search.json",
       "implementation_policy": "Kein GitHub-Write durch Audit. Nur bei freigegebenem reproduzierbarem Stabilisierungsscope ein separater PR pro Implementierungsissue; covered/defer/platform bleiben Dokumentation.",
       "delivery": {
-        "state": "Test-PR offen, Draft; ursprüngliches Issue nicht pauschal geschlossen",
+        "state": "Test-PR integriert; ursprüngliches Issue nicht pauschal geschlossen",
         "prs": [
           "https://github.com/Auda29/nulloy/pull/9"
         ],
         "head_sha": "1e43b3251aec758d1197173fa8f719d47eecd162",
-        "pr_state": "OPEN",
+        "pr_state": "MERGED",
         "tests": {
           "behavior_rows": 8,
           "qt_passed": 10,
@@ -1011,12 +1017,12 @@
       "duplicate_search_evidence": "duplicate-search.json",
       "implementation_policy": "Kein GitHub-Write durch Audit. Nur bei freigegebenem reproduzierbarem Stabilisierungsscope ein separater PR pro Implementierungsissue; covered/defer/platform bleiben Dokumentation.",
       "delivery": {
-        "state": "Korrektur-PR offen, Draft; ursprüngliches Issue nicht pauschal geschlossen",
+        "state": "Korrektur-PR integriert; ursprüngliches Issue nicht pauschal geschlossen",
         "prs": [
           "https://github.com/Auda29/nulloy/pull/10"
         ],
         "head_sha": "1aab840812feeb8983253f1be710a4573d418b85",
-        "pr_state": "OPEN",
+        "pr_state": "MERGED",
         "tests": {
           "red_failures": 2,
           "green_passed": 9,
@@ -1094,12 +1100,12 @@
       "duplicate_search_evidence": "duplicate-search.json",
       "implementation_policy": "Kein GitHub-Write durch Audit. Nur bei freigegebenem reproduzierbarem Stabilisierungsscope ein separater PR pro Implementierungsissue; covered/defer/platform bleiben Dokumentation.",
       "delivery": {
-        "state": "Test-PR offen, Draft; ursprüngliches Issue nicht pauschal geschlossen",
+        "state": "Test-PR integriert; ursprüngliches Issue nicht pauschal geschlossen",
         "prs": [
           "https://github.com/Auda29/nulloy/pull/11"
         ],
         "head_sha": "5726998594d0037f37c40bc73607e254831ce7f4",
-        "pr_state": "OPEN",
+        "pr_state": "MERGED",
         "tests": {
           "baseline": "5 QtTest passes; actual decoded tail12000frames on each of3repeats at0.5/1/2x; measured11.905/6.050/3.151s",
           "mutations": "force1x failed decoded segment duration; truncate last250ms failed delivered frames with0tail samples; both reverted",
@@ -1176,12 +1182,12 @@
       "duplicate_search_evidence": "duplicate-search.json",
       "implementation_policy": "Kein GitHub-Write durch Audit. Nur bei freigegebenem reproduzierbarem Stabilisierungsscope ein separater PR pro Implementierungsissue; covered/defer/platform bleiben Dokumentation.",
       "delivery": {
-        "state": "Test-PR offen, Draft; ursprüngliches Issue nicht pauschal geschlossen",
+        "state": "Test-PR integriert; ursprüngliches Issue nicht pauschal geschlossen",
         "prs": [
           "https://github.com/Auda29/nulloy/pull/8"
         ],
         "head_sha": "6b88da0d7f55b43c0450a7a5cbd7cc91e4315c5e",
-        "pr_state": "OPEN",
+        "pr_state": "MERGED",
         "tests": {
           "baseline": "5 QtTest passes, real decoded PCM gain 0/.2/1 across 3 open/EOS, stop/play and 3 gapless repeats; .2 produced RMS/peak .05",
           "mutation": "forcing unity in production setter failed PCM assertion .25 vs .05; reverted",
@@ -1284,7 +1290,7 @@
       "duplicate_search_evidence": "duplicate-search.json",
       "implementation_policy": "Kein GitHub-Write durch Audit. Nur bei freigegebenem reproduzierbarem Stabilisierungsscope ein separater PR pro Implementierungsissue; covered/defer/platform bleiben Dokumentation.",
       "delivery": {
-        "state": "Korrektur-PR offen, Draft; ursprüngliches Issue nicht pauschal geschlossen",
+        "state": "Korrektur als Draft; native Abnahme bzw. IPC-/Policy-Nachweis offen",
         "prs": [
           "https://github.com/Auda29/nulloy/pull/16"
         ],
@@ -1710,10 +1716,27 @@
       "duplicate_search_evidence": "duplicate-search.json",
       "implementation_policy": "Kein GitHub-Write durch Audit. Nur bei freigegebenem reproduzierbarem Stabilisierungsscope ein separater PR pro Implementierungsissue; covered/defer/platform bleiben Dokumentation.",
       "delivery": {
-        "state": "Stabilisierung in Bearbeitung",
-        "prs": [],
-        "tests": [],
-        "limitations": "Keine vollständige Windows-Paketabnahme in diesem Linux-Audit; statischer Codebefund bzw. benannte isolierte Probe ist kein veröffentlichter Fix. Ursprünglicher macOS-Fall bleibt ohne nativen Mac-Build/Reproduktion offen."
+        "state": "Test-PR integriert; ursprüngliches Issue nicht pauschal geschlossen",
+        "prs": [
+          "https://github.com/Auda29/nulloy/pull/22"
+        ],
+        "head_sha": "7fdb1434e998232510138eef2e6e690a087d2e28",
+        "pr_state": "MERGED",
+        "tests": "11/11 QtTest results passed XCB/Xvfb2.091sec, CTest offscreen1/1 passed2.09sec. Return/keypadEnter start selected file exactly once playing/stopped, editor focus no activation, Delete and customizedBackspace removal through actual NAction/QAction, editor text protection, defaultBackspace remainsSpeedReset.",
+        "test_commands": [
+          "cmake -S tests/upstream/218 -B /home/hermes/workspace/nulloy-swarm/evidence/218/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS_RELEASE='-O0 -DNDEBUG -ftrack-macro-expansion=0'",
+          "flock /home/hermes/workspace/nulloy-swarm/build.lock sh -c 'cmake --build /home/hermes/workspace/nulloy-swarm/evidence/218/build -j1 && ctest --test-dir /home/hermes/workspace/nulloy-swarm/evidence/218/build --output-on-failure'",
+          "QT_QPA_PLATFORM=xcb xvfb-run -a /home/hermes/workspace/nulloy-swarm/evidence/218/build/testKeyboard218"
+        ],
+        "limitations": [
+          "Characterization only, no production fix needed/no regression-red claim; independent base027d81a branch",
+          "Plugin-discovery seam, real GStreamer/TagLib/widgets and actual NAction plus Qxt common code; native global hooks fatal-if-called, not fake successes",
+          "CustomBackspace test first clears existing SpeedReset binding to avoid ambiguous shortcuts",
+          "Qt6Linux XCB+offscreen only. Qt5, Windows package, physical Macfn/Delete, real global hooks, preferences persistence, physical audio outstanding",
+          "Scope limited to production local-action/Qt-event routing with equivalent fixture wiring, not full NActionManager/player; originalMacBook not proven",
+          "Frozen for parent review/publication; no push/PR/upstream write"
+        ],
+        "original_issue_closed": false
       }
     },
     {
@@ -1817,10 +1840,53 @@
       "duplicate_search_evidence": "duplicate-search.json",
       "implementation_policy": "Kein GitHub-Write durch Audit. Nur bei freigegebenem reproduzierbarem Stabilisierungsscope ein separater PR pro Implementierungsissue; covered/defer/platform bleiben Dokumentation.",
       "delivery": {
-        "state": "Stabilisierung in Bearbeitung",
-        "prs": [],
-        "tests": [],
-        "limitations": "Keine vollständige Windows-Paketabnahme in diesem Linux-Audit; statischer Codebefund bzw. benannte isolierte Probe ist kein veröffentlichter Fix."
+        "state": "Korrektur als Draft; native Abnahme bzw. IPC-/Policy-Nachweis offen",
+        "prs": [
+          "https://github.com/Auda29/nulloy/pull/24"
+        ],
+        "head_sha": "21848c11d6ca4dc1e1c8552285ffc1b84946a029",
+        "pr_state": "OPEN",
+        "tests": {
+          "final_qttest_passed": 33,
+          "failed": 0,
+          "skipped": 0,
+          "ctest_consecutive_passes": 3,
+          "baseline_red": "red-01.txt: real unmodified NPlayer, expected 3 rows, actual 1",
+          "tdd_cycles": [
+            "multi-message retention",
+            "continuing idle window",
+            "all four CLI command boundaries",
+            "preference transitions"
+          ],
+          "sabotage_failures": 19,
+          "coverage": [
+            "12 enqueue/play/state combinations",
+            "8 restored-startup combinations",
+            "row and media selection",
+            "position preservation",
+            "actual percent-i display values",
+            "250ms idle and 1000ms absolute bounds",
+            "empty and missing paths",
+            "command priority and no late playback"
+          ],
+          "evidence": "/home/hermes/workspace/nulloy-swarm/evidence/211",
+          "fixtures": "C++ test generates real disposable PCM WAV files; CTest setup is automatic"
+        },
+        "test_commands": [
+          "cmake -S /home/hermes/workspace/nulloy-swarm/issue-211/tests/upstream/211 -B /home/hermes/workspace/nulloy-swarm/evidence/211/build -G Ninja -DCMAKE_CXX_FLAGS='--param ggc-min-expand=10 --param ggc-min-heapsize=16384'",
+          "flock /home/hermes/workspace/nulloy-swarm/build.lock sh -c 'cmake --build /home/hermes/workspace/nulloy-swarm/evidence/211/build -j1 && QT_QPA_PLATFORM=offscreen /home/hermes/workspace/nulloy-swarm/evidence/211/build/test211 -o /home/hermes/workspace/nulloy-swarm/evidence/211/green-final.txt,txt && ctest --test-dir /home/hermes/workspace/nulloy-swarm/evidence/211/build --output-on-failure --no-tests=error --repeat until-fail:3'",
+          "git -C /home/hermes/workspace/nulloy-swarm/issue-211 diff --cached --check"
+        ],
+        "limitations": [
+          "Bounded heuristic, not arbitrary shell selection detection: independent rapid opens can group, delayed/large selections can split and replace earlier groups.",
+          "Verified real Linux NPlayer/playlist/GStreamer/TagLib code with separate timed readMessage calls; actual process launch, IPC transport and Windows Explorer not exercised.",
+          "Linux-only standalone harness has explicit stock-font-query and desktop-global-hotkey boundary substitutes; GStreamer uses existing test fakesink, not audible validation.",
+          "Qt5 runtime and native Windows UI/package validation remain pending; main.cpp, loadDefaultPlaylist and all UI/drop code unchanged.",
+          "Existing --pause-to-play dispatch intentionally preserved; #98/#23 not implemented.",
+          "Independent review and publishing delegated to parent; no push, merge, PR or upstream write performed.",
+          "Early OOM/tool-session issues resolved through 2GiB-aware serialized builds; baseline warnings remain documented."
+        ],
+        "original_issue_closed": false
       }
     },
     {
@@ -2230,12 +2296,12 @@
       "duplicate_search_evidence": "duplicate-search.json",
       "implementation_policy": "Kein GitHub-Write durch Audit. Nur bei freigegebenem reproduzierbarem Stabilisierungsscope ein separater PR pro Implementierungsissue; covered/defer/platform bleiben Dokumentation.",
       "delivery": {
-        "state": "Test-PR offen, Draft; ursprüngliches Issue nicht pauschal geschlossen",
+        "state": "Test-PR integriert; ursprüngliches Issue nicht pauschal geschlossen",
         "prs": [
           "https://github.com/Auda29/nulloy/pull/13"
         ],
         "head_sha": "bdaf3bc25bdda7f0b8136d6cb8b585aad484f1c5",
-        "pr_state": "OPEN",
+        "pr_state": "MERGED",
         "tests": {
           "qt_passed": 10,
           "failed": 0,
@@ -2626,10 +2692,18 @@
       "duplicate_search_evidence": "duplicate-search.json",
       "implementation_policy": "Kein GitHub-Write durch Audit. Nur bei freigegebenem reproduzierbarem Stabilisierungsscope ein separater PR pro Implementierungsissue; covered/defer/platform bleiben Dokumentation.",
       "delivery": {
-        "state": "Stabilisierung in Bearbeitung",
-        "prs": [],
-        "tests": [],
-        "limitations": "Keine vollständige Windows-Paketabnahme in diesem Linux-Audit; statischer Codebefund bzw. benannte isolierte Probe ist kein veröffentlichter Fix."
+        "state": "Test-PR offen, Draft; ursprüngliches Issue nicht pauschal geschlossen",
+        "prs": [
+          "https://github.com/Auda29/nulloy/pull/25"
+        ],
+        "head_sha": "7bcc139562a7a207c5030ca1f629ebeb3f2542d7",
+        "pr_state": "OPEN",
+        "tests": "Siehe Issue-Bericht und verknüpfte CI-Prüfungen",
+        "test_commands": [],
+        "limitations": [
+          "Originalplattform und vollständiger Player bleiben gesonderte Abnahmen; siehe Issue-Bericht"
+        ],
+        "original_issue_closed": false
       }
     },
     {
@@ -2744,10 +2818,31 @@
       "duplicate_search_evidence": "duplicate-search.json",
       "implementation_policy": "Kein GitHub-Write durch Audit. Nur bei freigegebenem reproduzierbarem Stabilisierungsscope ein separater PR pro Implementierungsissue; covered/defer/platform bleiben Dokumentation.",
       "delivery": {
-        "state": "Stabilisierung in Bearbeitung",
-        "prs": [],
-        "tests": [],
-        "limitations": "Keine vollständige Windows-Paketabnahme in diesem Linux-Audit; statischer Codebefund bzw. benannte isolierte Probe ist kein veröffentlichter Fix. YouTube-Video nicht ausgewertet; Issue-Text und alle Kommentare liefern Testhypothese, Hardwarelatenz nicht gemessen."
+        "state": "Test-PR integriert; ursprüngliches Issue nicht pauschal geschlossen",
+        "prs": [
+          "https://github.com/Auda29/nulloy/pull/23"
+        ],
+        "head_sha": "654bc9edbcfc7b79952e20070653baa50d12f1bf",
+        "pr_state": "MERGED",
+        "tests": {
+          "baseline": "6QtTest passes;50/250/800/2000ms WAV exactPCM frames and position signal vs synchronized sink monotonicclock;maxskew43.10/.15/21.88/.20ms",
+          "mutation": "advance emittedposition250ms failed800ms row skew250.136ms vs60mslimit; restored",
+          "final": "CTest1/1pass3.38s underglobal lock; no production changes"
+        },
+        "test_commands": [
+          "cmake -S tests/upstream/141 -B /tmp/nulloy-141 -G Ninja -DCMAKE_BUILD_TYPE=Release",
+          "cmake --build /tmp/nulloy-141 -j1",
+          "ctest --test-dir /tmp/nulloy-141 --no-tests=error --output-on-failure --timeout 180"
+        ],
+        "limitations": [
+          "This harness was already written and baseline-tested before final bounded-assessment steering; finished only existing mutation/green cycle, no new expansion",
+          "Engine signal clock only, NOT actual painted waveform or DAC/audio hardware",
+          "No original2searlylead reproduced or closure/fix claimed",
+          "WAV only, noMP3/Windows/macOS/Qt5; original video not reviewed",
+          "50ms intermediate visibleprogress not claimed",
+          "parent independent review and package compatibility pending"
+        ],
+        "original_issue_closed": false
       }
     },
     {
@@ -2800,12 +2895,12 @@
       "duplicate_search_evidence": "duplicate-search.json",
       "implementation_policy": "Kein GitHub-Write durch Audit. Nur bei freigegebenem reproduzierbarem Stabilisierungsscope ein separater PR pro Implementierungsissue; covered/defer/platform bleiben Dokumentation.",
       "delivery": {
-        "state": "Korrektur-PR offen, Draft; ursprüngliches Issue nicht pauschal geschlossen",
+        "state": "Korrektur-PR integriert; ursprüngliches Issue nicht pauschal geschlossen",
         "prs": [
           "https://github.com/Auda29/nulloy/pull/17"
         ],
         "head_sha": "c96c926e396e53a36cd5424fd3a34d763d6f8735",
-        "pr_state": "OPEN",
+        "pr_state": "MERGED",
         "tests": "Siehe Issue-Bericht und verknüpfte CI-Prüfungen",
         "test_commands": [],
         "limitations": [
@@ -3020,10 +3115,18 @@
       "duplicate_search_evidence": "duplicate-search.json",
       "implementation_policy": "Kein GitHub-Write durch Audit. Nur bei freigegebenem reproduzierbarem Stabilisierungsscope ein separater PR pro Implementierungsissue; covered/defer/platform bleiben Dokumentation.",
       "delivery": {
-        "state": "Stabilisierung in Bearbeitung",
-        "prs": [],
-        "tests": [],
-        "limitations": "Keine vollständige Windows-Paketabnahme in diesem Linux-Audit; statischer Codebefund bzw. benannte isolierte Probe ist kein veröffentlichter Fix."
+        "state": "Korrektur-PR integriert; ursprüngliches Issue nicht pauschal geschlossen",
+        "prs": [
+          "https://github.com/Auda29/nulloy/pull/21"
+        ],
+        "head_sha": "67258f6ba225baa340c73a9726ddafec0fc2dd60",
+        "pr_state": "MERGED",
+        "tests": "Siehe Issue-Bericht und verknüpfte CI-Prüfungen",
+        "test_commands": [],
+        "limitations": [
+          "Originalplattform und vollständiger Player bleiben gesonderte Abnahmen; siehe Issue-Bericht"
+        ],
+        "original_issue_closed": false
       }
     },
     {
@@ -3076,12 +3179,12 @@
       "duplicate_search_evidence": "duplicate-search.json",
       "implementation_policy": "Kein GitHub-Write durch Audit. Nur bei freigegebenem reproduzierbarem Stabilisierungsscope ein separater PR pro Implementierungsissue; covered/defer/platform bleiben Dokumentation.",
       "delivery": {
-        "state": "Korrektur-PR offen, Draft; ursprüngliches Issue nicht pauschal geschlossen",
+        "state": "Korrektur-PR integriert; ursprüngliches Issue nicht pauschal geschlossen",
         "prs": [
           "https://github.com/Auda29/nulloy/pull/12"
         ],
         "head_sha": "7d7b0206d143a442b6aed6b03982a441309af211",
-        "pr_state": "OPEN",
+        "pr_state": "MERGED",
         "tests": {
           "ctest": "10/10 passed; final post-format run 14.23 seconds",
           "red": "red.txt: real GStreamer state Playing instead of expected Paused",
@@ -3206,12 +3309,12 @@
       "duplicate_search_evidence": "duplicate-search.json",
       "implementation_policy": "Kein GitHub-Write durch Audit. Nur bei freigegebenem reproduzierbarem Stabilisierungsscope ein separater PR pro Implementierungsissue; covered/defer/platform bleiben Dokumentation.",
       "delivery": {
-        "state": "Test-PR offen, Draft; ursprüngliches Issue nicht pauschal geschlossen",
+        "state": "Test-PR integriert; ursprüngliches Issue nicht pauschal geschlossen",
         "prs": [
           "https://github.com/Auda29/nulloy/pull/18"
         ],
         "head_sha": "ec445a36ab2b2c2a68f117e0a49a1af734e77ffe",
-        "pr_state": "OPEN",
+        "pr_state": "MERGED",
         "tests": "12/12 passed, 7.11sec: 0/1/100/5000 entries xPlay/Pause/Stop x20 shuffles, ID/path multiset, state/media/identity, paused position, indices, actual successor handoff, M3Uwrite/reload order",
         "test_commands": [
           "cmake -S tests/upstream/121 -B /home/hermes/workspace/nulloy-swarm/evidence/121/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS_RELEASE='-O0 -DNDEBUG -ftrack-macro-expansion=0'",
@@ -4547,12 +4650,12 @@
       "duplicate_search_evidence": "duplicate-search.json",
       "implementation_policy": "Kein GitHub-Write durch Audit. Nur bei freigegebenem reproduzierbarem Stabilisierungsscope ein separater PR pro Implementierungsissue; covered/defer/platform bleiben Dokumentation.",
       "delivery": {
-        "state": "Test-PR offen, Draft; ursprüngliches Issue nicht pauschal geschlossen",
+        "state": "Test-PR integriert; ursprüngliches Issue nicht pauschal geschlossen",
         "prs": [
           "https://github.com/Auda29/nulloy/pull/14"
         ],
         "head_sha": "c2db6d3bd7956dd4eece4e1d49f78fb2918a2d4d",
-        "pr_state": "OPEN",
+        "pr_state": "MERGED",
         "tests": {
           "qt_passed": 5,
           "failed": 0,

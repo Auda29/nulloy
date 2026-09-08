@@ -1,0 +1,139 @@
+{
+  "repository": "Auda29/nulloy",
+  "base": "027d81a583b07457a4fa5f18b3e7dcca50b05b58",
+  "review_type": "independent read-only source, harness, documentation and evidence review",
+  "blocking_findings": false,
+  "recommendation": "No issue-scope merge blockers identified for PRs 9, 10, 11, 13, 14. Accept characterization as characterization, not as fixes for the original reports. Parent retains fresh CI and merge gate responsibility.",
+  "sha_correction": "The initial full SHA values supplied for 245/240/241 did not match actual HEAD. The user explicitly corrected them to the reviewed_sha values below; no silent normalization was performed.",
+  "concurrent_parent_update": {
+    "description": "During review, parent merged PR7 infrastructure into all five worktrees. Verified each original reviewed_sha..HEAD diff is empty under src, tests and docs/upstream. Reviewed issue blobs therefore remain unchanged.",
+    "only_changed_paths": [".github/workflows/upstream-stabilization.yml", "docs/UPSTREAM_STABILIZATION.md", "tools/upstream/run-native.py", "tools/upstream/test-run-native.py"],
+    "infrastructure_reviewed_here": false,
+    "remote_pr_heads_match_gate_heads": true
+  },
+  "verification": {
+    "all_five_initial_worktrees_clean": true,
+    "all_five_final_worktrees_clean": true,
+    "all_five_diff_checks_no_output": true,
+    "all_five_complete_frozen_diffs_and_issue_docs_read": true,
+    "production_boundary": "Only issue 241 changes production: toUnicode adds !tstr.isLatin1() to the already-decoded Unicode bypass. All other issue changes are standalone tests and documentation.",
+    "fresh_reviewer_execution": "Under flock -w 5 /home/hermes/workspace/nulloy-swarm/build.lock, ran existing build11 then build176 with ctest --no-tests=error -V; command exited 0. No compilation or mutations performed. Build CMakeCache source directories point at the intended worktrees.",
+    "other_execution": "Inspected actual worker baseline/green/mutation logs for 240 and 241 and characterization log for 245. Did not duplicate parent 245 verification or queued 240/241 reruns.",
+    "ci": "Not independently checked or asserted green; parent owns fresh CI gate.",
+    "external_writes": "None: no GitHub comments, formal reviews, publication, push, merge or repository edits. CTest updated evidence build directories only."
+  },
+  "issues": [
+    {
+      "issue": 245,
+      "pr": 9,
+      "reviewed_sha": "e3f780683dded702d78badf0f48729746dba7456",
+      "gate_head": "1e43b3251aec758d1197173fa8f719d47eecd162",
+      "blocking": false,
+      "findings": [],
+      "verdict": "No blocker for characterization-only merge.",
+      "verified_evidence": [
+        "Full frozen diff: docs/upstream/245.md and tests/upstream/245 only; real tagReaderTaglib.cpp linked by standalone CMake.",
+        "metadata/245-characterization.txt: 10 passed, 0 failed, 0 skipped. Seven generated format rows plus unavailable-file row, setup and cleanup. Actual kbps 129/34/1411/103/24/118/334.",
+        "tests/upstream/245/testIssue245.cpp:43-50 parses production B, checks format-specific bounds, and checks empty after clear; lines 52-65 cover missing and invalid files. Not a copied bitrate implementation."
+      ],
+      "coverage_limits": [
+        "Compressed-format bounds mostly prove a plausible nonzero value, not exact bitrate accuracy; CBR MP3 and PCM bounds are materially tighter.",
+        "No original unknown-format sample, tracker case, formatting pipeline or visible skin %B coverage; no reproduced issue fix.",
+        "Linux Qt6.8.2/TagLib2.0.2 evidence only. Qt5 and Windows package compatibility are offered, not executed here. ffmpeg and named encoders are mandatory, not silently skipped."
+      ]
+    },
+    {
+      "issue": 241,
+      "pr": 10,
+      "reviewed_sha": "e8b0b113978d40ad3eb1ff6e8741354e4f06ce43",
+      "gate_head": "1aab840812feeb8983253f1be710a4573d418b85",
+      "blocking": false,
+      "findings": [],
+      "verdict": "No blocker for the narrow Unicode-preservation fix.",
+      "verified_evidence": [
+        "src/plugins/pluginTaglib/tagReaderTaglib.cpp:101-115: bypass is correct for strings that cannot losslessly carry Latin1 legacy bytes. Existing default/UTF8 behavior remains unchanged; codec selection and Latin1 heuristic remain untouched.",
+        "tests/upstream/241/testIssue241.cpp:18-23,40-72: generated MP3 ID3v2 UTF8/UTF16 and Latin1-carried Windows1251 rows exercise real title, artist, album and raw TITLE conversion.",
+        "metadata/241-red.txt and metadata/241-sabotage.txt: exactly the two Unicode-under-Windows1251 rows fail with corrupted actual titles; legacy/default/UTF8/unknown selection and original sample pass.",
+        "metadata/241-green.txt and metadata/241-green-restored.txt: 9 passed, 0 failed, 0 skipped with optional sample supplied. The remove-condition mutation and restoration are worker evidence, inspected rather than independently recreated.",
+        "tests/upstream/241/testIssue241.cpp:78-85 explicitly skips absent external sample and reads supplied original without writing it."
+      ],
+      "coverage_limits": [
+        "Not automatic legacy-encoding detection. Original attachment already works with Windows1251 selected on baseline; no promise to close every variant of issue241.",
+        "Latin1-only Unicode ambiguity remains explicitly documented; no regression claim for an unchanged heuristic.",
+        "Comment and other raw property keys share the reviewed conversion path but are not directly asserted; generated test matrix is MP3/ID3v2, not every TagLib container or encoding.",
+        "No independent Windows/Qt5 or packaged DLL execution. Original-sample acceptance is optional and skips without NULLOY_ISSUE241_SAMPLE."
+      ]
+    },
+    {
+      "issue": 240,
+      "pr": 11,
+      "reviewed_sha": "e098083a252d36d1ae0a5ba347fcca5cffbb2103",
+      "gate_head": "5726998594d0037f37c40bc73607e254831ce7f4",
+      "blocking": false,
+      "findings": [
+        {
+          "severity": "low",
+          "blocking": false,
+          "location": "tests/upstream/240/testTempo.cpp:50-57,146; docs/upstream/240/README.md:31",
+          "finding": "Tail coverage counts high-amplitude frames, not unique sample identities or ordering. The exact 12000 count catches uncompensated truncation but cannot prove every original tail sample arrived if loss is exactly compensated by duplicate high-amplitude tail data.",
+          "recommendation": "Treat this as end-marker count and endpoint characterization, not sample-identity/gapless proof. No broad new test matrix is required for this scoped PR."
+        }
+      ],
+      "verdict": "No blocker for characterization-only merge; retain timing and measurement limits.",
+      "verified_evidence": [
+        "Full frozen diff contains no production changes. Real engine uses _TESTS_ sink substitution plus test-only private access to attach synchronized appsink; playback, bus handling, rate seeks and handoff logic are production code.",
+        "audio/240-baseline.txt: 5 passed, 0 failed, 0 skipped. Three cycles at each of 0.5x/1x/2x contain 12000 counted tail frames; wall times 11905/6050/3151 ms.",
+        "audio/240-sabotage.txt: forcing 1x fails decoded segment-duration assertion at half speed.",
+        "audio/240-sabotage-tail.txt: truncating 250ms produces zero tail frames and fails delivered-frame lower bound; this mutation fails before reaching the tail-count assertion.",
+        "audio/240-final-green.txt: CTest 1/1 passed, 21.37 sec; worker docs round overall run to 21.38 sec."
+      ],
+      "coverage_limits": [
+        "WAV only; synchronized software appsink, not hardware/DAC, mixer, listening, UI repeat selection, visible position or tick correctness.",
+        "125ms media count and 250ms segment-duration tolerance per cycle; 1s aggregate wall-time tolerance. Under compiler contention an unchanged run failed wall time, honestly retained in evidence and documented.",
+        "Tail classification is amplitude threshold; cycle segmentation uses backwards PTS, not independent stream identity. Both are adequate for current controlled fixture, not universal audio continuity verification.",
+        "No short-file, compressed-codec, mid-handoff speed-change, Windows/macOS or Qt5 runtime proof. Original bug not reproduced or fixed."
+      ]
+    },
+    {
+      "issue": 176,
+      "pr": 13,
+      "reviewed_sha": "e9c10a3d8d26d736f7c85ed3996232743743dd3f",
+      "gate_head": "bdaf3bc25bdda7f0b8136d6cb8b585aad484f1c5",
+      "blocking": false,
+      "findings": [],
+      "verdict": "No blocker for codec/error characterization-only merge.",
+      "verified_evidence": [
+        "Fresh reviewer CTest in evidence/metadata/build176: 1/1 passed in 7.45 sec; QtTest 10 passed, 0 failed, 0 skipped. Detailed output persisted by CTest in metadata/build176/Testing/Temporary/LastTest.log.",
+        "Five required WAV codecs reached EOS with zero failures. Microsoft/DVI ADPCM each emitted one failure and specific missing-plugin ADPCM caps; these are characterized missing dependencies, not decoded success.",
+        "Controlled A-law rank suppression produced missing decoder caps and failure, followed by PCM EOS on same engine. RAII restores original ranks without modifying installed plugin files.",
+        "tests/upstream/176/testIssue176.cpp:93-103 rejects arbitrary failures in optional rows by requiring both Missing GStreamer plugin and audio/x-adpcm diagnostics. Production message and mediaFailed paths are linked, not mocked."
+      ],
+      "coverage_limits": [
+        "Restoration is implemented by RAII but subsequent recovery uses PCM, so runtime recovery does not independently prove A-law decoding resumes after rank restoration.",
+        "Optional ADPCM rows deliberately accept either EOS or actionable absence; they are not a regression gate guaranteeing those decoders are installed. No skip conceals that choice.",
+        "Only generated recorder-like WAVs and software fake sinks; no original WAV/.ifg identification, actual Windows/macOS release package, audible PCM correctness or decoder packaging fix."
+      ]
+    },
+    {
+      "issue": 11,
+      "pr": 14,
+      "reviewed_sha": "6d378257396a0357224a1f637094f95aa56d1087",
+      "gate_head": "c2db6d3bd7956dd4eece4e1d49f78fb2918a2d4d",
+      "blocking": false,
+      "findings": [],
+      "verdict": "No blocker for metadata-lifetime characterization-only merge; native playback sharing remains unproven.",
+      "verified_evidence": [
+        "Fresh reviewer CTest in evidence/metadata/build11: 1/1 passed in 0.16 sec; QtTest 5 passed, 0 failed, 1 skipped. Detailed output persisted by CTest in metadata/build11/Testing/Temporary/LastTest.log.",
+        "tests/upstream/11/testIssue11.cpp:57-85 initializes both real readers, proves Linux fixture descriptor visible while held, then zero descriptors after clearing through each reader over 100 cycles.",
+        "Owned-fixture rename, TagLib title write, release/reopen/read and deletion pass; no real user files used.",
+        "tests/upstream/11/testIssue11.cpp:113-135 explicitly skips Windows sharing probe on Linux. Guarded Windows probe distinguishes held-state success/sharing violation from mandatory exclusive open after release."
+      ],
+      "coverage_limits": [
+        "Linux /proc descriptor measurement is meaningful lifecycle evidence; POSIX rename alone is not offered as Windows sharing proof.",
+        "No native Windows execution or independent external opening process. Held-state probe characterizes both success and sharing violation, not a promise of write/delete sharing.",
+        "Metadata handles only; no GStreamer playback or waveform ownership across Play/Pause/Stop. Generated fixture has no embedded artwork, so real APIC/image payload decoding is not exercised.",
+        "No production change and no closure claim for external access while playing. Exact release DLL and platform tests remain follow-up rather than blockers to merging honestly scoped tests."
+      ]
+    }
+  ]
+}

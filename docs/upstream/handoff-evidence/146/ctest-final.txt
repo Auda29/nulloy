@@ -1,0 +1,8 @@
+Internal ctest changing into directory: /home/hermes/workspace/nulloy-swarm/build-146
+Test project /home/hermes/workspace/nulloy-swarm/build-146
+    Start 1: metadata146
+1/1 Test #1: metadata146 ......................   Passed   16.93 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Total Test time (real) =  16.93 sec

@@ -1,0 +1,105 @@
+{
+  "review_type": "independent read-only final PR source/test safety and coverage review",
+  "base": "05c59cbffcaf80e9299a4d7afee9cdd294321301",
+  "scope": "Only base...HEAD diffs for issues 132, 218, 141; surrounding production code inspected to validate changed behavior and harness seams.",
+  "overall_verdict": "No blocking findings or confirmed regressions in the scoped changes. PR21 is finite session-record validation; PR22/23 are characterization, not original-platform fixes or issue-closure evidence.",
+  "blocking": false,
+  "verification": {
+    "serialization": "All incremental builds and runtime tests used flock -w 300 /home/hermes/workspace/nulloy-swarm/build.lock; builds used -j1.",
+    "builds": "Reused existing configured targets only. Source freshness check found newer TagLib source in the frozen worktrees; incremental builds recompiled it for 132 and 218 before tests. 141 does not compile TagLib. All three build commands exited 0.",
+    "environment": "Linux Debian 13, Qt/QtTest 6.8.2, GCC 14.2.0; shared cgroup memory.max=2147483648 and cpu.max=100000 100000.",
+    "runtime_commands": "/home/hermes/workspace/nulloy-swarm/evidence/review-session-keyboard-runs.json",
+    "xcb_and_final_checks": "/home/hermes/workspace/nulloy-swarm/evidence/review-session-keyboard-final-checks.json",
+    "repositories": "All three requested frozen heads verified before and after; all three worktrees clean before and after; git diff --check base...HEAD exited 0 for each.",
+    "external_actions": "No GitHub writes, CI waiting, source edits, commits, or issue closure. Parent owns CI/platform/package acceptance."
+  },
+  "issues": {
+    "132": {
+      "pr": 21,
+      "gate_head": "67258f6ba225baa340c73a9726ddafec0fc2dd60",
+      "blocking": false,
+      "findings": [],
+      "source_assessment": [
+        "src/player.cpp:438-478: exact two-value guard prevents at(1) on incomplete records; conversion flags, qIsFinite, normalized position bounds, and loaded-playlist index bounds precede both autoplay and staged-media paths.",
+        "src/player.cpp:513-518: existing writer emits exactly row and position, so rejecting extra values is consistent with the current persisted format. Valid restoration logic is otherwise unchanged; damaged records retain the loaded playlist without selecting media.",
+        "tests/upstream/132/test132.cpp:17-61,126-205: real NPlayer constructor reaches the private loader through RestorePlaylist; settings are synced and reread after singleton destruction. Actual playlist/engine state and delayed non-playback are asserted, including valid preference matrix, explicit Play after staging, and paused endpoints.",
+        "Test settings and playlist are isolated to the dedicated executable's Data/test132 files; generated WAVs use QTemporaryDir. Real plugins use existing synchronized fake device sinks. The test-only native shortcut shim returns success without installing hooks; this is explicitly outside coverage and is not evidence of global shortcut behavior."
+      ],
+      "tests": {
+        "build_dir": "/home/hermes/workspace/nulloy-swarm/evidence/132/build",
+        "build_exit_code": 0,
+        "ctest": "1/1 passed, 6.58 seconds",
+        "qttest": "26 passed, 0 failed, 0 skipped (includes setup/cleanup)",
+        "log": "/home/hermes/workspace/nulloy-swarm/evidence/review-session-keyboard-132.log",
+        "xcb": "Independent Xvfb/xcb rerun: 26 passed, 0 failed, 0 skipped, process exit 0",
+        "xcb_log": "/home/hermes/workspace/nulloy-swarm/evidence/review-session-keyboard-132-xcb.log",
+        "historical_evidence_inspected": [
+          "132/red-single.log: actual QList::at assertion/SIGABRT on single-value record",
+          "132/red-numbers.log: seven malformed numeric rows fail absence-of-loaded-media assertions"
+        ],
+        "historical_evidence_note": "Prior RED logs inspected, not independently recreated or treated as newly executed evidence. Current Debug target uses -g0 without NDEBUG."
+      },
+      "limits": [
+        "No new playing/paused persistence flag or per-file bookmarks; StartPaused stages stopped media rather than asserting a PAUSED GStreamer pipeline.",
+        "Qt5, native Windows/macOS, alternative backends, custom skins, physical audio, global shortcuts and EOS autoplay endpoint behavior remain unverified.",
+        "Numeric-malformation rows run autoplay; empty/extra/index-bound cases cover both StartPaused values. The common validation guard is inspected for both paths.",
+        "Original issue remains open; this narrow stabilization does not complete the feature request."
+      ]
+    },
+    "218": {
+      "pr": 22,
+      "gate_head": "7fdb1434e998232510138eef2e6e690a087d2e28",
+      "blocking": false,
+      "findings": [],
+      "source_assessment": [
+        "No production changes. tests/upstream/218/CMakeLists.txt compiles real NAction, Qxt common code, playlist/item, settings, GStreamer and TagLib; discovery alone supplies the real engine.",
+        "tests/upstream/218/testKeyboard218.cpp:73-83 matches the relevant production window-level QAction attachment and local connections, without claiming the whole action manager/player is exercised.",
+        "Return/keypad Enter use QTest key events and verify selected-versus-playing row, real playback/media state and exactly one mediaChanged signal; editor-focus negatives test routing rather than manually invoking the target slots.",
+        "Deletion uses actual NAction shortcuts and checks exact survivors. Custom Backspace first clears default SpeedReset, avoiding ambiguous shortcuts; editor tests assert text editing without removal. Native hook seam is fatal-if-called, not simulated registration success."
+      ],
+      "tests": {
+        "build_dir": "/home/hermes/workspace/nulloy-swarm/evidence/218/build",
+        "build_exit_code": 0,
+        "ctest": "1/1 passed, 2.09 seconds",
+        "qttest": "11 passed, 0 failed, 0 skipped (includes setup/cleanup)",
+        "log": "/home/hermes/workspace/nulloy-swarm/evidence/review-session-keyboard-218.log",
+        "xcb": "Independent Xvfb/xcb rerun: 11 passed, 0 failed, 0 skipped, process exit 0",
+        "xcb_log": "/home/hermes/workspace/nulloy-swarm/evidence/review-session-keyboard-218-xcb.log"
+      },
+      "limits": [
+        "QTest/Qt event delivery on Linux is not physical MacBook Return/Delete/fn-Delete verification.",
+        "Preferences persistence/conflict UI, whole-player/all-skin integration, global OS hooks, Qt5 and native Windows/macOS packages remain unverified.",
+        "This is baseline characterization, not a reproduced regression or production fix; original issue should remain open."
+      ]
+    },
+    "141": {
+      "pr": 23,
+      "gate_head": "654bc9edbcfc7b79952e20070653baa50d12f1bf",
+      "blocking": false,
+      "findings": [],
+      "source_assessment": [
+        "No production changes. Standalone harness compiles real GStreamer engine and uses a synchronized F32LE/mono/48kHz appsink; only application-argument initialization and private sink access are test adaptations.",
+        "tests/upstream/141/testPosition.cpp:22-41: streaming callback records monotonic presentation-start timing, frame count and final buffer end through atomics. OutputClock outlives the engine; production engine teardown stops and unreferences the pipeline.",
+        "tests/upstream/141/testPosition.cpp:88-123: real positionChanged and mediaFinished signals are observed; every fixture requires exact decoded frame count, no engine error, completion, EOS no earlier than final callback plus buffer duration minus 20 ms, and position/output-clock skew below 60 ms.",
+        "Documentation explicitly limits the claim to the engine signal, not painted waveform, DAC or audible playback, and distinguishes the deliberate +250 ms sensitivity mutation from a reproduced original defect."
+      ],
+      "tests": {
+        "build_dir": "/home/hermes/workspace/nulloy-swarm/evidence/audio/build-141",
+        "build_exit_code": 0,
+        "ctest": "1/1 passed, 3.46 seconds",
+        "qttest": "6 passed, 0 failed, 0 skipped (four durations plus setup/cleanup)",
+        "log": "/home/hermes/workspace/nulloy-swarm/evidence/review-session-keyboard-141.log",
+        "samples_by_duration_ms": {"50": 2400, "250": 12000, "800": 38400, "2000": 96000},
+        "max_skew_ms_by_duration_ms": {"50": 39.636, "250": 20.469, "800": 0.197, "2000": 40.709},
+        "position_signal_count_by_duration_ms": {"50": 1, "250": 9, "800": 35, "2000": 92},
+        "historical_sensitivity": "Inspected evidence/audio/141-sabotage.txt: 800 ms row failed at 250.136 ms skew versus 60 ms threshold. Mutation not rerun during read-only review."
+      },
+      "limits": [
+        "Not painted-widget/display-latency, driver/DAC, physical audio, original Windows video, MP3, Qt5, or macOS/Windows execution evidence.",
+        "Exact frame count is not amplitude or waveform-content identity proof. The clock starts at first software-sink buffer, not playback request or physical audio onset.",
+        "For durations >=250 ms the assertion requires highest position >0.5, not a minimum intermediate-signal cadence; do not promote this to continuous visible-animation coverage. The 50 ms case may have no intermediate signal.",
+        "No production fix or original issue closure justified; reported-platform UI/audio correlation remains pending."
+      ]
+    }
+  }
+}

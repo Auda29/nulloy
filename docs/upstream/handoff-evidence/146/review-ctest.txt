@@ -1,0 +1,39 @@
+Internal ctest changing into directory: /home/hermes/workspace/nulloy-swarm/build-146
+UpdateCTestConfiguration  from :/home/hermes/workspace/nulloy-swarm/build-146/DartConfiguration.tcl
+UpdateCTestConfiguration  from :/home/hermes/workspace/nulloy-swarm/build-146/DartConfiguration.tcl
+Test project /home/hermes/workspace/nulloy-swarm/build-146
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 1
+    Start 1: metadata146
+
+1: Test command: /home/hermes/workspace/nulloy-swarm/build-146/testMetadata146
+1: Working Directory: /home/hermes/workspace/nulloy-swarm/build-146
+1: Environment variables: 
+1:  QT_QPA_PLATFORM=offscreen
+1: Test timeout computed to be: 120
+1: ********* Start testing of TestMetadata146 *********
+1: Config: Using QtTest library 6.8.2, Qt 6.8.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 14.2.0), debian 13
+1: PASS   : TestMetadata146::initTestCase()
+1: QWARN  : TestMetadata146::shortcutsRefreshMetadata(custom-arrows-scroll) This plugin does not support propagateSizeHints()
+1: PASS   : TestMetadata146::shortcutsRefreshMetadata(custom-arrows-scroll)
+1: QWARN  : TestMetadata146::shortcutsRefreshMetadata(custom-arrows-no-scroll) This plugin does not support propagateSizeHints()
+1: PASS   : TestMetadata146::shortcutsRefreshMetadata(custom-arrows-no-scroll)
+1: QWARN  : TestMetadata146::shortcutsRefreshMetadata(default-z-b-scroll) This plugin does not support propagateSizeHints()
+1: PASS   : TestMetadata146::shortcutsRefreshMetadata(default-z-b-scroll)
+1: QWARN  : TestMetadata146::shortcutsRefreshMetadata(default-z-b-no-scroll) This plugin does not support propagateSizeHints()
+1: PASS   : TestMetadata146::shortcutsRefreshMetadata(default-z-b-no-scroll)
+1: QWARN  : TestMetadata146::unboundArrowsKeepPlayback() This plugin does not support propagateSizeHints()
+1: PASS   : TestMetadata146::unboundArrowsKeepPlayback()
+1: PASS   : TestMetadata146::cleanupTestCase()
+1: Totals: 7 passed, 0 failed, 0 skipped, 0 blacklisted, 16799ms
+1: ********* Finished testing of TestMetadata146 *********
+1/1 Test #1: metadata146 ......................   Passed   16.83 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Total Test time (real) =  16.83 sec

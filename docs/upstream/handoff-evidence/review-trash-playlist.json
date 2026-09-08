@@ -1,0 +1,189 @@
+{
+  "review": "Independent focused trash/playlist/engine review",
+  "base": "8238c94",
+  "blocking": false,
+  "scope": "Frozen worktrees, read-only source review; no GitHub writes, source edits, merges or rebuilds. Existing executables exercised sequentially under global build.lock.",
+  "reviewed_count": 4,
+  "reviews": [
+    {
+      "issue": 255,
+      "pr": 15,
+      "sha": "eed97c21876de703a707a7e0080e01bed033373e",
+      "blocking": false,
+      "findings": [],
+      "worktree_clean_before": true,
+      "worktree_clean_after": true,
+      "sha_unchanged": true,
+      "diff_check_exit_code": 0,
+      "evidence": {
+        "independent_existing_binary_run": {
+          "issue": 255,
+          "command": [
+            "ctest",
+            "--test-dir",
+            "/home/hermes/workspace/nulloy-swarm/evidence/255/review-build",
+            "--no-tests=error",
+            "--output-on-failure",
+            "-j1"
+          ],
+          "exit_code": 0,
+          "log": "/home/hermes/workspace/nulloy-swarm/evidence/review-trash-playlist-255.log",
+          "binary_sha256": {
+            "testTrash": "2d49eb1f9bb1fc613c2d0ee1cae7e0132a5d7075239be293689c60dd5b2c43b2",
+            "testWindowsTrash": "245c754b77505ed84e06ad40a7c8e64d2b0bfaee7fe1e6fce8458ba2d16d42d0"
+          }
+        }
+      },
+      "observations": [
+        "src/platform/trash.cpp:28-79 returns unique successful paths in input order; cancellation/error returns only earlier successes. Failed QFile::remove is not reported successful.",
+        "src/platform/trash.cpp:53-57 checks cancellation before error fallback. NativeResult keeps negative native errors distinct from cancellation across declared adapter signatures.",
+        "src/platform/trash_win.cpp requests FOF_WANTNUKEWARNING and propagates fAnyOperationsAborted independently of SHFileOperation return code.",
+        "src/actionManager.cpp:458-465 passes successful paths to removeFiles; playlistWidget.cpp:182-199 removes all matching duplicates and clears item pointer/map entries. Action wiring inspected, not instantiated.",
+        "Reviewed existing review-red.txt: eight cancellation rows failed with the former unwanted Trash Error dialog; corrected shared/windows GREEN logs report 18/15 QtTest passes including init/cleanup. Independent rerun passed both CTest suites."
+      ],
+      "limits": [
+        "Linux controlled Windows shell boundary is not a native SDK/ABI, Recycle Bin, or hardware test.",
+        "macOS adapter status/signature inspected; inherited FSPathMakeRefWithOptions error handling is unchanged and native macOS crash resolution is not established.",
+        "No integrated action-manager runtime test; supported package CI remains parent-owned."
+      ]
+    },
+    {
+      "issue": 129,
+      "pr": 12,
+      "sha": "7d7b0206d143a442b6aed6b03982a441309af211",
+      "blocking": false,
+      "findings": [],
+      "worktree_clean_before": true,
+      "worktree_clean_after": true,
+      "sha_unchanged": true,
+      "diff_check_exit_code": 0,
+      "evidence": {
+        "independent_existing_binary_run": {
+          "issue": 129,
+          "command": [
+            "ctest",
+            "--test-dir",
+            "/home/hermes/workspace/nulloy-swarm/evidence/129/build",
+            "--no-tests=error",
+            "--output-on-failure",
+            "-j1",
+            "-R",
+            "^removal129$"
+          ],
+          "exit_code": 0,
+          "log": "/home/hermes/workspace/nulloy-swarm/evidence/review-trash-playlist-129.log",
+          "binary_sha256": {
+            "testRemoval129": "2577765804b77c16df54aab76fff75b782f4c9faa44d19dcc65e7a6dbd6ddcdf"
+          }
+        }
+      },
+      "observations": [
+        "src/widgetCollection/playlistWidget.cpp:248-251 changes only non-stopped activation to Playing-only activation. Paused removal retains loaded media/position; it does not load-and-pause a replacement.",
+        "src/widgetCollection/playlistWidget.cpp:217-223 nulls the removed playing pointer and removes its ID map entry; handlers at 367-391 reject stale removed IDs. Empty-list removal at 232-235 still clears media.",
+        "Independent functional CTest passed: paused/current removal, playing/paused/stopped matrix, end-of-list/loop, duplicates, discontiguous selection, stale EOS/failure IDs and successor handoff.",
+        "Existing ctest-final.txt confirms 10/10 functional/benchmark tests; large benchmarks were not redundantly rerun."
+      ],
+      "limits": [
+        "removeFiles track-index/duration omission is pre-existing and explicitly excluded from new assertions.",
+        "Retained paused media can still be explicitly resumed outside the playlist by design; no replacement-media policy was invented.",
+        "No full packaged UI, native keyboard or original macOS freeze reproduction claimed."
+      ]
+    },
+    {
+      "issue": 121,
+      "pr": 18,
+      "sha": "ec445a36ab2b2c2a68f117e0a49a1af734e77ffe",
+      "blocking": false,
+      "findings": [],
+      "worktree_clean_before": true,
+      "worktree_clean_after": true,
+      "sha_unchanged": true,
+      "diff_check_exit_code": 0,
+      "evidence": {
+        "independent_existing_binary_run": {
+          "issue": 121,
+          "command": [
+            "ctest",
+            "--test-dir",
+            "/home/hermes/workspace/nulloy-swarm/evidence/121/build",
+            "--no-tests=error",
+            "--output-on-failure",
+            "-j1"
+          ],
+          "exit_code": 0,
+          "log": "/home/hermes/workspace/nulloy-swarm/evidence/review-trash-playlist-121.log",
+          "binary_sha256": {
+            "testShuffle121": "127826e4ca8413251b9de69915f2f11f0ed6351b299de7812e2a4861f218886d"
+          }
+        }
+      },
+      "observations": [
+        "Diff against 8238c94 changes only docs and standalone tests; no production state/deletion code.",
+        "Independent rerun passed all 12 CTest size/state combinations. Tests retain ID/path membership, playing identity, media/state, paused/stopped position, successor handoff and saved M3U path order."
+      ],
+      "limits": [
+        "Characterization, not a newly reproduced/fixed defect.",
+        "No random-distribution, full restart, physical audio or native platform acceptance."
+      ]
+    },
+    {
+      "issue": 261,
+      "pr": 19,
+      "sha": "647f47b5d05919cc41e888e9f83cbb2457776e05",
+      "blocking": false,
+      "findings": [
+        {
+          "id": "PR19-L1",
+          "severity": "low",
+          "blocking": false,
+          "kind": "test-assertion-coverage",
+          "file": "tests/upstream/261/testStress.cpp",
+          "lines": "83-91",
+          "title": "Resume-output check can be satisfied by output produced before pause",
+          "evidence": "The buffer snapshot is taken at line 83, before two seeks and two 25 ms waits. The buffers.load() > before assertion at line 91 can already be true when pause()/play() run. It proves output since the pre-seek snapshot, not necessarily fresh output after that iteration resumes.",
+          "impact": "No production regression: PR19 is characterization-only, next-iteration startup and final EOS recovery still test real progress. docs/upstream/261/README.md:23 states a stronger per-iteration resume guarantee than this assertion establishes.",
+          "recommendation": "Optional narrow follow-up: snapshot the counter after pause and immediately before play, or soften the per-iteration claim. No feature-test expansion required.",
+          "verification": "Confirmed by static ordering of the counter snapshot, waits and assertion; no mutation or extra compile performed."
+        }
+      ],
+      "worktree_clean_before": true,
+      "worktree_clean_after": true,
+      "sha_unchanged": true,
+      "diff_check_exit_code": 0,
+      "evidence": {
+        "independent_existing_binary_run": {
+          "issue": 261,
+          "command": [
+            "ctest",
+            "--test-dir",
+            "/home/hermes/workspace/nulloy-swarm/evidence/audio/build-261",
+            "--no-tests=error",
+            "--output-on-failure",
+            "-j1"
+          ],
+          "exit_code": 0,
+          "log": "/home/hermes/workspace/nulloy-swarm/evidence/review-trash-playlist-261.log",
+          "binary_sha256": {
+            "testStress": "bd74d092b80a2b556be86c8a2cbdeda980708ab3121bda0a6db3ba16132c1d42"
+          }
+        }
+      },
+      "observations": [
+        "Diff against 8238c94 changes only docs and standalone tests; no production engine code.",
+        "Independent stress CTest passed in 22.96 seconds; its direct log records 100 iterations, 700 nonempty buffers, 110 stream starts, final EOS recovery and 3 QtTest passes including init/cleanup."
+      ],
+      "limits": [
+        "Clocked fakesink/output buffers are not audible continuity or hardware evidence.",
+        "No exact native Mac reproduction, waveform/playlist integration, sanitizer or overnight endurance claim."
+      ]
+    }
+  ],
+  "summary": {
+    "production_regressions_found": 0,
+    "blocking_findings": 0,
+    "nonblocking_findings": 1,
+    "ctest_passed": 16,
+    "ctest_failed": 0
+  },
+  "verification": "All four exact supplied SHAs matched and worktrees remained clean; git diff --check 8238c94..HEAD exited zero for each. Binary hashes and real rerun logs are attached per issue. No fresh compilation or independent Windows CI verification is claimed."
+}

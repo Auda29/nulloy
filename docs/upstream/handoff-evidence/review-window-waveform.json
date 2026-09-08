@@ -1,0 +1,110 @@
+{
+  "review_type": "independent focused read-only frozen-commit review",
+  "base": "8238c94",
+  "overall_verdict": "No blocking findings or confirmed regressions identified in the scoped changes. Native platform acceptance remains pending as documented.",
+  "test_log": "/home/hermes/workspace/nulloy-swarm/evidence/review-window-waveform-tests.log",
+  "execution": {
+    "builds": "Existing configured build directories only; cmake --build --parallel 1 succeeded before each CTest run. Waveform Ninja reported no work; window target built successfully.",
+    "serialization": "flock -w 480 /home/hermes/workspace/nulloy-swarm/build.lock",
+    "tests": "ctest --no-tests=error --timeout 180 -V",
+    "environment": "Debian 13, Qt/QtTest 6.8.2, GCC 14.2.0; waveform GStreamer 1.26.2",
+    "process_exit_code": 0,
+    "infrastructure_note": "Initial background invocation failed before build/test because its relative log redirection could not resolve evidence/. Retried in foreground with absolute paths; full build/test command succeeded. This was not a test failure."
+  },
+  "issues": {
+    "139": {
+      "pr": 17,
+      "sha": "c96c926e396e53a36cd5424fd3a34d763d6f8735",
+      "sha_verified_before_and_after": true,
+      "worktree_status_before": "clean",
+      "worktree_status_after": "clean",
+      "diff_check_exit_code": 0,
+      "blockers": [],
+      "findings": [],
+      "review_notes": [
+        {
+          "location": "src/plugins/pluginGstreamer/waveformBuilderGstreamer.cpp:109-139; src/plugins/abstractWaveformBuilder.cpp:87-139",
+          "assessment": "stop() precedes reset(): prior completed peaks can still be cached, pipeline streaming is stopped before peak mutation, and the previous QThread is joined. Reset clears peaks and position/index before either early return; a cache hit copies the cached peaks back synchronously. m_currentFile remaining unchanged on an early return cannot trigger a stale cache write because m_playbin is null."
+        },
+        {
+          "location": "src/plugins/pluginGstreamer/waveformBuilderGstreamer.cpp:187-221; src/interfaces/waveformBuilderInterface.h:25-28",
+          "assessment": "The timer and builder QObject retain owner-thread affinity; there is no moveToThread or run override. Error-path stop therefore joins the separate default QThread event loop, not itself. update() holds its own bus and popped-message references across pipeline teardown and releases them afterward, matching the existing EOS path. No access to m_playbin follows stop() in update(). Incomplete peaks are not written to cache."
+        }
+      ],
+      "tests": {
+        "build_dir": "/home/hermes/workspace/nulloy-swarm/evidence/waveform/build",
+        "cmake_source": "/home/hermes/workspace/nulloy-swarm/issue-139/tests/upstream/139",
+        "source_binding": "CMake compiles the frozen worktree's production GStreamer builder, abstract builder, peaks and common sources; existing build was checked up-to-date before execution.",
+        "ctest_name": "waveform139",
+        "ctest_passed": 1,
+        "ctest_failed": 0,
+        "ctest_seconds": 6.12,
+        "qttest_passed_including_init_cleanup": 12,
+        "qttest_failed": 0,
+        "qttest_skipped": 0,
+        "long_fixture_seconds": 600,
+        "metrics_file": "/home/hermes/workspace/nulloy-swarm/evidence/review-waveform-metrics.jsonl",
+        "metrics_validation": "Existing tests/upstream/139/summarize.py exited 0 and verified all 218 rows: environment 1, completion 12, cache-save 100, cache-load 3, cancellation 50, close 50, rename 1, unlink 1.",
+        "coverage": "Missing input after completion; invalid-audio stop and recovery; cold/warm WAV/Ogg/FLAC cache identity; 50 stop and 50 destructor cancellation samples; rename/unlink during decode; completion and cache serialization."
+      },
+      "limitations": [
+        "Core-only builder harness does not reproduce or resolve the original whole-UI directory-move freeze report.",
+        "No Windows/macOS filesystem-sharing, original UI, network mount or slow-filesystem verification.",
+        "Qt5 compilation not performed; only Qt6 available in these builds.",
+        "Prior worker baseline/sabotage evidence was not independently rerun in this finite review."
+      ]
+    },
+    "236": {
+      "pr": 16,
+      "sha": "791ea82705898652d15866be7b77e3ad5f720976",
+      "sha_verified_before_and_after": true,
+      "worktree_status_before": "clean",
+      "worktree_status_after": "clean",
+      "diff_check_exit_code": 0,
+      "blockers": [],
+      "findings": [],
+      "review_notes": [
+        {
+          "location": "src/mainWindow.cpp:104-121,180-210,288-314",
+          "assessment": "New-screen observers are registered synchronously while QScreen is valid. Deferred recovery reads the current screen list and does not dereference removed-screen signal arguments. Connections and zero-delay lambdas have this as lifetime context. Native normal-state restoration is deferred and rechecks state before applying/clearing the normal geometry cache."
+        },
+        {
+          "location": "src/mainWindow.cpp:131-160,180-279; src/windowGeometry.h:11-33",
+          "assessment": "Malformed settings are length/conversion checked. Geometry policy uses individual logical work areas rather than a bounding union, preserves usable partial/negative/spanning placement, ignores invalid screens and bounds fallback size. Minimized/maximized/fullscreen notifications adjust only cached normal geometry; hidden normal windows are moved/resized without being shown. Explicit maximize/fullscreen exits restore and clear cache before subsequent user moves."
+        },
+        {
+          "location": "src/mainWindow.cpp:39-42,217-219,245-247,294-295; tests/upstream/236/CMakeLists.txt:19-26",
+          "assessment": "Qt5-specific QDesktopWidget calls remain guarded and now select availableGeometry(this); added QScreen/connect/timer APIs are compatible with the project's Qt5.15 baseline by inspection. Frameless windows now participate in state-change recovery rather than returning early. Windows test linkage names the production taskbar sources and platform libraries. No native Windows/Qt5 build verdict is inferred from this inspection."
+        }
+      ],
+      "tests": {
+        "build_dir": "/home/hermes/workspace/nulloy-swarm/evidence/236/build-qt6",
+        "cmake_source": "/home/hermes/workspace/nulloy-swarm/issue-236/tests/upstream/236",
+        "source_binding": "N_SRC cache resolves to issue-236/src, not the external baseline copy. Production mainWindow/settings and moc are compiled, with the existing no-skins fixture and isolated settings path.",
+        "ctest_name": "upstream236",
+        "qpa_platform": "offscreen",
+        "ctest_passed": 1,
+        "ctest_failed": 0,
+        "ctest_seconds": 0.05,
+        "qttest_passed_including_init_cleanup": 45,
+        "qttest_failed": 0,
+        "qttest_skipped": 0,
+        "coverage": "Reachability and work-area policy; malformed settings; hidden/minimized show; framed/frameless maximize/fullscreen recovery; synthesized screen notifications with state preservation; native QWidget showNormal path; clearing restored cache before later moves; settings round trips."
+      },
+      "limitations": [
+        "Qt5 unavailable: existing evidence/236/build-qt5/CMakeCache.txt records Qt5_DIR-NOTFOUND. No new Qt5 build attempted or claimed.",
+        "No native Windows taskbar, physical hotplug, mixed-DPI, decorated frame-metric, macOS, or original-skin/UI acceptance verification.",
+        "Synthetic screen rectangles/signals and offscreen QWidget operations establish source-boundary behavior, not actual monitor removal or window-manager event ordering. Earlier no-WM Xvfb evidence is likewise not native platform proof; Xvfb was not rerun here.",
+        "Top-strip reachability is a documented heuristic, not skin-specific hit testing. Existing widget minimum sizes may exceed very small work areas.",
+        "Prior worker baseline/sabotage evidence was not independently rerun in this finite review."
+      ]
+    }
+  },
+  "repository_changes": "None. Frozen HEADs and clean worktrees verified after test execution; no GitHub writes, merges, commits or source/test edits.",
+  "created_evidence": [
+    "evidence/review-window-waveform.json",
+    "evidence/review-window-waveform-tests.log",
+    "evidence/review-waveform-metrics.jsonl"
+  ],
+  "other_generated_changes": "Existing external build/CTest logs and isolated test caches may be updated by the build/test commands; no tracked outputs changed."
+}
