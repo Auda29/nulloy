@@ -5,6 +5,7 @@ on:
     branches: [master, 'codex/phase-2-*', 'codex/phase-3-*', 'codex/phase-4-*']
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -27,6 +28,11 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+      - name: Keep checkout Git for package provenance
+        shell: pwsh
+        run: |
+          "NULLOY_GIT_EXECUTABLE=$((Get-Command git).Source)" >> $env:GITHUB_ENV
+          git status --short
       - uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
@@ -55,6 +61,7 @@ jobs:
           cmake --build --preset ${{ matrix.preset }}
           ctest --preset ${{ matrix.preset }}
           python tools/phase4/test-import-profile.py
+          python tools/release/test-alpha.py
       - name: Package and verify without toolchain PATH
         shell: msys2 {0}
         run: |

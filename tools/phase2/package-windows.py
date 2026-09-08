@@ -148,10 +148,16 @@ def package(args):
             "Third-party binaries come from MSYS2 MINGW64. Package versions are in toolchain.txt.\n"
             "Corresponding MSYS2 package recipes and source locations: https://github.com/msys2/MINGW-packages\n",
             encoding="utf-8")
-        commit = subprocess.check_output(["git", "-c", f"safe.directory={source.as_posix()}",
+        # MSYS2 and the Git used by checkout may have different system settings
+        # for CRLF conversion. Use the checkout Git when supplied by CI.
+        git = os.environ.get("NULLOY_GIT_EXECUTABLE", "git")
+        commit = subprocess.check_output([git, "-c", f"safe.directory={source.as_posix()}",
                                           "rev-parse", "HEAD"], cwd=source, text=True).strip()
-        dirty = bool(subprocess.check_output(["git", "-c", f"safe.directory={source.as_posix()}",
-                                             "status", "--porcelain", "--untracked-files=no"], cwd=source, text=True).strip())
+        changes = subprocess.check_output([git, "-c", f"safe.directory={source.as_posix()}",
+                                           "status", "--porcelain", "--untracked-files=no"], cwd=source, text=True).strip()
+        dirty = bool(changes)
+        if dirty:
+            print("Package source has tracked changes:\n" + changes)
         metadata = {"source_commit": commit, "tracked_changes": dirty, "version": version,
                     "executable": executable, "root": app_name, "archive": output.name,
                     "portable": portable, "upstream_update_check": enabled("NULLOY_UPDATE_CHECK")}

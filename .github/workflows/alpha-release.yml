@@ -1,0 +1,49 @@
+name: Alpha release
+
+on:
+  push:
+    tags: ['v*-alpha.*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: alpha-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate tag and preset version
+        run: python3 tools/release/alpha.py validate
+
+  test:
+    needs: validate
+    uses: ./.github/workflows/windows-cmake.yml
+
+  publish:
+    needs: [validate, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Nulloy-Qt6-windows-x64
+          path: .phase4/release-input/package
+      - uses: actions/download-artifact@v4
+        with:
+          name: Windows-Qt6-test-evidence
+          path: .phase4/release-input/evidence
+      - name: Validate assets and assemble release
+        env:
+          RELEASE_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python3 tools/release/alpha.py prepare
+      - name: Publish GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: python3 tools/release/alpha.py publish
