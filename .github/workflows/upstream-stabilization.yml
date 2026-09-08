@@ -1,0 +1,54 @@
+name: Upstream stabilization (native Linux components)
+
+on:
+  push:
+    branches: ['integration/upstream-issues']
+  pull_request:
+    branches: ['integration/upstream-issues']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream-native-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    container: debian:13-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc4017c709b6259bc132
+    timeout-minutes: 25
+    steps:
+      - name: Install native component test dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates git g++ cmake ninja-build pkg-config python3 \
+            qt6-base-dev qt6-declarative-dev qt6-svg-dev qt6-tools-dev qt6-5compat-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-tools \
+            libtag1-dev zlib1g-dev xvfb xauth ffmpeg fonts-dejavu-core
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Verify runner and existing Python contracts
+        run: |
+          python3 tools/upstream/test-run-native.py
+          python3 tools/phase4/test-import-profile.py
+          python3 tools/release/test-alpha.py
+      - name: Exercise native issue harnesses
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          dpkg-query -W > /tmp/nulloy-toolchain.txt
+          python3 tools/upstream/run-native.py --allow-empty --output /tmp/nulloy-upstream-tests
+      - name: Upload exact test evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: upstream-linux-component-evidence
+          path: |
+            /tmp/nulloy-toolchain.txt
+            /tmp/nulloy-upstream-tests/results.json
+            /tmp/nulloy-upstream-tests/*/step-*.log
+            /tmp/nulloy-upstream-tests/*/Testing/Temporary/LastTest.log
+          if-no-files-found: warn
