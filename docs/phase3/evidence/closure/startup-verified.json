@@ -1,0 +1,20 @@
+{
+  "archive_sha256": "8af2f3324c42f428e3dfffda34275afbbe769b60d4fbf277699fe357a1e4395a",
+  "file_hashes_verified": 516,
+  "x64_binaries": 235,
+  "path": "Windows System32 only",
+  "extraction_path": "temporary directory with spaces and umlaut",
+  "audio": "normal device selection, muted",
+  "skins": [
+    "Slim/0.9",
+    "Silver/0.9",
+    "Metro/0.9",
+    "Native/0.9"
+  ],
+  "repetitions_per_skin": 3,
+  "qt_major": "6",
+  "explicit_scale_factor": null,
+  "formats": [],
+  "unicode_tag_roundtrip": false,
+  "startup_trace": true
+}

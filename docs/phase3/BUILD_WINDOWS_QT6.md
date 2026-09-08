@@ -52,6 +52,19 @@ temporären Ordner mit Leerzeichen und Umlaut; sein PATH enthält nur System32.
 Die Testwiedergabe ist stummgeschaltet. `--headless-audio` verwendet den
 GStreamer-Ersatz für Systeme ohne Audiogerät; dies ist kein Hörtest.
 
+Ergänzende Format- und Tag-Prüfung mit erzeugten Testdateien:
+
+```bash
+python tools/phase3/build-format-fixtures.py --prefix "$(cygpath -m /mingw64)" --build .phase3/build
+python tools/phase2/verify-package.py --prefix "$(cygpath -m /mingw64)" --build .phase3/build --format-fixtures .phase3/build/format-fixtures
+python tools/phase2/verify-package.py --prefix "$(cygpath -m /mingw64)" --build .phase3/build --trace-startup --repeat 3
+```
+
+Die Formatprüfung schreibt Unicode-Tags ausschließlich in temporäre Kopien der
+erzeugten Dateien. Ergebnisse liegen unter `format-check`. Die Startdiagnose
+protokolliert Plugin-Zeitmarken und GStreamer-Registry-Meldungen unter
+`startup-check`; Erststart und Folgestarts bleiben getrennt auswertbar.
+
 Der Vergleichsbuild bleibt unter dem Preset `windows-x64` mit Qt 5.15 verfügbar.
 Für die ursprünglichen Skin-Tests werden dieselben Produktionsadapter verwendet:
 

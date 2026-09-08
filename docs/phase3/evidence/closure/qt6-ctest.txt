@@ -1,0 +1,13 @@
+Test project D:/Benutzer Dateien/Benutzer/ChatGPT/Nulloy-Fork/.phase3/build
+    Start 1: testTrackInfoReader
+1/4 Test #1: testTrackInfoReader ..............   Passed    0.14 sec
+    Start 2: testPlaylistWidget
+2/4 Test #2: testPlaylistWidget ...............   Passed    4.65 sec
+    Start 3: testFileDrop
+3/4 Test #3: testFileDrop .....................   Passed    0.80 sec
+    Start 4: testMigration
+4/4 Test #4: testMigration ....................   Passed    0.84 sec
+
+100% tests passed out of 4
+
+Total Test time (real) =   6.43 sec

@@ -3,9 +3,11 @@
 Stand: 8. September 2026. Der vollständige Windows-x64-Player läuft mit Qt 6.11.2,
 GStreamer 1.28.6 und TagLib 2.2.1. Die technische Integration und der manuelle
 Test der Kernbedienung sind erfolgreich. Der Nutzer meldet auch unauffällige
-Ladezeiten, hat diese aber nicht gemessen. Die frühere Erststart-Auffälligkeit
-bleibt als Messbefund dokumentiert. Dies ist ein Teststand, keine veröffentlichte
-Migrationsversion.
+Ladezeiten, hat diese aber nicht gemessen. Die ergänzenden Format- und
+Tag-Schreibtests bestehen. Der langsame Erststart wurde auf den Aufbau des
+GStreamer-Plugin-Caches eingegrenzt, aber noch nicht behoben. Die vollständige
+Abnahme bleibt wegen dieses Befunds und spezieller manueller Windows-Prüfungen
+offen. Dies ist ein Teststand, keine veröffentlichte Migrationsversion.
 
 Basis ist Phase 2, Commit `b0ab67a4fa1ae2c4e38f6df85a8a97ea4a9285a2`.
 Phase 3 liegt auf `codex/phase-3-qt6-player`. Phase 2 wird dadurch nicht gemergt.
@@ -73,8 +75,41 @@ mit ausschließlich System32. Der Entpackpfad enthält Leerzeichen und einen
 Umlaut. Vor dem Lauf werden ZIP- und Datei-Prüfsummen geprüft. Skriptfehler und
 Warnungen über nicht speicherbare QJSValue-Werte führen zum Fehlschlag.
 
-Der Windows-Workflow enthält getrennte Qt-5- und Qt-6-Jobs. Eine lokale Prüfung
-ist noch kein Nachweis eines erfolgreichen GitHub-CI-Laufs auf diesem Branch.
+Der Windows-Workflow enthält getrennte Qt-5- und Qt-6-Jobs. Beide Jobs des
+[Integrationslaufs 34216854569](https://github.com/Auda29/nulloy/actions/runs/34216854569)
+für Commit `367df4110c20022f48729e1668086795d46ba1a3` sind erfolgreich, einschließlich
+Paketprüfung und Qt-6-Skin-Prototyp. Die Abschlussänderung ergänzt in beiden Jobs
+die nachfolgende Formatprüfung; ihr jeweiliger Status steht im Pull Request.
+
+## Ergänzende Abschlussprüfung
+
+Sechs erzeugte Audioformate bestehen in den entpackten Qt-5- und Qt-6-Paketen den vollständigen
+Bedienablauf: WAV, MP3, FLAC, Ogg/Vorbis, Opus und WavPack. Vor der Wiedergabe
+schreibt der Test Titel, Künstler, Album und Titelnummer, öffnet die Datei neu
+und vergleicht die Werte. Dazu gehören Umlaute und japanische Zeichen.
+Private Musikdateien werden dafür nicht verwendet.
+
+Dabei fiel ein vorhandener Fehler in der TagLib-Anbindung auf. Im UTF-8-Modus
+wurde ein bereits dekodierter Unicode-Text zunächst verlustbehaftet nach Latin-1
+konvertiert und danach erneut als UTF-8 gelesen. Der Fix übernimmt den von
+TagLib dekodierten Text direkt. Explizit ausgewählte ältere Zeichencodierungen
+behalten ihre bisherige Behandlung. Die sechs Pakettests schützen den Fix
+gegen Regressionen. AAC/M4A, AIFF und weitere Formate sind nicht abgedeckt.
+Die erzeugte VBR-MP3 enthält einen Xing-Header für Dauer und Seek. Ohne diesen
+Header lieferte der Qt-5-Vergleich zunächst eine abweichende Dauerschätzung;
+erst nach rund neun Sekunden passte sie. Solche MP3-Dateien sind damit keine
+Bestätigung einer sofort korrekten Daueranzeige.
+
+Der Menütest beobachtet jetzt das tatsächliche Anzeigen eines gefüllten Menüs.
+Die frühere Prüfung nach einer festen Verzögerung konnte fehlschlagen, wenn
+der Desktop-Fokus das bereits geöffnete Menü zwischenzeitlich schloss.
+Mit der Anpassung bestehen alle vier Skins in jeweils drei aufeinanderfolgenden
+Paketläufen.
+
+Das anschließend geprüfte Paket hat SHA-256
+`8af2f3324c42f428e3dfffda34275afbbe769b60d4fbf277699fe357a1e4395a`.
+Die ursprüngliche manuelle Nutzerabnahme bleibt dem älteren Paket zugeordnet.
+Neue Belege liegen unter [evidence/closure](docs/phase3/evidence/closure).
 
 ## Manueller Test
 
@@ -114,14 +149,27 @@ Dies sind lokale Einzelmessungen während der Integration, keine zugesicherten
 Grenzwerte. Andere frisch entpackte Läufe lagen beim ersten Start zwischen etwa
 8 und 26 Sekunden. Das Abschalten des separaten GStreamer-Scanner-Prozesses
 brachte im Vergleichstest keine Verbesserung und wurde nicht übernommen.
-Die Ursache des langsamen Erststarts ist nicht abschließend isoliert.
+Die ergänzende Messung mit Zeitmarken grenzt den Engpass ein: Von 9.443 ms bis
+zum sichtbaren Slim-Fenster entfielen rund 7.950 ms auf die erstmalige
+GStreamer-Registry-Prüfung und deren Aufbau. Im vorherigen Diagnoselauf waren es
+11.905 ms bei 13.522 ms Gesamtzeit. Der zweite und dritte Start der abschließenden
+Messreihe benötigten 574 und 556 ms. Die Waveform benötigte 605, 261 und 319 ms,
+der Cachezugriff jeweils unter 1 ms und das Beenden 20, 28 und 25 ms.
+
+Damit ist der langsame Abschnitt nachgewiesen. Welche einzelnen Plugins oder
+lokalen Dateiprüfungen ihn dominieren, ist nicht geklärt. Eine Optimierung darf
+die Formatabdeckung nicht stillschweigend verkleinern. Der Erststart bleibt
+deshalb ein offener Leistungspunkt, auch wenn Folgestarts schnell sind.
+Der Qt-5-Vergleich zeigt denselben Engpass: 11.612 ms Registry-Aufbau bei
+13.446 ms bis zum sichtbaren Fenster. Die Verzögerung tritt somit auch ohne
+die Qt-6-Migration in der neuen Paket-Toolchain auf.
 
 Weiter offen:
 
 - Ergänzende manuelle Prüfungen für Fensterziehen, Monitorwechsel,
   Taskleistenanzeige und Hotkeys bei Fokus in anderen Programmen.
-- Erststart-Verhalten und Formatabdeckung über WAV und die privaten MP3-Dateien
-  hinaus. Ein kompletter Format- und Tag-Schreibtest wurde nicht durchgeführt.
+- Erststart aus einem frisch entpackten Ordner beschleunigen und erneut messen.
+  Die Diagnose ist abgeschlossen, die Optimierung nicht.
 
 Die aktuelle Rückmeldung bezieht sich auf das oben benannte Qt-6-Paket. Die
 frühere Bestätigung des Referenzplayers wird dafür nicht herangezogen. Der

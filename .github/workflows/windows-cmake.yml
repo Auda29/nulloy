@@ -58,6 +58,11 @@ jobs:
         run: |
           python tools/phase2/package-windows.py --prefix "$(cygpath -m /mingw64)" --build ${{ matrix.build }} --source .
           python tools/phase2/verify-package.py --prefix "$(cygpath -m /mingw64)" --build ${{ matrix.build }} --headless-audio
+      - name: Verify audio formats and Unicode tag roundtrips
+        shell: msys2 {0}
+        run: |
+          python tools/phase3/build-format-fixtures.py --prefix "$(cygpath -m /mingw64)" --build ${{ matrix.build }}
+          python tools/phase2/verify-package.py --prefix "$(cygpath -m /mingw64)" --build ${{ matrix.build }} --format-fixtures ${{ matrix.build }}/format-fixtures --headless-audio
       - name: Test shared Qt 6 skin adapters
         if: matrix.qt == 6
         shell: msys2 {0}
@@ -82,5 +87,6 @@ jobs:
             ${{ matrix.build }}/*-results.txt
             ${{ matrix.build }}/toolchain.txt
             ${{ matrix.build }}/package-check/
+            ${{ matrix.build }}/format-check/
             ${{ matrix.build }}/Testing/Temporary/LastTest.log
             .phase3/skin-probe/*-results.txt

@@ -98,6 +98,11 @@ NTagReaderTaglib::~NTagReaderTaglib()
 
 QString NTagReaderTaglib::toUnicode(const TagLib::String &tstr) const
 {
+    // TagLib has already decoded Unicode tags. A Latin-1 intermediate loses
+    // characters and must not be decoded again as UTF-8.
+    if (!m_codec || m_codec == m_utf8Codec) {
+        return QString::fromUtf8(tstr.toCString(true));
+    }
     const char *cstr = tstr.toCString(false);
     QTextCodec::ConverterState state;
     m_utf8Codec->toUnicode(cstr, tstr.size(), &state);

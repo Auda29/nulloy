@@ -111,7 +111,9 @@ Nachweis: [Phase-2-Bericht](PHASE2_REPORT.md) und [Windows-Build-Leitfaden](docs
 - [ ] Fensterrahmen, Tray, Taskleiste und globale Hotkeys manuell abnehmen. Automatisierte Fenster-, Tray-, Hotkey-, Einzelinstanz- und Dateiübergabeprüfungen bestehen.
 - [x] Lebensdauer von Qt-Objekten, Abbruch von Hintergrundarbeit und Beenden während der Waveform-Berechnung prüfen.
 - [x] Die Kernbedienung manuell vergleichen. Der Nutzer bestätigt den vorgeschlagenen Testablauf für das Qt-6-Paket als erfolgreich, einschließlich subjektiv unauffälliger Ladezeiten. Exakte Zeiten wurden nicht gemessen.
-- [ ] Ergänzende Plattformprüfungen und die frühere Erststart-Auffälligkeit abschließend klären. Siehe [Phase-3-Bericht](PHASE3_REPORT.md).
+- [x] WAV, MP3, FLAC, Ogg/Vorbis, Opus und WavPack mit Wiedergabe, Waveform und Unicode-Tag-Schreiben im Paket prüfen; Prüfung in beide CI-Jobs aufnehmen.
+- [x] Erststart messen und eingrenzen: Der Aufbau des GStreamer-Plugin-Caches dominiert die Verzögerung. Folgestarts liegen in der letzten Slim-Messreihe bei 574 und 556 ms.
+- [ ] Ergänzende manuelle Plattformprüfungen abschließen und den Erststart aus einem frisch entpackten Ordner beschleunigen. Siehe [Phase-3-Bericht](PHASE3_REPORT.md).
 
 **Abnahme:** Der komplette Player läuft unter Windows x64 mit Qt 6. Die bisherigen Kernfunktionen bestehen den Vergleich. Es gibt keine ungeklärten Änderungen an Darstellung, Bedienung oder gespeicherten Nutzerdaten.
 

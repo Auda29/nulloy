@@ -26,6 +26,33 @@
 Q_IMPORT_PLUGIN(NWidgetCollection)
 #endif
 
+namespace {
+QElapsedTimer *startupClock = nullptr;
+QtMessageHandler previousHandler = nullptr;
+void startupMessage(QtMsgType type, const QMessageLogContext &context, const QString &message)
+{
+    if (startupClock && (message.startsWith("found container") || message.startsWith("registering plugin")))
+        previousHandler(QtInfoMsg, context, QString("startup-ms %1: %2").arg(startupClock->elapsed()).arg(message));
+    previousHandler(type, context, message);
+}
+
+class MenuObserver : public QObject
+{
+public:
+    bool opened = false;
+    bool eventFilter(QObject *object, QEvent *event) override
+    {
+        if (event->type() == QEvent::Show) {
+            if (auto menu = qobject_cast<QMenu *>(object)) {
+                opened = !menu->actions().isEmpty();
+                QTimer::singleShot(0, menu, &QMenu::close);
+            }
+        }
+        return false;
+    }
+};
+}
+
 class TestPlayerPackage : public QObject
 {
     Q_OBJECT
@@ -54,7 +81,15 @@ private slots:
 #endif
         QElapsedTimer clock;
         clock.start();
+        if (qEnvironmentVariableIsSet("NULLOY_TEST_STARTUP_TRACE")) {
+            startupClock = &clock;
+            previousHandler = qInstallMessageHandler(startupMessage);
+        }
         auto player = std::make_unique<NPlayer>();
+        if (startupClock) {
+            qInstallMessageHandler(previousHandler);
+            startupClock = nullptr;
+        }
         QVERIFY(player->mainWindow()->isVisible());
         QVERIFY(QTest::qWaitForWindowExposed(player->mainWindow()));
         qInfo() << "window-exposed-ms" << clock.elapsed();
@@ -76,6 +111,26 @@ private slots:
         QCOMPARE(files.size(), 2);
         for (const QString &file : files) {
             QVERIFY(QFile::exists(file));
+        }
+        if (qEnvironmentVariableIsSet("NULLOY_TEST_WRITE_TAGS")) {
+            // The runner supplies disposable synthetic media copies only.
+            auto tags = player->tagReader();
+            tags->setEncoding("UTF-8");
+            tags->setSource(files[0]);
+            QVERIFY(tags->isWriteSupported());
+            const QMap<QString, QStringList> expected{
+                {"TITLE", {QString::fromUtf8("Grüße 日本語")}},
+                {"ARTIST", {QString::fromUtf8("Künstler Ä")}},
+                {"ALBUM", {"Migration test"}}, {"TRACKNUMBER", {"7"}}};
+            const auto unsaved = tags->setTags(expected);
+            QVERIFY2(unsaved.isEmpty(), qPrintable(unsaved.keys().join(',')));
+            tags->setSource(files[1]);
+            tags->setSource(files[0]);
+            const auto reopened = tags->getTags();
+            for (auto it = expected.cbegin(); it != expected.cend(); ++it)
+                QCOMPARE(reopened.value(it.key()), it.value());
+            QCOMPARE(tags->getTag('t'), expected.value("TITLE").first());
+            qInfo() << "unicode-tags-written-and-reopened" << QFileInfo(files[0]).suffix();
         }
         // One file, followed by a simultaneous two-file external drop.
         for (const QList<QUrl> urls : {QList<QUrl>{QUrl::fromLocalFile(files[0])},
@@ -110,7 +165,9 @@ private slots:
         player->tagReader()->setSource(files[0]);
         const qint64 tagDuration = player->tagReader()->getTag('D').toLongLong();
         QVERIFY(tagDuration > 0);
-        QVERIFY(qAbs(engine->durationMsec() - tagDuration * 1000) < 2000);
+        QTRY_VERIFY2(qAbs(engine->durationMsec() - tagDuration * 1000) < 2000,
+                     qPrintable(QString("Playback duration %1 ms, tag duration %2 s")
+                                    .arg(engine->durationMsec()).arg(tagDuration)));
         if (!referenceMedia) {
             QCOMPARE(engine->durationMsec(), qint64(10000));
             QCOMPARE(tagDuration, qint64(10));
@@ -133,18 +190,13 @@ private slots:
         QVERIFY(QFile::exists(files[1]));
         QVERIFY(player->mainWindow()->grab().save(QCoreApplication::applicationDirPath() + "/render.png"));
         if (auto menuButton = player->mainWindow()->findChild<QAbstractButton *>("menuButton")) {
-            bool menuOpened = false;
-            QTimer closeMenu;
-            closeMenu.setSingleShot(true);
-            connect(&closeMenu, &QTimer::timeout, [&] {
-                if (auto menu = qobject_cast<QMenu *>(QApplication::activePopupWidget())) {
-                    menuOpened = true;
-                    menu->close();
-                }
-            });
-            closeMenu.start(150);
+            // Observe the real show event; desktop focus can close a popup
+            // before an arbitrary delayed visibility check runs.
+            MenuObserver observer;
+            qApp->installEventFilter(&observer);
             menuButton->click();
-            QVERIFY(menuOpened);
+            qApp->removeEventFilter(&observer);
+            QVERIFY(observer.opened);
         }
         const QSize normalSize = player->mainWindow()->size();
         player->mainWindow()->toggleMaximize();

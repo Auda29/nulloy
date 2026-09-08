@@ -1,0 +1,24 @@
+{
+  "archive_sha256": "c7bd95b9da1d2ef2b1e399119be79b70fdd24350224f17e3f5eb3c42fc109a93",
+  "file_hashes_verified": 490,
+  "x64_binaries": 210,
+  "path": "Windows System32 only",
+  "extraction_path": "temporary directory with spaces and umlaut",
+  "audio": "normal device selection, muted",
+  "skins": [
+    "Slim/0.9"
+  ],
+  "repetitions_per_skin": 1,
+  "qt_major": "5",
+  "explicit_scale_factor": null,
+  "formats": [
+    "wav",
+    "mp3",
+    "flac",
+    "ogg",
+    "opus",
+    "wv"
+  ],
+  "unicode_tag_roundtrip": true,
+  "startup_trace": true
+}

@@ -18,12 +18,21 @@ parser.add_argument("--headless-audio", action="store_true", help="Use GStreamer
 parser.add_argument("--repeat", type=int, choices=range(1, 11), default=1,
                     help="Repeat each skin in the same extraction to distinguish cold and warm starts")
 parser.add_argument("--scale", type=float, choices=(1, 1.5, 2), help="Explicit Qt scale factor for UI comparison")
+parser.add_argument("--format-fixtures", help="Generated fixture folder; enables Unicode tag writing tests")
+parser.add_argument("--trace-startup", action="store_true")
 args = parser.parse_args()
+if args.media and args.format_fixtures:
+    parser.error("Private media and synthetic format tests are separate modes")
 build, prefix = Path(args.build).resolve(), Path(args.prefix).resolve()
 evidence = build / ("private-media-check" if args.media else "package-check")
+if args.format_fixtures:
+    evidence = build / "format-check"
+elif args.trace_startup:
+    evidence = build / "startup-check"
 if args.scale:
     evidence = evidence.with_name(evidence.name + f"-scale-{args.scale:g}")
 evidence.mkdir(exist_ok=True)
+(evidence / "verified.json").unlink(missing_ok=True)
 archive = build / "Nulloy-windows-x64.zip"
 actual_hash = hashlib.sha256(archive.read_bytes()).hexdigest()
 assert actual_hash == archive.with_suffix(".zip.sha256").read_text().split()[0]
@@ -47,6 +56,12 @@ with tempfile.TemporaryDirectory(prefix="package check ä ", dir=build) as temp:
     if args.scale:
         env["QT_SCALE_FACTOR"] = str(args.scale)
     env["GST_DEBUG"] = "2"
+    if args.trace_startup:
+        env["NULLOY_TEST_STARTUP_TRACE"] = "1"
+        env["GST_DEBUG"] = "GST_REGISTRY:4"
+    else:
+        env.pop("NULLOY_TEST_STARTUP_TRACE", None)
+    env.pop("NULLOY_TEST_WRITE_TAGS", None)
     if args.headless_audio:
         env["GST_PLUGIN_FEATURE_RANK"] = "directsoundsink:0,waveformsink:0,wasapisink:0,wasapi2sink:0"
     version = subprocess.run([str(root / "Nulloy.exe"), "--version"], cwd=temp, env=env,
@@ -63,10 +78,23 @@ with tempfile.TemporaryDirectory(prefix="package check ä ", dir=build) as temp:
         env["NULLOY_TEST_MEDIA"] = "|".join(media)
     else:
         env.pop("NULLOY_TEST_MEDIA", None)
-    for skin, attempt in ((skin, attempt) for skin in skins for attempt in range(args.repeat)):
-        name = skin.split("/")[0].lower() + (f"-{attempt + 1}" if args.repeat > 1 else "")
+    formats = []
+    if args.format_fixtures:
+        fixtures = Path(args.format_fixtures).resolve()
+        formats = json.loads((fixtures / "formats.json").read_text())
+        shutil.copytree(fixtures, root / "format-fixtures")
+        cases = [("Slim/0.9", fmt, attempt) for fmt in formats for attempt in range(args.repeat)]
+        skins = ("Slim/0.9",)
+        env["NULLOY_TEST_WRITE_TAGS"] = "1"
+    else:
+        cases = [(skin, None, attempt) for skin in skins for attempt in range(args.repeat)]
+    for skin, fmt, attempt in cases:
+        name = (fmt or skin.split("/")[0].lower()) + (f"-{attempt + 1}" if args.repeat > 1 else "")
+        if fmt:
+            env["NULLOY_TEST_MEDIA"] = "|".join((root / "format-fixtures" / f"0{i}.{fmt}").as_posix() for i in (1, 2))
         env["NULLOY_TEST_SKIN"] = skin
         result = evidence / f"{name}-results.txt"
+        result.unlink(missing_ok=True)
         cache = root / "testPlayerPackage.peaks"
         if cache.exists():
             cache.unlink()
@@ -75,6 +103,8 @@ with tempfile.TemporaryDirectory(prefix="package check ä ", dir=build) as temp:
         (evidence / f"{name}-stderr.txt").write_bytes(completed.stderr)
         if (root / "render.png").exists():
             shutil.copy2(root / "render.png", evidence / f"{name}.png")
+        if not result.exists():
+            raise RuntimeError(f"{name} did not produce a test result")
         if result.exists():
             log = result.read_text(encoding="utf-8")
             print(log)
@@ -89,5 +119,6 @@ with tempfile.TemporaryDirectory(prefix="package check ä ", dir=build) as temp:
         "extraction_path": "temporary directory with spaces and umlaut",
         "audio": "GStreamer no-device fallback" if args.headless_audio else "normal device selection, muted",
         "skins": skins, "repetitions_per_skin": args.repeat, "qt_major": qt_major,
-        "explicit_scale_factor": args.scale
+        "explicit_scale_factor": args.scale, "formats": formats,
+        "unicode_tag_roundtrip": bool(formats), "startup_trace": args.trace_startup
     }, indent=2) + "\n", encoding="utf-8")

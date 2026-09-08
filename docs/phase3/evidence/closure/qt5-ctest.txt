@@ -1,0 +1,13 @@
+Test project D:/Benutzer Dateien/Benutzer/ChatGPT/Nulloy-Fork/.phase3/qt5-compare
+    Start 1: testTrackInfoReader
+1/4 Test #1: testTrackInfoReader ..............   Passed   10.64 sec
+    Start 2: testPlaylistWidget
+2/4 Test #2: testPlaylistWidget ...............   Passed   25.04 sec
+    Start 3: testFileDrop
+3/4 Test #3: testFileDrop .....................   Passed   11.02 sec
+    Start 4: testMigration
+4/4 Test #4: testMigration ....................   Passed   11.06 sec
+
+100% tests passed out of 4
+
+Total Test time (real) =  57.91 sec
