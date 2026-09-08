@@ -29,6 +29,21 @@ class TestMigration : public QObject
 {
     Q_OBJECT
 private slots:
+    void aiffFilterMigration()
+    {
+        const QString oldFilters = "*.m3u *.m3u8 *.mp3 *.ogg *.mp4 *.wma *.flac *.ape *.wav *.wv *.tta *.mpc *.spx *.opus *.m4a *.aac *.aiff *.xm *.s3m *.it *.mod";
+        NSettings::instance()->setValue("FileFilters", oldFilters);
+        delete NSettings::instance();
+        const QString migrated = NSettings::instance()->value("FileFilters").toString();
+        QVERIFY(migrated.split(' ').contains("*.aif"));
+        QVERIFY(migrated.split(' ').contains("*.aifc"));
+        NSettings::instance()->setValue("FileFilters", "*.wav *.aiff");
+        delete NSettings::instance();
+        QCOMPARE(NSettings::instance()->value("FileFilters").toString(), QString("*.wav *.aiff"));
+        NSettings::instance()->remove("FileFilters");
+        delete NSettings::instance();
+        QCOMPARE(NSettings::instance()->value("FileFilters").toString(), migrated);
+    }
     void portablePaths()
     {
         QTemporaryDir caller;

@@ -138,13 +138,20 @@ NSettings::NSettings(QObject *parent)
     initValue("CustomTrashCommand", "");
     initValue("CustomFileManager", false);
     initValue("CustomFileManagerCommand", "");
-    initValue("FileFilters", QString("*.m3u *.m3u8 \
+    const QString previousFilters = QString("*.m3u *.m3u8 \
         *.mp3 *.ogg *.mp4 *.wma \
         *.flac *.ape *.wav *.wv *.tta \
         *.mpc *.spx *.opus \
         *.m4a *.aac *.aiff \
         *.xm *.s3m *.it *.mod")
-                                 .simplified());
+                                 .simplified();
+    QString defaultFilters = previousFilters;
+    defaultFilters.replace("*.aiff", "*.aiff *.aif *.aifc");
+    // Upgrade only the old default; preserve custom filter lists verbatim.
+    if (value("FileFilters").toString().simplified() == previousFilters) {
+        setValue("FileFilters", defaultFilters);
+    }
+    initValue("FileFilters", defaultFilters);
 
     initValue("TrackInfo/TopLeft", "{%B kbps/%s kHz|{%B kbps}{%s kHz}}");
     initValue("TrackInfo/MiddleCenter", "{%a - %t|%F}");

@@ -55,7 +55,7 @@ NPlaylistWidget::NPlaylistWidget(QWidget *parent) : QListWidget(parent)
     connect(m_playbackEngine, SIGNAL(mediaChanged(const QString &, int)), this,
             SLOT(on_playbackEngine_mediaChanged(const QString &, int)));
     connect(m_playbackEngine, SIGNAL(nextMediaRequested()), this,
-            SLOT(on_playbackEngine_prepareNextMediaRequested()), Qt::BlockingQueuedConnection);
+            SLOT(on_playbackEngine_prepareNextMediaRequested()), Qt::QueuedConnection);
 
     setItemDelegate(new NPlaylistWidgetItemDelegate(this));
     m_playingItem = NULL;
@@ -80,6 +80,39 @@ NPlaylistWidget::NPlaylistWidget(QWidget *parent) : QListWidget(parent)
     });
     connect(verticalScrollBar(), SIGNAL(valueChanged(int)), this,
             SLOT(startProcessVisibleItemsTimer()));
+
+    connect(this, &NPlaylistWidget::itemsChanged, this,
+            &NPlaylistWidget::on_playbackEngine_prepareNextMediaRequested);
+    // Internal drag/drop and model edits must also refresh the successor, after
+    // the widget has finished updating its item map and playing-item pointer.
+    auto *prepareNextTimer = new QTimer(this);
+    prepareNextTimer->setSingleShot(true);
+    connect(prepareNextTimer, &QTimer::timeout, this,
+            &NPlaylistWidget::on_playbackEngine_prepareNextMediaRequested);
+    const auto scheduleNext = [prepareNextTimer]() {
+        if (!prepareNextTimer->isActive()) {
+            prepareNextTimer->start(0);
+        }
+    };
+    connect(model(), &QAbstractItemModel::rowsMoved, this,
+            scheduleNext);
+    connect(model(), &QAbstractItemModel::rowsInserted, this,
+            scheduleNext);
+    connect(model(), &QAbstractItemModel::rowsRemoved, this,
+            scheduleNext);
+    connect(model(), &QAbstractItemModel::layoutChanged, this,
+            scheduleNext);
+    connect(model(), &QAbstractItemModel::modelAboutToBeReset, this, [this]() {
+        m_playingItem = NULL;
+        m_itemMap.clear();
+        m_playbackEngine->nextMediaRespond("", 0);
+    });
+    connect(NSettings::instance(), &NSettings::valueChanged, this,
+            [this](const QString &key, const QVariant &) {
+                if (key == "LoopPlaylist") {
+                    on_playbackEngine_prepareNextMediaRequested();
+                }
+            });
 }
 
 void NPlaylistWidget::setTrackInfoReader(NTrackInfoReader *reader)
@@ -157,10 +190,16 @@ void NPlaylistWidget::removeFiles(const QStringList &files)
 
     std::reverse(rowsToRemove.begin(), rowsToRemove.end());
     for (int row : rowsToRemove) {
-        delete takeItem(row);
+        auto *removed = takeItem(row);
+        if (removed == m_playingItem) {
+            m_playingItem = NULL;
+        }
+        m_itemMap.remove(removed->data(N::IdRole).toInt());
+        delete removed;
     }
 
     viewport()->update();
+    emit itemsChanged();
 }
 
 void NPlaylistWidget::removeSelected()
@@ -236,7 +275,11 @@ void NPlaylistWidget::updateTrackIndexes()
     }
 }
 
-NPlaylistWidget::~NPlaylistWidget() {}
+NPlaylistWidget::~NPlaylistWidget()
+{
+    // QListWidget destroys its model after our item map has been destroyed.
+    disconnect(model(), nullptr, this, nullptr);
+}
 
 void NPlaylistWidget::resetPlayingItem()
 {
@@ -292,6 +335,7 @@ void NPlaylistWidget::on_playbackEngine_mediaChanged(const QString &file, int id
     resetPlayingItem();
 
     if (!m_itemMap.contains(id)) {
+        m_playbackEngine->nextMediaRespond("", 0);
         emit playingItemChanged();
         QListWidget::viewport()->update();
         return;
@@ -299,6 +343,7 @@ void NPlaylistWidget::on_playbackEngine_mediaChanged(const QString &file, int id
 
     NPlaylistWidgetItem *item = m_itemMap[id];
     setPlayingItem(item);
+    on_playbackEngine_prepareNextMediaRequested();
 }
 
 void NPlaylistWidget::on_playbackEngine_prepareNextMediaRequested()
@@ -310,6 +355,7 @@ void NPlaylistWidget::on_playbackEngine_prepareNextMediaRequested()
         item = nextItem(m_playingItem);
     }
     if (!item) {
+        m_playbackEngine->nextMediaRespond("", 0);
         return;
     }
     m_playbackEngine->nextMediaRespond(item->data(N::PathRole).toString(),
@@ -326,7 +372,7 @@ void NPlaylistWidget::on_playbackEngine_mediaFinished(const QString &, int id)
     if (m_repeatMode) {
         item = m_itemMap[id];
     } else {
-        item = nextItem(item);
+        item = nextItem(m_itemMap[id]);
     }
 
     if (!item) {
@@ -334,7 +380,7 @@ void NPlaylistWidget::on_playbackEngine_mediaFinished(const QString &, int id)
         return;
     }
 
-    playItem(nextItem(item));
+    playItem(item);
 }
 
 void NPlaylistWidget::on_playbackEngine_mediaFailed(const QString &file, int id)
@@ -503,7 +549,8 @@ void NPlaylistWidget::rowsInserted(const QModelIndex &parent, int start, int end
 void NPlaylistWidget::shufflePlaylist()
 {
     QList<QListWidgetItem *> items;
-    for (int i = 0; i < count(); ++i) {
+    const int itemCount = count();
+    for (int i = 0; i < itemCount; ++i) {
         items.append(takeItem(0));
     }
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
@@ -536,6 +583,7 @@ void NPlaylistWidget::setRepeatMode(bool enable)
     }
     m_repeatMode = enable;
     NSettings::instance()->setValue("Repeat", enable);
+    on_playbackEngine_prepareNextMediaRequested();
 }
 
 NPlaylistWidgetItem *NPlaylistWidget::itemAtRow(int row) const

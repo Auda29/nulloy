@@ -32,7 +32,7 @@ class NTagReaderTaglib : public NTagReaderInterface, public NPlugin
     Q_INTERFACES(NTagReaderInterface NPlugin)
 
 private:
-    bool m_isValid;
+    bool isValid() const;
     QTextCodec *m_codec;
     QTextCodec *m_utf8Codec;
 
