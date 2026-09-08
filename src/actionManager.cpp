@@ -15,6 +15,10 @@
 
 #include "actionManager.h"
 
+#ifdef Q_OS_WIN
+#include "winIcon.h"
+#endif
+
 #include "action.h"
 #include "coverWidget.h"
 #include "mainWindow.h"

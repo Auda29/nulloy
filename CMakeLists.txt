@@ -1,0 +1,180 @@
+cmake_minimum_required(VERSION 3.24)
+project(Nulloy LANGUAGES CXX RC)
+
+if(NOT WIN32 OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+    message(FATAL_ERROR "Phase 2 currently targets Windows x64. The upstream qmake build remains available for other platforms.")
+endif()
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC_SEARCH_PATHS "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/src/skins/native")
+
+option(NULLOY_SKINS "Build the original skin support and all bundled skins" ON)
+option(NULLOY_GSTREAMER "Build the GStreamer playback/waveform plugin" ON)
+option(NULLOY_GSTREAMER_TAGREADER "Include GStreamer's optional tag reader" OFF)
+option(NULLOY_TAGLIB "Build the TagLib tag/cover plugin" ON)
+option(NULLOY_VLC "Build the optional VLC plugin" OFF)
+option(NULLOY_UPDATE_CHECK "Enable upstream update checking" OFF)
+option(NULLOY_CONSOLE "Attach a console to the player executable" OFF)
+include(CTest)
+set(NULLOY_APP_NAME "Nulloy" CACHE STRING "Executable name")
+file(STRINGS "${PROJECT_SOURCE_DIR}/ChangeLog" CHANGELOG_HEADER LIMIT_COUNT 1)
+string(REGEX MATCH "[0-9]+\\.[0-9]+\\.[0-9]+" DEFAULT_VERSION "${CHANGELOG_HEADER}")
+set(NULLOY_VERSION "${DEFAULT_VERSION}" CACHE STRING "Player version override")
+set(NULLOY_RUN_DIR "${PROJECT_BINARY_DIR}/run")
+set(NULLOY_TEST_DIR "${PROJECT_BINARY_DIR}/test-run")
+find_package(Qt5 5.15 REQUIRED COMPONENTS Widgets Script Svg Network UiTools Designer WinExtras LinguistTools Test)
+find_package(ZLIB REQUIRED)
+find_package(PkgConfig REQUIRED)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+find_program(MAGICK_EXECUTABLE NAMES magick REQUIRED)
+
+add_library(nulloy_options INTERFACE)
+target_include_directories(nulloy_options INTERFACE src src/interfaces src/platform src/plugins src/widgetCollection)
+target_compile_definitions(nulloy_options INTERFACE UNICODE _UNICODE _N_SHARED_BUILD_
+    "_N_VERSION_=\"${NULLOY_VERSION}\"" "N_LIBDIR=\"lib\"")
+target_link_libraries(nulloy_options INTERFACE Qt5::Widgets Qt5::Svg)
+
+set(QXT_DIR "${PROJECT_SOURCE_DIR}/3rdParty/qxt-696423b-patched")
+set(SINGLE_DIR "${PROJECT_SOURCE_DIR}/3rdParty/qtsingleapplication-8fd81b2/src")
+set(COMPRESSOR_DIR "${PROJECT_SOURCE_DIR}/3rdParty/qtiocompressor-2.3.1/src")
+add_library(nulloy_dependencies STATIC
+    ${QXT_DIR}/qxtglobalshortcut.cpp ${QXT_DIR}/qxtglobalshortcut_win.cpp ${QXT_DIR}/qxtglobalshortcut.h
+    ${SINGLE_DIR}/qtsingleapplication.cpp ${SINGLE_DIR}/qtlocalpeer.cpp
+    ${SINGLE_DIR}/qtsingleapplication.h ${SINGLE_DIR}/qtlocalpeer.h
+    ${COMPRESSOR_DIR}/qtiocompressor.cpp ${COMPRESSOR_DIR}/qtiocompressor.h)
+target_include_directories(nulloy_dependencies PUBLIC ${QXT_DIR} ${SINGLE_DIR} ${COMPRESSOR_DIR})
+target_compile_definitions(nulloy_dependencies PUBLIC QXT_STATIC)
+target_link_libraries(nulloy_dependencies PUBLIC nulloy_options Qt5::Network ZLIB::ZLIB)
+
+file(GLOB WIDGET_SOURCES CONFIGURE_DEPENDS src/widgetCollection/*.cpp src/widgetCollection/*.h)
+if(NOT NULLOY_SKINS)
+    list(REMOVE_ITEM WIDGET_SOURCES "${PROJECT_SOURCE_DIR}/src/widgetCollection/widgetCollection.cpp"
+        "${PROJECT_SOURCE_DIR}/src/widgetCollection/widgetCollection.h")
+endif()
+add_library(nulloy_widgets STATIC ${WIDGET_SOURCES})
+target_link_libraries(nulloy_widgets PUBLIC nulloy_options Qt5::Designer)
+if(NULLOY_SKINS)
+    target_compile_definitions(nulloy_widgets PRIVATE QT_STATICPLUGIN)
+else()
+    target_compile_definitions(nulloy_options INTERFACE _N_NO_SKINS_)
+endif()
+
+file(GLOB CORE_SOURCES CONFIGURE_DEPENDS src/*.cpp src/*.h)
+list(REMOVE_ITEM CORE_SOURCES "${PROJECT_SOURCE_DIR}/src/main.cpp")
+if(NULLOY_SKINS)
+    list(APPEND CORE_SOURCES src/native-skin-embedded.qrc)
+else()
+    list(REMOVE_ITEM CORE_SOURCES "${PROJECT_SOURCE_DIR}/src/skinFileSystem.cpp" "${PROJECT_SOURCE_DIR}/src/skinFileSystem.h"
+        "${PROJECT_SOURCE_DIR}/src/skinLoader.cpp" "${PROJECT_SOURCE_DIR}/src/skinLoader.h")
+    list(APPEND CORE_SOURCES src/no-skins.qrc)
+endif()
+add_library(nulloy_core OBJECT ${CORE_SOURCES} src/icons/icons.qrc
+    src/platform/winIcon.cpp src/platform/winIcon.h src/platform/w7TaskBar.cpp src/platform/w7TaskBar.h
+    src/platform/trash.cpp src/platform/trash_win.cpp src/platform/trash.h)
+target_link_libraries(nulloy_core PUBLIC nulloy_options nulloy_dependencies nulloy_widgets
+    Qt5::Script Qt5::CorePrivate Qt5::UiTools Qt5::WinExtras dwmapi ole32 shell32 advapi32)
+if(NOT NULLOY_UPDATE_CHECK)
+    target_compile_definitions(nulloy_core PUBLIC _N_NO_UPDATE_CHECK_)
+endif()
+
+file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/generated")
+set(ICON_ICO "${PROJECT_BINARY_DIR}/generated/icon.ico")
+set(FILE_ICO "${PROJECT_BINARY_DIR}/generated/file.ico")
+add_custom_command(OUTPUT "${ICON_ICO}" "${FILE_ICO}"
+    COMMAND "${MAGICK_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/src/icons/icon.svg" -define icon:auto-resize "${ICON_ICO}"
+    COMMAND "${MAGICK_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/src/icons/file.svg" "(" "${PROJECT_SOURCE_DIR}/src/icons/icon.svg"
+        -resize 50% ")" -gravity center -compose over -composite -define icon:auto-resize "${FILE_ICO}"
+    DEPENDS src/icons/icon.svg src/icons/file.svg VERBATIM)
+file(GENERATE OUTPUT "${PROJECT_BINARY_DIR}/generated/icon.rc"
+    CONTENT "IDI_ICON1 ICON \"${ICON_ICO}\"\nIDI_ICON2 ICON \"${FILE_ICO}\"\n")
+set_source_files_properties("${PROJECT_BINARY_DIR}/generated/icon.rc" PROPERTIES OBJECT_DEPENDS "${ICON_ICO};${FILE_ICO}")
+add_executable(nulloy src/main.cpp "${PROJECT_BINARY_DIR}/generated/icon.rc" "${ICON_ICO}" "${FILE_ICO}")
+set_target_properties(nulloy PROPERTIES OUTPUT_NAME "${NULLOY_APP_NAME}" RUNTIME_OUTPUT_DIRECTORY "${NULLOY_RUN_DIR}")
+if(NOT NULLOY_CONSOLE)
+    set_target_properties(nulloy PROPERTIES WIN32_EXECUTABLE TRUE)
+endif()
+target_link_libraries(nulloy PRIVATE nulloy_core)
+
+file(GLOB SKIN_INPUTS CONFIGURE_DEPENDS src/skins/slim/* src/skins/metro/* src/skins/silver/*)
+file(GLOB TRANSLATIONS CONFIGURE_DEPENDS src/i18n/*.ts)
+set(DATA_OUTPUTS)
+foreach(ts IN LISTS TRANSLATIONS)
+    get_filename_component(language "${ts}" NAME_WE)
+    set(qm "${NULLOY_RUN_DIR}/i18n/${language}.qm")
+    add_custom_command(OUTPUT "${qm}" COMMAND ${CMAKE_COMMAND} -E make_directory "${NULLOY_RUN_DIR}/i18n"
+        COMMAND Qt5::lrelease "${ts}" -qm "${qm}" DEPENDS "${ts}" VERBATIM)
+    list(APPEND DATA_OUTPUTS "${qm}")
+endforeach()
+if(NULLOY_SKINS)
+    set(SKIN_OUTPUTS "${NULLOY_RUN_DIR}/Skins/Slim.nzs" "${NULLOY_RUN_DIR}/Skins/Silver.nzs" "${NULLOY_RUN_DIR}/Skins/Metro.nzs")
+    add_custom_command(OUTPUT ${SKIN_OUTPUTS}
+        COMMAND ${Python3_EXECUTABLE} "${PROJECT_SOURCE_DIR}/tools/phase2/build-assets.py" skins
+            "${PROJECT_SOURCE_DIR}/src/skins" "${NULLOY_RUN_DIR}/Skins"
+        DEPENDS ${SKIN_INPUTS} tools/phase2/build-assets.py VERBATIM)
+    list(APPEND DATA_OUTPUTS ${SKIN_OUTPUTS})
+endif()
+add_custom_target(nulloy_data ALL DEPENDS ${DATA_OUTPUTS})
+add_dependencies(nulloy nulloy_data)
+
+function(nulloy_plugin target folder output)
+    file(GLOB sources CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/src/plugins/${folder}/*.cpp" "${PROJECT_SOURCE_DIR}/src/plugins/${folder}/*.h")
+    if(folder STREQUAL "pluginGstreamer" AND NOT NULLOY_GSTREAMER_TAGREADER)
+        list(FILTER sources EXCLUDE REGEX "tagReaderGstreamer\\.(cpp|h)$")
+    endif()
+    add_library(${target} MODULE ${sources} src/common.cpp src/plugins/abstractWaveformBuilder.cpp src/plugins/abstractWaveformBuilder.h src/waveformPeaks.cpp)
+    target_link_libraries(${target} PRIVATE nulloy_options ${ARGN})
+    set_target_properties(${target} PROPERTIES PREFIX "" OUTPUT_NAME "${output}"
+        LIBRARY_OUTPUT_DIRECTORY "${NULLOY_RUN_DIR}/Plugins" RUNTIME_OUTPUT_DIRECTORY "${NULLOY_RUN_DIR}/Plugins")
+    if(folder STREQUAL "pluginGstreamer" AND NULLOY_GSTREAMER_TAGREADER)
+        target_compile_definitions(${target} PRIVATE _N_GSTREAMER_TAGREADER_PLUGIN_)
+    endif()
+endfunction()
+if(NULLOY_GSTREAMER)
+    pkg_check_modules(GSTREAMER REQUIRED IMPORTED_TARGET gstreamer-1.0 gstreamer-pbutils-1.0)
+    nulloy_plugin(plugin_gstreamer pluginGstreamer PluginGStreamer PkgConfig::GSTREAMER)
+endif()
+if(NULLOY_TAGLIB)
+    pkg_check_modules(TAGLIB REQUIRED IMPORTED_TARGET taglib)
+    nulloy_plugin(plugin_taglib pluginTaglib PluginTagLib PkgConfig::TAGLIB)
+endif()
+if(NULLOY_VLC)
+    pkg_check_modules(VLC REQUIRED IMPORTED_TARGET libvlc vlc-plugin)
+    nulloy_plugin(plugin_vlc pluginVlc PluginVLC PkgConfig::VLC)
+endif()
+
+if(BUILD_TESTING)
+    add_executable(testPlayerPackage tests/testPlayerPackage.cpp)
+    target_link_libraries(testPlayerPackage PRIVATE nulloy_core Qt5::Test)
+    set_target_properties(testPlayerPackage PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${NULLOY_TEST_DIR}")
+    if(NOT NULLOY_GSTREAMER)
+        message(FATAL_ERROR "The existing playback integration tests require NULLOY_GSTREAMER=ON; disable BUILD_TESTING for a different backend-only build.")
+    endif()
+    nulloy_plugin(test_gstreamer pluginGstreamer PluginGStreamer PkgConfig::GSTREAMER)
+    target_compile_definitions(test_gstreamer PRIVATE _TESTS_)
+    set_target_properties(test_gstreamer PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${NULLOY_TEST_DIR}/Plugins"
+        RUNTIME_OUTPUT_DIRECTORY "${NULLOY_TEST_DIR}/Plugins")
+    if(NULLOY_TAGLIB)
+        add_custom_command(TARGET plugin_taglib POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${NULLOY_TEST_DIR}/Plugins"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:plugin_taglib> "${NULLOY_TEST_DIR}/Plugins")
+        add_dependencies(test_gstreamer plugin_taglib)
+    elseif(NOT NULLOY_GSTREAMER_TAGREADER)
+        message(FATAL_ERROR "Playback tests require a tag reader: enable NULLOY_TAGLIB or NULLOY_GSTREAMER_TAGREADER.")
+    endif()
+    add_custom_target(nulloy_test_data
+        COMMAND ${Python3_EXECUTABLE} "${PROJECT_SOURCE_DIR}/tools/phase2/build-assets.py" tests
+            "${PROJECT_SOURCE_DIR}/tests" "${NULLOY_TEST_DIR}/tests"
+        VERBATIM)
+    foreach(test IN ITEMS testTrackInfoReader testPlaylistWidget testFileDrop)
+        add_executable(${test} "tests/${test}.cpp")
+        target_link_libraries(${test} PRIVATE nulloy_core Qt5::Test)
+        set_target_properties(${test} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${NULLOY_TEST_DIR}")
+        add_dependencies(${test} test_gstreamer nulloy_test_data)
+        add_test(NAME ${test} COMMAND ${test} -o "${PROJECT_BINARY_DIR}/${test}-results.txt,txt")
+        set_tests_properties(${test} PROPERTIES WORKING_DIRECTORY "${NULLOY_TEST_DIR}" TIMEOUT 120 RUN_SERIAL TRUE
+            ENVIRONMENT "QT_QPA_PLATFORM=windows")
+    endforeach()
+endif()

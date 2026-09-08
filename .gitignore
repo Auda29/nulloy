@@ -12,3 +12,4 @@ moc_*
 # Local migration evidence, copied profiles, media and build tools
 /.phase0/
 /.phase1/
+/.phase2/
