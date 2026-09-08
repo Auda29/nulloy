@@ -118,9 +118,14 @@ int main(int argc, char *argv[])
 #endif
 
     QtSingleApplication instance(argc, argv);
+#ifdef _N_PORTABLE_FORK_
+    instance.setApplicationName("NulloyFork");
+    instance.setOrganizationDomain("github.com/Auda29/nulloy");
+#else
     instance.setApplicationName("Nulloy");
-    instance.setApplicationVersion(QString(_N_VERSION_));
     instance.setOrganizationDomain("nulloy.com");
+#endif
+    instance.setApplicationVersion(QString(_N_VERSION_));
     instance.setQuitOnLastWindowClosed(false);
 
     qInstallMessageHandler(messageHandler);
@@ -156,7 +161,7 @@ int main(int argc, char *argv[])
                 return 1;
             }
         } else {
-            files << arg;
+            files << NCore::absoluteMediaArgument(arg);
         }
     }
 

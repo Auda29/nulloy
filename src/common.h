@@ -26,6 +26,7 @@ namespace NCore
     QString defaultPlaylistPath();
     QString settingsPath();
     QString rcDir();
+    QString absoluteMediaArgument(const QString &argument);
 } // namespace NCore
 
 #endif

@@ -29,6 +29,20 @@ class TestMigration : public QObject
 {
     Q_OBJECT
 private slots:
+    void portablePaths()
+    {
+        QTemporaryDir caller;
+        const QString previous = QDir::currentPath();
+        QVERIFY(QDir::setCurrent(caller.path()));
+        const QString resolved = NCore::absoluteMediaArgument(QString::fromUtf8("Grüße.wav"));
+        QVERIFY(QDir::setCurrent(previous));
+        QCOMPARE(resolved, caller.filePath(QString::fromUtf8("Grüße.wav")));
+        QCOMPARE(NCore::absoluteMediaArgument("https://example.com/audio.ogg"),
+                 QString("https://example.com/audio.ogg"));
+#ifdef _N_PORTABLE_FORK_
+        QCOMPARE(NCore::rcDir(), QCoreApplication::applicationDirPath() + "/Data");
+#endif
+    }
     void legacyWaveformCache()
     {
         QTemporaryDir directory;

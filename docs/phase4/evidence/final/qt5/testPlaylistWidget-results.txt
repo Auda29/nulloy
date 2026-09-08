@@ -1,0 +1,19 @@
+********* Start testing of TestPlaylistWidget *********
+Config: Using QtTest library 5.15.19, Qt 5.15.19 (x86_64-little_endian-llp64 shared (dynamic) release build; by GCC 16.1.0), windows 11
+QDEBUG : TestPlaylistWidget::initTestCase() found container "GStreamer" :
+QDEBUG : TestPlaylistWidget::initTestCase() * PlaybackEngine
+QDEBUG : TestPlaylistWidget::initTestCase() * WaveformBuilder
+QDEBUG : TestPlaylistWidget::initTestCase() found container "TagLib" :
+QDEBUG : TestPlaylistWidget::initTestCase() * TagReader
+QDEBUG : TestPlaylistWidget::initTestCase() * CoverReader
+QDEBUG : TestPlaylistWidget::initTestCase() registering plugin: "NPlaybackEngineGStreamer"
+QDEBUG : TestPlaylistWidget::initTestCase() registering plugin: "NWaveformBuilderGstreamer"
+QDEBUG : TestPlaylistWidget::initTestCase() registering plugin: "NTagReaderTaglib"
+QDEBUG : TestPlaylistWidget::initTestCase() registering plugin: "NCoverReaderTaglib"
+PASS   : TestPlaylistWidget::initTestCase()
+PASS   : TestPlaylistWidget::testPlaylistRemoval()
+PASS   : TestPlaylistWidget::testAutoPlay()
+PASS   : TestPlaylistWidget::testRepeat()
+PASS   : TestPlaylistWidget::cleanupTestCase()
+Totals: 5 passed, 0 failed, 0 skipped, 0 blacklisted, 25201ms
+********* Finished testing of TestPlaylistWidget *********

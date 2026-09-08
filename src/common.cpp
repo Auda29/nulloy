@@ -53,6 +53,15 @@ QString NCore::applicationBinaryName()
     return QFileInfo(QCoreApplication::arguments().first()).completeBaseName();
 }
 
+QString NCore::absoluteMediaArgument(const QString &argument)
+{
+    // Resolve in the caller's directory before IPC or portable plugin setup.
+    const QUrl url(argument);
+    if (url.scheme().size() > 1)
+        return argument;
+    return QFileInfo(argument).absoluteFilePath();
+}
+
 QString NCore::applicationBasenameName()
 {
     return QFileInfo(QCoreApplication::arguments().first()).fileName();
@@ -71,6 +80,9 @@ QString NCore::settingsPath()
 QString NCore::rcDir()
 {
     if (!_rcDir_init) {
+#ifdef _N_PORTABLE_FORK_
+        _rcDir = QCoreApplication::applicationDirPath() + "/Data";
+#else
 #ifndef Q_OS_WIN
         QDir parentDir(QCoreApplication::applicationDirPath());
         if (parentDir.dirName() == "bin") {
@@ -99,6 +111,7 @@ QString NCore::rcDir()
         } else {
             _rcDir = QCoreApplication::applicationDirPath();
         }
+#endif
 #endif
         QDir dir(_rcDir);
         if (!dir.exists()) {

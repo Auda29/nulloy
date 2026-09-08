@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-08",
+  "result": "accepted_by_user",
+  "user_statement": "hab ich abgenommen mir ist im test nichts aufgefallen",
+  "package": "NulloyFork-0.10.0-alpha.1-windows-x64.zip",
+  "source_commit": "aafa738632d6e6196c9f95e07b2ea3308ea4294c",
+  "archive_sha256": "9733d197da77a73bb8ba40392df117b49934aca0137e9bfee0e194af0f0ba272",
+  "executable_sha256": "04c58b54bae9bd921e666f7f9ddfaf0058e5dd3756cd226d679a0b547f732dc8",
+  "manual_test_directory": ".phase4/manual-test-aafa738/NulloyFork",
+  "requested_checks": [
+    "multiple tracks via drag and drop",
+    "waveform",
+    "close and restart",
+    "minimize via Windows taskbar"
+  ],
+  "reported_issues": [],
+  "scope": "Qualitative acceptance of the previously supplied test package; no additional timing measurements or separate long-term test reported.",
+  "separate_windows_machine_without_development_tools": "not_confirmed"
+}

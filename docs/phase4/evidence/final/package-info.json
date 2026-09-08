@@ -1,0 +1,10 @@
+{
+  "source_commit": "aafa738632d6e6196c9f95e07b2ea3308ea4294c",
+  "tracked_changes": false,
+  "version": "0.10.0-alpha.1",
+  "executable": "NulloyFork.exe",
+  "root": "NulloyFork",
+  "archive": "NulloyFork-0.10.0-alpha.1-windows-x64.zip",
+  "portable": true,
+  "upstream_update_check": false
+}

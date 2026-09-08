@@ -1,0 +1,188 @@
+{
+  "fresh-1": {
+    "metro-1-results": {
+      "window-exposed-ms": 547,
+      "full-waveform-ms": 250,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 28
+    },
+    "metro-2-results": {
+      "window-exposed-ms": 556,
+      "full-waveform-ms": 313,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 26
+    },
+    "metro-3-results": {
+      "window-exposed-ms": 546,
+      "full-waveform-ms": 444,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 31
+    },
+    "native-1-results": {
+      "window-exposed-ms": 682,
+      "full-waveform-ms": 436,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 32
+    },
+    "native-2-results": {
+      "window-exposed-ms": 658,
+      "full-waveform-ms": 267,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 17
+    },
+    "native-3-results": {
+      "window-exposed-ms": 586,
+      "full-waveform-ms": 297,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 31
+    },
+    "silver-1-results": {
+      "window-exposed-ms": 538,
+      "full-waveform-ms": 301,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 23
+    },
+    "silver-2-results": {
+      "window-exposed-ms": 568,
+      "full-waveform-ms": 302,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 21
+    },
+    "silver-3-results": {
+      "window-exposed-ms": 544,
+      "full-waveform-ms": 243,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 33
+    },
+    "slim-1-results": {
+      "window-exposed-ms": 1920,
+      "full-waveform-ms": 835,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 28
+    },
+    "slim-2-results": {
+      "window-exposed-ms": 844,
+      "full-waveform-ms": 253,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 25
+    },
+    "slim-3-results": {
+      "window-exposed-ms": 543,
+      "full-waveform-ms": 248,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 22
+    }
+  },
+  "fresh-2": {
+    "metro-1-results": {
+      "window-exposed-ms": 532,
+      "full-waveform-ms": 276,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 22
+    },
+    "metro-2-results": {
+      "window-exposed-ms": 548,
+      "full-waveform-ms": 287,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 32
+    },
+    "metro-3-results": {
+      "window-exposed-ms": 551,
+      "full-waveform-ms": 277,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 22
+    },
+    "native-1-results": {
+      "window-exposed-ms": 558,
+      "full-waveform-ms": 289,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 23
+    },
+    "native-2-results": {
+      "window-exposed-ms": 551,
+      "full-waveform-ms": 216,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 20
+    },
+    "native-3-results": {
+      "window-exposed-ms": 542,
+      "full-waveform-ms": 230,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 15
+    },
+    "silver-1-results": {
+      "window-exposed-ms": 556,
+      "full-waveform-ms": 252,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 17
+    },
+    "silver-2-results": {
+      "window-exposed-ms": 664,
+      "full-waveform-ms": 304,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 23
+    },
+    "silver-3-results": {
+      "window-exposed-ms": 545,
+      "full-waveform-ms": 276,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 23
+    },
+    "slim-1-results": {
+      "window-exposed-ms": 1671,
+      "full-waveform-ms": 772,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 24
+    },
+    "slim-2-results": {
+      "window-exposed-ms": 537,
+      "full-waveform-ms": 244,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 24
+    },
+    "slim-3-results": {
+      "window-exposed-ms": 547,
+      "full-waveform-ms": 286,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 24
+    }
+  },
+  "formats": {
+    "flac-results": {
+      "window-exposed-ms": 977,
+      "full-waveform-ms": 484,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 25
+    },
+    "mp3-results": {
+      "window-exposed-ms": 755,
+      "full-waveform-ms": 535,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 25
+    },
+    "ogg-results": {
+      "window-exposed-ms": 722,
+      "full-waveform-ms": 483,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 24
+    },
+    "opus-results": {
+      "window-exposed-ms": 754,
+      "full-waveform-ms": 433,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 28
+    },
+    "wav-results": {
+      "window-exposed-ms": 1888,
+      "full-waveform-ms": 1040,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 35
+    },
+    "wv-results": {
+      "window-exposed-ms": 805,
+      "full-waveform-ms": 468,
+      "cached-waveform-ms": 0,
+      "shutdown-during-waveform-ms": 22
+    }
+  }
+}

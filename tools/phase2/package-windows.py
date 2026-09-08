@@ -58,13 +58,20 @@ def package(args):
                  if "=" in line and not line.startswith(("#", "//")))
     enabled = lambda option: cache.get(option + ":BOOL", "OFF").upper() in ("ON", "YES", "TRUE", "1")
     qt_major = cache.get("NULLOY_QT_MAJOR:STRING", "5")
-    output = build / "Nulloy-windows-x64.zip"
+    portable = enabled("NULLOY_PORTABLE_FORK")
+    app_name = cache.get("NULLOY_APP_NAME:STRING", "Nulloy")
+    executable = args.executable or app_name + ".exe"
+    version = cache.get("NULLOY_VERSION:STRING", "unknown")
+    package_name = f"{app_name}-{version}-windows-x64" if portable else "Nulloy-windows-x64"
+    output = build / (package_name + ".zip")
+    if portable and enabled("NULLOY_UPDATE_CHECK"):
+        raise RuntimeError("The portable fork must not use upstream updates")
     binaries = {p.name.lower(): p for p in (prefix / "bin").glob("*.dll")}
     system = Path(os.environ["SystemRoot"]) / "System32"
     with tempfile.TemporaryDirectory(prefix="package-", dir=build) as temp:
-        stage = Path(temp) / "Nulloy"
+        stage = Path(temp) / app_name
         stage.mkdir()
-        shutil.copy2(run / args.executable, stage)
+        shutil.copy2(run / executable, stage)
         (stage / "Plugins").mkdir()
         for option, filename in (("NULLOY_GSTREAMER", "PluginGStreamer.dll"),
                                  ("NULLOY_TAGLIB", "PluginTagLib.dll"), ("NULLOY_VLC", "PluginVLC.dll")):
@@ -81,11 +88,13 @@ def package(args):
         options = ["--release", "--no-translations", "--no-compiler-runtime", "--no-opengl-sw"]
         if qt_major == "5":
             options += ["--no-angle", "--no-system-d3d-compiler"]
-        subprocess.run([str(prefix / "bin" / deploy), *options, str(stage / args.executable)], check=True)
+        subprocess.run([str(prefix / "bin" / deploy), *options, str(stage / executable)], check=True)
         if (stage / "Plugins/PluginGStreamer.dll").exists():
             shutil.copytree(prefix / "lib/gstreamer-1.0", stage / "gstreamer-1.0",
                             ignore=shutil.ignore_patterns("*.a", "*.la", "include", "pkgconfig"))
             shutil.copy2(prefix / "libexec/gstreamer-1.0/gst-plugin-scanner.exe", stage)
+            if portable:
+                shutil.copy2(prefix / "bin/gst-inspect-1.0.exe", stage)
         if (stage / "Plugins/PluginVLC.dll").exists():
             raise RuntimeError("VLC packaging has not been validated; use the GStreamer test package.")
         queue = sorted([*stage.rglob("*.exe"), *stage.rglob("*.dll")])
@@ -111,18 +120,47 @@ def package(args):
                 else:
                     raise RuntimeError(f"Unresolved dependency: {relative} -> {dll}")
         (stage / "qt.conf").write_text("[Paths]\nPlugins=.\n", encoding="utf-8")
+        if portable and (stage / "gstreamer-1.0").exists():
+            # ZIP timestamps have two-second resolution. Preserve them when extracting;
+            # GStreamer still validates timestamps, sizes and external dependencies.
+            for plugin in (stage / "gstreamer-1.0").glob("*.dll"):
+                stamp = int(plugin.stat().st_mtime) // 2 * 2
+                os.utime(plugin, (stamp, stamp))
+            env = os.environ.copy()
+            for key in list(env):
+                if key.startswith(("GST_", "QT_", "QML")):
+                    del env[key]
+            env.update(PATH=str(system), GST_PLUGIN_SYSTEM_PATH_1_0="gstreamer-1.0",
+                       GST_PLUGIN_PATH_1_0="", GST_PLUGIN_SCANNER_1_0=str(stage / "gst-plugin-scanner.exe"),
+                       GST_REGISTRY=str(stage / "gstreamer-registry.seed.bin"))
+            subprocess.run([str(stage / "gst-inspect-1.0.exe"), "playbin"], cwd=stage, env=env,
+                           check=True, timeout=120, stdout=subprocess.DEVNULL)
+            if str(stage).encode() in (stage / "gstreamer-registry.seed.bin").read_bytes():
+                raise RuntimeError("Registry seed contains the staging directory")
         if (prefix / "share/licenses").exists():
             shutil.copytree(prefix / "share/licenses", stage / "licenses/msys2")
         (stage / "TEST-BUILD.txt").write_text(
             f"Nulloy community fork: Windows x64 / Qt {qt_major} CMake test build.\n"
             "Source: https://github.com/Auda29/nulloy\n"
-            "Extract into a writable folder. Settings stay next to the executable.\n"
+            f"Extract into a writable folder. Settings stay {'in Data/' if portable else 'next to the executable'}.\n"
             "Do not replace an existing installation or copy personal profiles into this archive.\n"
             "Upstream update checking is disabled in the default build.\n"
             "Third-party binaries come from MSYS2 MINGW64. Package versions are in toolchain.txt.\n"
             "Corresponding MSYS2 package recipes and source locations: https://github.com/msys2/MINGW-packages\n",
             encoding="utf-8")
-        manifest = {"qt_major": qt_major, "binaries": checked, "files": {}}
+        commit = subprocess.check_output(["git", "-c", f"safe.directory={source.as_posix()}",
+                                          "rev-parse", "HEAD"], cwd=source, text=True).strip()
+        dirty = bool(subprocess.check_output(["git", "-c", f"safe.directory={source.as_posix()}",
+                                             "status", "--porcelain", "--untracked-files=no"], cwd=source, text=True).strip())
+        metadata = {"source_commit": commit, "tracked_changes": dirty, "version": version,
+                    "executable": executable, "root": app_name, "archive": output.name,
+                    "portable": portable, "upstream_update_check": enabled("NULLOY_UPDATE_CHECK")}
+        (stage / "build-info.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+        if portable:
+            for document in ("PHASE4_REPORT.md", "docs/phase4/PORTABLE.md"):
+                if (source / document).is_file():
+                    shutil.copy2(source / document, stage)
+        manifest = {**metadata, "qt_major": qt_major, "binaries": checked, "files": {}}
         toolchain = build / "toolchain.txt"
         if toolchain.exists():
             shutil.copy2(toolchain, stage)
@@ -133,7 +171,8 @@ def package(args):
         with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
             for file in sorted(stage.rglob("*")):
                 if file.is_file():
-                    archive.write(file, "Nulloy/" + file.relative_to(stage).as_posix())
+                    archive.write(file, app_name + "/" + file.relative_to(stage).as_posix())
+    (build / "package-info.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     checksum = hashlib.sha256(output.read_bytes()).hexdigest()
     output.with_suffix(".zip.sha256").write_text(f"{checksum}  {output.name}\n", encoding="ascii")
     print(f"Packaged {len(checked)} verified x64 binaries: {output}")
@@ -143,5 +182,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     for option in ("prefix", "build", "source"):
         parser.add_argument("--" + option, required=True)
-    parser.add_argument("--executable", default="Nulloy.exe")
+    parser.add_argument("--executable", help="Override executable name from the CMake cache")
     package(parser.parse_args())

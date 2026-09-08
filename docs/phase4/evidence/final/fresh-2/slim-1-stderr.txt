@@ -1,0 +1,5 @@
+0:00:00.001788200      13000       7244 INFO            GST_REGISTRY gstregistry.c:1950:ensure_current_registry: reading registry cache: D:/Benutzer Dateien/Benutzer/ChatGPT/Nulloy-Fork/.phase4/build/package check ä 9f7u56_1/NulloyFork/Data/gstreamer-1.0.registry.bin
+0:00:00.019429500      13000       7244 INFO            GST_REGISTRY gstregistrybinary.c:685:priv_gst_registry_binary_read_cache: loaded D:/Benutzer Dateien/Benutzer/ChatGPT/Nulloy-Fork/.phase4/build/package check ä 9f7u56_1/NulloyFork/Data/gstreamer-1.0.registry.bin in 0.017568 seconds
+0:00:00.019472100      13000       7244 INFO            GST_REGISTRY gstregistry.c:1817:scan_and_update_registry: Validating plugins from registry cache: D:/Benutzer Dateien/Benutzer/ChatGPT/Nulloy-Fork/.phase4/build/package check ä 9f7u56_1/NulloyFork/Data/gstreamer-1.0.registry.bin
+0:00:00.023198600      13000       7244 INFO            GST_REGISTRY gstregistry.c:1909:scan_and_update_registry: Registry cache has not changed
+0:00:00.023225100      13000       7244 INFO            GST_REGISTRY gstregistry.c:1985:ensure_current_registry: registry reading and updating done

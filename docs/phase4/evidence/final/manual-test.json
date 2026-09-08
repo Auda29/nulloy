@@ -1,0 +1,10 @@
+{
+  "archive_sha256": "9733d197da77a73bb8ba40392df117b49934aca0137e9bfee0e194af0f0ba272",
+  "files_verified": 521,
+  "executable": "D:\\Benutzer Dateien\\Benutzer\\ChatGPT\\Nulloy-Fork\\.phase4\\manual-test-aafa738\\NulloyFork\\NulloyFork.exe",
+  "executable_sha256": "04c58b54bae9bd921e666f7f9ddfaf0058e5dd3756cd226d679a0b547f732dc8",
+  "source_commit": "aafa738632d6e6196c9f95e07b2ea3308ea4294c",
+  "profile": "settings copied from accepted phase3 taskbar test; no playlist imported",
+  "source_settings_sha256_unchanged": "50bcc9697b0fc7f979f15c455df62ac14469ae12905ba1e74d4e10c0ca0574ee",
+  "launched": false
+}

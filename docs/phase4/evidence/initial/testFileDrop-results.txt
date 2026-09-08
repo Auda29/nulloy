@@ -1,0 +1,20 @@
+********* Start testing of TestFileDrop *********
+Config: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-llp64 shared (dynamic) release build; by GCC 16.2.0), windows 11
+QDEBUG : TestFileDrop::initTestCase() found container "GStreamer" :
+QDEBUG : TestFileDrop::initTestCase() * PlaybackEngine
+QDEBUG : TestFileDrop::initTestCase() * WaveformBuilder
+QDEBUG : TestFileDrop::initTestCase() found container "TagLib" :
+QDEBUG : TestFileDrop::initTestCase() * TagReader
+QDEBUG : TestFileDrop::initTestCase() * CoverReader
+QDEBUG : TestFileDrop::initTestCase() registering plugin: "NPlaybackEngineGStreamer"
+QDEBUG : TestFileDrop::initTestCase() registering plugin: "NWaveformBuilderGstreamer"
+QDEBUG : TestFileDrop::initTestCase() registering plugin: "NTagReaderTaglib"
+QDEBUG : TestFileDrop::initTestCase() registering plugin: "NCoverReaderTaglib"
+PASS   : TestFileDrop::initTestCase()
+PASS   : TestFileDrop::externalFiles(single-file-empty)
+PASS   : TestFileDrop::externalFiles(multiple-files-empty)
+PASS   : TestFileDrop::externalFiles(single-file-append)
+PASS   : TestFileDrop::externalFiles(multiple-files-append)
+PASS   : TestFileDrop::cleanupTestCase()
+Totals: 6 passed, 0 failed, 0 skipped, 0 blacklisted, 641ms
+********* Finished testing of TestFileDrop *********
