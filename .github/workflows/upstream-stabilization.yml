@@ -49,6 +49,6 @@ jobs:
           path: |
             /tmp/nulloy-toolchain.txt
             /tmp/nulloy-upstream-tests/results.json
-            /tmp/nulloy-upstream-tests/*/step-*.log
-            /tmp/nulloy-upstream-tests/*/Testing/Temporary/LastTest.log
+            /tmp/nulloy-upstream-tests/*/run-*/step-*.log
+            /tmp/nulloy-upstream-tests/*/run-*/Testing/Temporary/LastTest.log
           if-no-files-found: warn

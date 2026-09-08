@@ -41,7 +41,12 @@ python3 tools/upstream/run-native.py --output /tmp/nulloy-upstream-tests
 python3 tools/upstream/run-native.py --issue 255 --output /tmp/nulloy-255
 ```
 
-Das Ausgabeverzeichnis muss außerhalb des Quellbaums liegen. Leere CTest-Suiten
+Das Ausgabeverzeichnis muss außerhalb des Quellbaums liegen. Ohne `--output` entsteht
+ein neues Verzeichnis neben dem Checkout (nicht auf einem eventuell mit `noexec`
+eingehängten `/tmp`). Jeder Aufruf baut pro Issue in einem neuen `run-*`-Unterverzeichnis;
+alte CTest-Registrierungen können dadurch keine gelöschten Tests als bestanden ausgeben.
+Vorherige Belege bleiben erhalten, es werden keine fremden Ausgabeverzeichnisse gelöscht.
+Leere CTest-Suiten
 sind Fehler. `--allow-empty` ist nur für die anfängliche Infrastruktur-PR vorgesehen,
 bevor erste Issue-Harnesses auf diesem Branch existieren; es behauptet keine Tests.
 Alle entdeckten Harnesses werden geprüft, auch wenn ein anderer fehlschlägt.

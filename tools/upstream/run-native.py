@@ -51,7 +51,7 @@ def main():
         harnesses = [p for p in harnesses if p.name in args.issue]
     if not harnesses and not args.allow_empty:
         parser.error("No native issue harnesses discovered")
-    output = args.output.resolve() if args.output else Path(tempfile.mkdtemp(prefix="nulloy-upstream-"))
+    output = args.output.resolve() if args.output else Path(tempfile.mkdtemp(prefix="nulloy-upstream-", dir=source.parent))
     if output == source or source in output.parents:
         parser.error("--output must be outside the source tree")
     output.mkdir(parents=True, exist_ok=True)
@@ -59,8 +59,11 @@ def main():
     env.setdefault("QT_QPA_PLATFORM", "offscreen")
     results = []
     for harness in harnesses:
-        build = output / harness.name
-        build.mkdir(parents=True, exist_ok=True)
+        issue_output = output / harness.name
+        issue_output.mkdir(parents=True, exist_ok=True)
+        # Never reuse CMake/CTest state: removed registrations can otherwise leave
+        # runnable stale tests. Keep earlier evidence without deleting user paths.
+        build = Path(tempfile.mkdtemp(prefix="run-", dir=issue_output))
         entry = {"issue": int(harness.name), "source": str(harness), "steps": [], "passed": False}
         for index, command in enumerate(commands(harness, build)):
             log = build / ("step-%d.log" % index)

@@ -49,6 +49,27 @@ class RunnerContract(unittest.TestCase):
         self.assertEqual(steps[2], ["ctest", "--test-dir", "build/255", "--output-on-failure", "--no-tests=error", "--timeout", "180"])
 
     @unittest.skipUnless(shutil.which("cmake") and shutil.which("ninja"), "Native runner tools absent")
+    def test_reused_output_cannot_execute_deleted_test_registrations(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "source"
+            harness = source / "tests" / "upstream" / "255"
+            harness.mkdir(parents=True)
+            base = "cmake_minimum_required(VERSION 3.24)\nproject(ReuseFixture NONE)\n"
+            registration = "enable_testing()\nadd_test(NAME obsolete COMMAND ${CMAKE_COMMAND} -E true)\n"
+            config = harness / "CMakeLists.txt"
+            config.write_text(base + registration)
+            args = [sys.executable, str(Path(runner.__file__)), "--source", str(source),
+                    "--output", str(root / "build")]
+            first = subprocess.run(args, capture_output=True, text=True, timeout=60)
+            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+            config.write_text(base)
+            second = subprocess.run(args, capture_output=True, text=True, timeout=60)
+            self.assertEqual(second.returncode, 1, second.stdout + second.stderr)
+            results = json.loads((root / "build" / "results.json").read_text())
+            self.assertFalse(results[0]["passed"])
+
+    @unittest.skipUnless(shutil.which("cmake") and shutil.which("ninja"), "Native runner tools absent")
     def test_real_ctest_failures_and_empty_tests_are_not_green(self):
         for behavior, expected in (("true", 0), ("false", 1), (None, 1)):
             with self.subTest(behavior=behavior), tempfile.TemporaryDirectory() as temp:
