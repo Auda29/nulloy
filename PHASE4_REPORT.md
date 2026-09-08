@@ -1,6 +1,6 @@
 # Phase 4: Portabler Player
 
-Status: technische Umsetzung und lokale Paketprüfung abgeschlossen. Manuelle Abnahme und separater Windows-Rechner offen. Keine Veröffentlichung.
+Status: technische Umsetzung, lokale Paketprüfung und manuelle Nutzerabnahme abgeschlossen. Prüfung auf separatem Windows-Rechner offen. Keine Veröffentlichung.
 Branch: `codex/phase-4-portable-player`, Basis `683783cc2d260c92405c8b2b65b0904740c2c46a`.
 
 ## Änderungen
@@ -88,13 +88,27 @@ das ZIP gelegt; der im ZIP enthaltene Bericht dokumentiert den Stand beim Paketb
 
 Für den manuellen Test wurde `.phase4/manual-test-aafa738/NulloyFork` vorbereitet.
 Die Einstellungen stammen aus einer unveränderten Kopie des abgenommenen Phase-3-Tests.
-Die Playlist beginnt leer. Die neue EXE wurde noch nicht für den Nutzer gestartet.
+Die Playlist war für den Test zunächst leer.
 
-## Offene Abnahme
+## Manuelle Nutzerabnahme
 
-Der Alltagstest des konkreten neuen Pakets und ein Start auf einem separaten
-Windows-System ohne Entwicklungswerkzeuge stehen aus. Lokale Tests mit bereinigtem
-PATH ersetzen diese Prüfung nicht. Entpacker ohne erhaltene Zeitstempel können
+Der Nutzer hat das bereitgestellte Phase-4-Paket am 8. September 2026 abgenommen:
+
+> hab ich abgenommen mir ist im test nichts aufgefallen
+
+Die Rückmeldung bezieht sich auf den zuvor angefragten Test von Drag-and-drop mit
+mehreren Tracks, Waveform, Schließen/Neustart und Taskleisten-Minimierung. Es wurden
+keine Auffälligkeiten gemeldet. Sie ist eine qualitative Abnahme, keine zusätzliche
+Zeitmessung oder gesondert nachgewiesene Langzeitprüfung.
+
+Paketzuordnung und Rückmeldung: [Nutzerabnahme](docs/phase4/evidence/final/user-acceptance.json).
+
+## Offene Prüfung
+
+Ein Start auf einem separaten Windows-System ohne Entwicklungswerkzeuge steht
+weiterhin aus. Die Nutzerabnahme bestätigt keinen Wechsel auf einen anderen Rechner.
+Lokale Tests mit bereinigtem PATH ersetzen diese Prüfung nicht.
+Entpacker ohne erhaltene Zeitstempel können
 weiterhin einen vollständigen Cache-Aufbau auslösen.
 
 Anleitung: [Portabler Test](docs/phase4/PORTABLE.md).

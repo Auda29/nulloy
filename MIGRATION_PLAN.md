@@ -2,7 +2,7 @@
 
 Stand: 8. September 2026
 
-Status: Phasen 0 bis 3 abgeschlossen und in Fork-`master` gemergt. Phase 4 technisch in Arbeit; Paketabnahme offen. Siehe [Phase-4-Bericht](PHASE4_REPORT.md).
+Status: Phasen 0 bis 3 abgeschlossen und in Fork-`master` gemergt. Phase 4 technisch umgesetzt und vom Nutzer abgenommen; Prüfung auf separatem Windows-Rechner offen. Siehe [Phase-4-Bericht](PHASE4_REPORT.md).
 
 Repository: [Auda29/nulloy](https://github.com/Auda29/nulloy)
 
@@ -121,15 +121,16 @@ Die funktionale Abnahme ist abgeschlossen. Mit Zustimmung des Nutzers bleibt die
 ### Phase 4: Erste nutzbare Migrationsversion
 
 - [x] Den Erststart aus einem frisch entpackten Ordner beschleunigen. Der Aufbau des GStreamer-Plugin-Caches ist als Engpass nachgewiesen, auch im Qt-5-Vergleich. Erststart und Folgestarts getrennt messen, die bisher geprüften Audioformate beibehalten und die Pakettests erneut bestehen lassen. Ausgangswerte und Messbelege stehen im [Phase-3-Bericht](PHASE3_REPORT.md).
-- [ ] Ein portables Windows-x64-Testpaket erstellen und auf einem System ohne Entwicklungswerkzeuge starten.
+- [x] Ein portables Windows-x64-Testpaket erstellen und lokal mit bereinigtem PATH prüfen.
+- [ ] Das Paket auf einem separaten Windows-System ohne Entwicklungswerkzeuge starten.
 - [x] Eigene Daten- und Einzelinstanz-Zuordnung für den Fork festlegen, damit er parallel zum Original geprüft werden kann. Übernahme alter Daten zunächst über Kopien, ohne das Originalprofil umzuschreiben.
 - [x] Update-Prüfung eindeutig dem Fork zuordnen. Solange kein eigener Update-Kanal besteht, automatische Upstream-Prüfungen für Testpakete deaktivieren und dies dokumentieren. Sichtbare Änderungen am Update-Dialog separat entscheiden.
 - [x] Versionskennung, Fork-Hinweis und mitzuliefernde Lizenztexte festlegen. Eine Änderung des Designs ist damit nicht verbunden.
 - [x] Ein versioniertes Prüfprotokoll mit Commit, Abhängigkeiten, Testergebnissen und bekannten Einschränkungen beilegen.
-- [ ] Das Paket im Alltag mit dem bisherigen Player vergleichen. Eine Veröffentlichung ist ein eigener Umsetzungsschritt.
+- [x] Das konkrete Paket manuell mit dem bisherigen Player vergleichen und vom Nutzer abnehmen lassen. Am 8. September bestätigt der Nutzer die Abnahme ohne Auffälligkeiten im Test. Eine Langzeitprüfung ist damit nicht nachgewiesen; eine Veröffentlichung ist ein eigener Umsetzungsschritt.
 - [ ] Bei Veröffentlichung Tag, Quellstand, heruntergeladenes Release-Paket und SHA-256 prüfen. Ein erfolgreicher CI-Lauf allein gilt nicht als Paketabnahme.
 
-Technischer Stand vom 8. September: Testpaket erstellt und lokal mit bereinigtem PATH geprüft; Erststarts der abschließenden Messungen bei 1,67 bis 1,92 Sekunden. Der separate Windows-Rechner und die manuelle Paketabnahme bleiben offen. Details und Ausreißer stehen im [Phase-4-Bericht](PHASE4_REPORT.md).
+Stand vom 8. September: Testpaket erstellt, lokal mit bereinigtem PATH geprüft und vom Nutzer ohne gemeldete Auffälligkeiten abgenommen. Erststarts der abschließenden automatischen Messungen lagen bei 1,67 bis 1,92 Sekunden. Der separate Windows-Rechner bleibt offen. Details und Ausreißer stehen im [Phase-4-Bericht](PHASE4_REPORT.md).
 
 **Abnahme:** Ein eigenständig startbares Paket mit nachvollziehbarer Herkunft ist vorhanden. Der Nutzer bestätigt den Erhalt seines bisherigen UI- und Bedienverhaltens. Diese Bestätigung betrifft das konkrete Testpaket; die vorangehenden technischen Arbeiten können unabhängig davon erfolgen.
 
