@@ -67,7 +67,7 @@ synchronized fake audio sinks, so they do not measure audible gap length.
 The resource fixes follow the API ownership contracts; these tests are not a
 long-running heap or leak measurement.
 
-## Manual check before merging
+## Validation and remaining manual check
 
 Local validation on Windows 11, 2026-09-08:
 
@@ -92,4 +92,7 @@ the current track several times. Check that pause/resume, repeat and the next
 track behave as expected. Listen to adjacent tracks for unwanted gaps and check
 opening, closing and cold/cached waveform loading with your usual files.
 
-No release tag or existing release is changed by this PR.
+PR #6 was merged on 2026-09-08 following the user's merge and release instruction.
+Its changes are included in alpha.2. A manual listening and interaction check of
+this release has not yet been confirmed; the successful automated checks above
+must not be read as a listening test.

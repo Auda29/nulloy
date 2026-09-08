@@ -100,15 +100,14 @@ def prepare():
               "limitations": ["Alpha Windows x64 build; no installer or automatic fork updates",
                               "CI audio tests use the no-device fallback",
                               "Separate Windows machine without development tools not yet confirmed",
-                              "User acceptance covered the earlier local Phase 4 package, not this CI binary"]}
+                              "Manual listening and interaction acceptance for this release not yet confirmed"]}
     (OUTPUT / "release-validation.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     sums = "".join(f"{sha256(p)}  {p.name}\n" for p in sorted(OUTPUT.iterdir()))
     (OUTPUT / "SHA256SUMS.txt").write_text(sums, encoding="utf-8")
+    changes = (ROOT / "docs/releases" / f"{version}.md").read_text(encoding="utf-8").strip()
     notes = f"""# NulloyFork {version}
 
-Erste Alpha des Community-Forks für Windows x64 mit Qt 6. Die bisherigen Skins und
-Bedienelemente bleiben erhalten. Das portable Paket nutzt einen eigenen `Data`-Ordner
-und einen vorbereiteten GStreamer-Cache für schnellere Erststarts.
+{changes}
 
 **Start:** `NulloyFork-{version}-windows-x64.zip` vollständig in einen beschreibbaren
 Ordner entpacken und `NulloyFork.exe` starten. Eigene Tracks per Drag-and-drop hinzufügen.
@@ -120,9 +119,10 @@ Quellstand: `{commit}`. Prüfsummen stehen in `SHA256SUMS.txt`;
 `release-validation.json` ordnet die Prüfungen diesem Download zu.
 
 Diese Alpha hat keinen Installer und keine automatischen Fork-Updates. Ein Test auf
-einem separaten Windows-Rechner ohne Entwicklungswerkzeuge steht aus. Die manuelle
-Phase-4-Abnahme betraf das lokale Vorgängerpaket; dieses Download-Paket wurde in CI gebaut.
-Der enthaltene Phase-4-Bericht dokumentiert diese frühere lokale Prüfung. Fehlende,
+einem separaten Windows-Rechner ohne Entwicklungswerkzeuge steht aus. Eine manuelle
+Hör- und Bedienabnahme dieses Releases ist noch nicht bestätigt. Die automatisierten
+Audiotests verwenden einen Ersatz für fehlende Audiogeräte und sind kein Hörtest.
+Der enthaltene Phase-4-Bericht dokumentiert die frühere lokale Prüfung. Fehlende,
 veraltete oder beschädigte GStreamer-Caches können weiterhin einen längeren Start verursachen.
 
 GPL- und Drittanbieter-Lizenztexte sind im Paket enthalten. Der Quellcode dieses

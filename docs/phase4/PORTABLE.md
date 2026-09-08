@@ -1,6 +1,6 @@
-# Portabler Phase-4-Test
+# Portabler NulloyFork
 
-Das Testpaket heißt `NulloyFork-0.10.0-alpha.1-windows-x64.zip`.
+Das Testpaket heißt `NulloyFork-0.10.0-alpha.2-windows-x64.zip`.
 Es stammt aus dem [Community-Fork](https://github.com/Auda29/nulloy).
 Es ist keine offizielle Nulloy-Veröffentlichung. Die vorhandenen Skins bleiben unverändert.
 
@@ -64,4 +64,4 @@ aber weiterhin auf dem Entwicklungsrechner.
 `build-info.json` nennt Version, Quell-Commit und uncommittete Änderungen beim Paketbau.
 `toolchain.txt` enthält die Paketversionen. `package-manifest.json` enthält Dateihashes und
 die geprüften x64-Abhängigkeiten. GPL- und Drittanbieter-Lizenztexte liegen bei.
-Eine öffentliche Veröffentlichung ist ein eigener Schritt.
+Aktuelle Pakete stehen in den [Fork-Releases](https://github.com/Auda29/nulloy/releases).

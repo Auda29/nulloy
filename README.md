@@ -9,14 +9,14 @@ The aim is to modernize the player while keeping its familiar interface,
 playlist workflow and skins. Adding one or several tracks by drag-and-drop,
 responsive startup and shutdown, and quick waveform loading remain priorities.
 
-[Download the Windows x64 alpha](https://github.com/Auda29/nulloy/releases/tag/v0.10.0-alpha.1)
+[Download the Windows x64 alpha](https://github.com/Auda29/nulloy/releases/tag/v0.10.0-alpha.2)
 | [All fork releases](https://github.com/Auda29/nulloy/releases)
 | [Report a fork issue](https://github.com/Auda29/nulloy/issues)
 | [Build and test workflow](https://github.com/Auda29/nulloy/actions/workflows/windows-cmake.yml)
 
 ## What is different in this fork?
 
-The following changes are included in **v0.10.0-alpha.1**:
+The following changes are included in **v0.10.0-alpha.2**:
 
 | Area | Changes in the fork |
 |---|---|
@@ -39,10 +39,10 @@ interface this fork preserves. [More upstream screenshots](https://nulloy.com/sc
 
 ## Download and run
 
-The current release is **v0.10.0-alpha.1**, a Windows x64 prerelease.
+The current release is **v0.10.0-alpha.2**, a Windows x64 prerelease.
 
-1. Download `NulloyFork-0.10.0-alpha.1-windows-x64.zip` from the
-   [fork release page](https://github.com/Auda29/nulloy/releases/tag/v0.10.0-alpha.1).
+1. Download `NulloyFork-0.10.0-alpha.2-windows-x64.zip` from the
+   [fork release page](https://github.com/Auda29/nulloy/releases/tag/v0.10.0-alpha.2).
 2. Extract the entire ZIP into a writable folder and start `NulloyFork.exe`.
 3. Drag one or multiple audio files into the playlist.
 
@@ -65,11 +65,10 @@ the [portable migration report](PHASE4_REPORT.md).
 The Qt 6, CMake, Windows x64 and portable-profile migration has been completed.
 The [migration plan](MIGRATION_PLAN.md) describes the staged approach and later work.
 
-[Fork PR #6](https://github.com/Auda29/nulloy/pull/6) tracks the adapted port of
+[Merged fork PR #6](https://github.com/Auda29/nulloy/pull/6) contains the adapted port of
 [upstream PR #263](https://github.com/nulloy/nulloy/pull/263): seek/gapless fixes,
 GStreamer resource handling, shared TagLib file validation and AIFF file filters.
-These changes are **not included in v0.10.0-alpha.1**. See the PR for its current
-review and merge status.
+These changes are included in **v0.10.0-alpha.2**. See the [release notes](docs/releases/0.10.0-alpha.2.md) for the changes and remaining validation limits.
 
 A limited Rust component pilot is planned for a later phase. The current player
 is C++/Qt; a complete Rust rewrite has not been adopted as the project goal.

@@ -41,7 +41,7 @@
       "cacheVariables": {
         "NULLOY_PORTABLE_FORK": true,
         "NULLOY_APP_NAME": "NulloyFork",
-        "NULLOY_VERSION": "0.10.0-alpha.1"
+        "NULLOY_VERSION": "0.10.0-alpha.2"
       }
     }
   ],
