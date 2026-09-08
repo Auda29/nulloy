@@ -15,6 +15,8 @@
 
 #include <QSignalSpy>
 #include <QPluginLoader>
+#include <QDragEnterEvent>
+#include <QDropEvent>
 #include <QtTest/QtTest>
 
 #include "playbackEngineInterface.h"
@@ -181,6 +183,7 @@ private slots:
         m_playbackEngine->stop();
 
         QSignalSpy spy(m_playbackEngine, SIGNAL(mediaChanged(const QString &, int)));
+        QSignalSpy finished(m_playbackEngine, SIGNAL(mediaFinished(const QString &, int)));
         int count = 0;
         int row = 0;
 
@@ -198,6 +201,181 @@ private slots:
         ++count;
         QTRY_COMPARE(m_playlistWidget->playingRow(), row);
         QCOMPARE(spy.count(), count);
+        QCOMPARE(finished.count(), 0);
+    }
+
+    void successorChanges_data()
+    {
+        QTest::addColumn<QString>("change");
+        for (const char *name : {"drop", "remove", "remove-pending", "move", "shuffle", "repeat", "loop"})
+            QTest::newRow(name) << QString(name);
+    }
+
+    void successorChanges()
+    {
+        QFETCH(QString, change);
+        const QString root = QCoreApplication::applicationDirPath() + "/tests/";
+        m_playlistWidget->setFiles({root + "01.wav", root + "02.wav", root + "03.wav"});
+        m_playlistWidget->resize(640, 400);
+        m_playlistWidget->show();
+        const int startRow = (change == "drop" || change == "loop") ? 2 : 0;
+        m_playlistWidget->playRow(startRow);
+        QTRY_COMPARE(m_playlistWidget->playingRow(), startRow);
+        QTRY_COMPARE(m_playbackEngine->state(), N::PlaybackPlaying);
+        int expectedId = 0;
+        if (change == "drop") {
+            QMimeData mime;
+            mime.setUrls({QUrl::fromLocalFile(root + "04.wav"), QUrl::fromLocalFile(root + "05.wav")});
+            QDragEnterEvent enter(QPoint(20, 300), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
+            QCoreApplication::sendEvent(m_playlistWidget->viewport(), &enter);
+            QVERIFY(enter.isAccepted());
+            QDropEvent drop(QPointF(20, 300), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
+            QCoreApplication::sendEvent(m_playlistWidget->viewport(), &drop);
+            QVERIFY(drop.isAccepted());
+            QCOMPARE(m_playlistWidget->count(), 5);
+            expectedId = m_playlistWidget->item(3)->data(N::IdRole).toInt();
+        } else if (change == "remove" || change == "remove-pending") {
+            if (change == "remove-pending") {
+                m_playbackEngine->setPosition(0.97);
+                QTest::qWait(80);
+            }
+            m_playlistWidget->removeFiles({root + "02.wav"});
+            expectedId = m_playlistWidget->item(1)->data(N::IdRole).toInt();
+        } else if (change == "move") {
+            auto *moved = m_playlistWidget->takeItem(2);
+            m_playlistWidget->insertItem(1, moved);
+            expectedId = moved->data(N::IdRole).toInt();
+        } else if (change == "shuffle") {
+            NSettings::instance()->setValue("LoopPlaylist", true);
+            m_playlistWidget->shufflePlaylist();
+            QCOMPARE(m_playlistWidget->count(), 3);
+            const int next = (m_playlistWidget->playingRow() + 1) % 3;
+            expectedId = m_playlistWidget->item(next)->data(N::IdRole).toInt();
+        } else if (change == "repeat") {
+            m_playlistWidget->setRepeatMode(true);
+            expectedId = m_playlistWidget->playingItem()->data(N::IdRole).toInt();
+        } else {
+            NSettings::instance()->setValue("LoopPlaylist", true);
+            expectedId = m_playlistWidget->item(0)->data(N::IdRole).toInt();
+        }
+        QCoreApplication::processEvents();
+        QSignalSpy changed(m_playbackEngine, SIGNAL(mediaChanged(const QString &, int)));
+        QSignalSpy finished(m_playbackEngine, SIGNAL(mediaFinished(const QString &, int)));
+        m_playbackEngine->setPosition(0.99);
+        QTRY_VERIFY(!changed.isEmpty());
+        QCOMPARE(changed.first().at(1).toInt(), expectedId);
+        // This must use playbin's gapless handoff, not the EOS fallback.
+        QCOMPARE(finished.count(), 0);
+    }
+
+    void endOfStreamFallback_data()
+    {
+        QTest::addColumn<bool>("repeat");
+        QTest::newRow("next") << false;
+        QTest::newRow("repeat") << true;
+    }
+
+    void endOfStreamFallback()
+    {
+        QFETCH(bool, repeat);
+        const QString root = QCoreApplication::applicationDirPath() + "/tests/";
+        m_playlistWidget->setFiles({root + "01.wav", root + "02.wav", root + "03.wav"});
+        m_playlistWidget->setRepeatMode(repeat);
+        m_playlistWidget->playRow(0);
+        QTRY_COMPARE(m_playlistWidget->playingRow(), 0);
+        QTRY_COMPARE(m_playbackEngine->state(), N::PlaybackPlaying);
+        QSignalSpy changed(m_playbackEngine, SIGNAL(mediaChanged(const QString &, int)));
+        QSignalSpy finished(m_playbackEngine, SIGNAL(mediaFinished(const QString &, int)));
+        m_playbackEngine->nextMediaRespond("", 0);
+        m_playbackEngine->setPosition(0.99);
+        QTRY_COMPARE(finished.count(), 1);
+        QTRY_VERIFY(!changed.isEmpty());
+        QCOMPARE(m_playlistWidget->playingRow(), repeat ? 0 : 1);
+    }
+
+    void seekStopAndManualSwitch()
+    {
+        const QString root = QCoreApplication::applicationDirPath() + "/tests/";
+        m_playlistWidget->setFiles({root + "01.wav", root + "02.wav", root + "03.wav"});
+        for (int i = 0; i < 12; ++i) {
+            m_playlistWidget->playRow(0);
+            QTRY_COMPARE(m_playlistWidget->playingRow(), 0);
+            QTRY_COMPARE(m_playbackEngine->state(), N::PlaybackPlaying);
+            m_playbackEngine->setPosition(0.97);
+            QTest::qWait(25 + (i % 4) * 20);
+            m_playbackEngine->setPosition(0.2);
+            m_playbackEngine->pause();
+            m_playbackEngine->play();
+            m_playbackEngine->stop();
+            m_playlistWidget->playRow(2);
+            QTRY_COMPARE(m_playlistWidget->playingRow(), 2);
+            QTest::qWait(100);
+            QCOMPARE(m_playbackEngine->currentMedia(), root + "03.wav");
+        }
+    }
+
+    void seekBackBeforeTrackEnd()
+    {
+        const QString root = QCoreApplication::applicationDirPath() + "/tests/";
+        m_playlistWidget->setFiles({root + "01.wav", root + "02.wav"});
+        m_playlistWidget->playRow(0);
+        QTRY_COMPARE(m_playlistWidget->playingRow(), 0);
+        QTRY_COMPARE(m_playbackEngine->state(), N::PlaybackPlaying);
+        for (int i = 0; i < 8; ++i) {
+            m_playbackEngine->setPosition(0.97);
+            QTest::qWait(80);
+            m_playbackEngine->setPosition(0.2);
+            QTest::qWait(350);
+            QCOMPARE(m_playlistWidget->playingRow(), 0);
+            QVERIFY(m_playbackEngine->position() < 0.3);
+            QTRY_COMPARE(m_playbackEngine->state(), N::PlaybackPlaying);
+        }
+        m_playbackEngine->setPosition(0.99);
+        QTRY_COMPARE(m_playlistWidget->playingRow(), 1);
+    }
+
+    void shortTracks_data()
+    {
+        QTest::addColumn<int>("milliseconds");
+        QTest::newRow("50ms") << 50;
+        QTest::newRow("250ms") << 250;
+        QTest::newRow("800ms") << 800;
+    }
+
+    void shortTracks()
+    {
+        QFETCH(int, milliseconds);
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        QStringList files;
+        for (int i = 0; i < 3; ++i) {
+            const QString path = directory.filePath(QString("short-%1.wav").arg(i));
+            QFile file(path);
+            QVERIFY(file.open(QIODevice::WriteOnly));
+            QDataStream stream(&file);
+            stream.setByteOrder(QDataStream::LittleEndian);
+            const quint32 bytes = 44100 * milliseconds / 1000 * 2;
+            stream.writeRawData("RIFF", 4);
+            stream << quint32(36 + bytes);
+            stream.writeRawData("WAVEfmt ", 8);
+            stream << quint32(16) << quint16(1) << quint16(1) << quint32(44100)
+                   << quint32(88200) << quint16(2) << quint16(16);
+            stream.writeRawData("data", 4);
+            stream << bytes;
+            const QByteArray silence(bytes, '\0');
+            QCOMPARE(stream.writeRawData(silence.constData(), bytes), int(bytes));
+            file.close();
+            files << path;
+        }
+        m_playlistWidget->setFiles(files);
+        QSignalSpy changed(m_playbackEngine, SIGNAL(mediaChanged(const QString &, int)));
+        QSignalSpy finished(m_playlistWidget, SIGNAL(playlistFinished()));
+        m_playlistWidget->playRow(0);
+        QTRY_COMPARE(finished.count(), 1);
+        QCOMPARE(changed.count(), 3);
+        for (int i = 0; i < files.size(); ++i)
+            QCOMPARE(changed.at(i).at(0).toString(), files.at(i));
+        QCOMPARE(m_playbackEngine->state(), N::PlaybackStopped);
     }
 
     void testRepeat()

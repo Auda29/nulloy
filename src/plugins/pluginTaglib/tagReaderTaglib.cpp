@@ -34,7 +34,6 @@ QString NTaglib::_filePath;
 
 NTagReaderTaglib::NTagReaderTaglib(QObject *parent) : NTagReaderInterface(parent)
 {
-    m_isValid = false;
     m_codec = nullptr;
     m_utf8Codec = QTextCodec::codecForName("UTF-8");
 }
@@ -55,8 +54,6 @@ void NTagReaderTaglib::setSource(const QString &file)
         return;
     }
 
-    m_isValid = false;
-
     if (NTaglib::_tagRef) {
         delete NTaglib::_tagRef;
         NTaglib::_tagRef = NULL;
@@ -76,7 +73,12 @@ void NTagReaderTaglib::setSource(const QString &file)
     NTaglib::_tagRef = new TagLib::FileRef(file.toUtf8().data());
 #endif
 
-    m_isValid = NTaglib::_tagRef->file() && NTaglib::_tagRef->file()->isValid();
+}
+
+bool NTagReaderTaglib::isValid() const
+{
+    // The cover reader can replace or release this shared FileRef as well.
+    return NTaglib::_tagRef && NTaglib::_tagRef->file() && NTaglib::_tagRef->file()->isValid();
 }
 
 void NTagReaderTaglib::setEncoding(const QString &encoding)
@@ -115,7 +117,7 @@ QString NTagReaderTaglib::toUnicode(const TagLib::String &tstr) const
 
 QString NTagReaderTaglib::getTag(QChar ch) const
 {
-    if (!m_isValid) {
+    if (!isValid()) {
         return "";
     }
 
@@ -297,7 +299,7 @@ NTagReaderTaglib::QMapToTMap(const QMap<QString, QStringList> &qmap) const
 
 QMap<QString, QStringList> NTagReaderTaglib::getTags() const
 {
-    if (!m_isValid) { // workaround to relay the error
+    if (!isValid()) { // workaround to relay the error
         QMap<QString, QStringList> tags;
         tags["Error"] = QStringList() << "Invalid";
         return tags;
@@ -307,6 +309,12 @@ QMap<QString, QStringList> NTagReaderTaglib::getTags() const
 
 QMap<QString, QStringList> NTagReaderTaglib::setTags(const QMap<QString, QStringList> &tags)
 {
+    if (!isValid()) {
+        QMap<QString, QStringList> unsaved;
+        unsaved["Error"] = QStringList() << "Write";
+        return unsaved;
+    }
+
     QMap<QString, QStringList> unsaved = TMapToQMap(
         NTaglib::_tagRef->file()->setProperties(QMapToTMap(tags)));
     if (unsaved.isEmpty()) {

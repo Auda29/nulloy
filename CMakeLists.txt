@@ -208,7 +208,11 @@ if(BUILD_TESTING)
         COMMAND ${Python3_EXECUTABLE} "${PROJECT_SOURCE_DIR}/tools/phase2/build-assets.py" tests
             "${PROJECT_SOURCE_DIR}/tests" "${NULLOY_TEST_DIR}/tests"
         VERBATIM)
-    foreach(test IN ITEMS testTrackInfoReader testPlaylistWidget testFileDrop testMigration)
+    set(nulloy_tests testTrackInfoReader testPlaylistWidget testFileDrop testMigration)
+    if(NULLOY_TAGLIB)
+        list(APPEND nulloy_tests testPluginResources)
+    endif()
+    foreach(test IN LISTS nulloy_tests)
         add_executable(${test} "tests/${test}.cpp" "${PROJECT_BINARY_DIR}/generated/manifest.rc")
         target_link_libraries(${test} PRIVATE nulloy_core Qt${NULLOY_QT_MAJOR}::Test)
         if(test STREQUAL "testMigration")

@@ -17,6 +17,7 @@
 #define N_PLAYBACK_ENGINE_GSTREAMER_H
 
 #include <gst/gst.h>
+#include <QMutex>
 
 #include "global.h"
 #include "playbackEngineInterface.h"
@@ -43,17 +44,26 @@ private:
     qreal m_position;
     bool m_positionPostponed;
     GstState m_gstState;
+    GstState m_requestedState = GST_STATE_NULL;
     gint64 m_durationNsec;
-    bool m_crossfading;
-    bool m_nextMediaRequestBlock;
 
     QString m_currentMedia;
     int m_currentContext;
-    QString m_bkpMedia;
-    int m_bkpContext;
+    // Only these fields are shared with the about-to-finish streaming callback.
+    QMutex m_nextMediaMutex;
+    QString m_nextMediaFile;
+    QByteArray m_nextMediaUri;
+    int m_nextMediaContext = 0;
+    QString m_pendingMedia;
+    int m_pendingContext = 0;
+    bool m_acceptNextMedia = false;
+    bool m_initialStreamStart = true;
+    bool m_suppressStreamStart = false;
 
     N::PlaybackState fromGstState(GstState state) const;
-    bool gstSetFile(const QString &file, int context, bool prepareNext);
+    bool gstSetFile(const QString &file, int context);
+    void resetPipeline();
+    void restartCurrentMedia();
     void processGstMessage(GstMessage *msg);
     void fail();
 
@@ -74,8 +84,7 @@ public:
     Q_INVOKABLE qreal speed() const;
     Q_INVOKABLE qreal pitch() const;
 
-    void _emitNextMediaRequest();
-    bool _nextMediaRequestBlocked();
+    void _handleAboutToFinish();
 
 public slots:
     Q_INVOKABLE void setMedia(const QString &file, int context);
