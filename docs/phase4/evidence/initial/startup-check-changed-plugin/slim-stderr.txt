@@ -1,0 +1,9 @@
+0:00:00.001657400       6984      29084 INFO            GST_REGISTRY gstregistry.c:1950:ensure_current_registry: reading registry cache: D:/Benutzer Dateien/Benutzer/ChatGPT/Nulloy-Fork/.phase4/build/package check ä lo01v5to/NulloyFork/Data/gstreamer-1.0.registry.bin
+0:00:00.018975500       6984      29084 INFO            GST_REGISTRY gstregistrybinary.c:685:priv_gst_registry_binary_read_cache: loaded D:/Benutzer Dateien/Benutzer/ChatGPT/Nulloy-Fork/.phase4/build/package check ä lo01v5to/NulloyFork/Data/gstreamer-1.0.registry.bin in 0.017246 seconds
+0:00:00.019020100       6984      29084 INFO            GST_REGISTRY gstregistry.c:1817:scan_and_update_registry: Validating plugins from registry cache: D:/Benutzer Dateien/Benutzer/ChatGPT/Nulloy-Fork/.phase4/build/package check ä lo01v5to/NulloyFork/Data/gstreamer-1.0.registry.bin
+0:00:00.021414700       6984      29084 INFO            GST_REGISTRY gstregistry.c:1393:gst_registry_scan_path_level:<registry0> cached info for gstreamer-1.0\libgstplayback.dll is stale
+0:00:00.238426100       6984      29084 INFO            GST_REGISTRY gstregistry.c:1918:scan_and_update_registry: Registry cache changed. Writing new registry cache
+0:00:00.238462800       6984      29084 INFO            GST_REGISTRY gstregistrybinary.c:432:priv_gst_registry_binary_write_cache: Building binary registry cache image
+0:00:00.239857100       6984      29084 INFO            GST_REGISTRY gstregistrybinary.c:464:priv_gst_registry_binary_write_cache: Writing binary registry cache
+0:00:00.241795400       6984      29084 INFO            GST_REGISTRY gstregistry.c:1927:scan_and_update_registry: Registry cache written successfully
+0:00:00.241823500       6984      29084 INFO            GST_REGISTRY gstregistry.c:1985:ensure_current_registry: registry reading and updating done

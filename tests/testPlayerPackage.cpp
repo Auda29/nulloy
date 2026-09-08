@@ -16,6 +16,7 @@
 #include "mainWindow.h"
 #include "player.h"
 #include "playlistWidget.h"
+#include "playlistStorage.h"
 #include "playbackEngineInterface.h"
 #include "pluginLoader.h"
 #include "settings.h"
@@ -57,6 +58,73 @@ class TestPlayerPackage : public QObject
 {
     Q_OBJECT
 private slots:
+    void portableProcesses()
+    {
+        const QString otherExe = qEnvironmentVariable("NULLOY_TEST_SECOND_PLAYER");
+        if (otherExe.isEmpty()) QSKIP("Separate portable process check");
+        const QString firstExe = QCoreApplication::applicationDirPath() + "/NulloyFork.exe";
+        const QString firstRoot = QFileInfo(firstExe).absolutePath();
+        const QString otherRoot = QFileInfo(otherExe).absolutePath();
+        for (const QString &root : {firstRoot, otherRoot}) {
+            QDir().mkpath(root + "/Data");
+            QSettings settings(root + "/Data/NulloyFork.cfg", QSettings::IniFormat);
+            settings.clear();
+            settings.setValue("SingleInstance", true);
+            settings.setValue("EnqueueFiles", true);
+            settings.setValue("PlayEnqueued", false);
+            settings.setValue("QuitOnClose", true);
+            settings.setValue("Volume", 0.0);
+            settings.setValue("DisplayLogDialog", false);
+            settings.setValue("Skin", "Slim/0.9");
+            settings.sync();
+            QFile::remove(root + "/Data/NulloyFork.m3u");
+        }
+        const auto window = [](QProcess &process) {
+            struct Search { DWORD pid; HWND result = nullptr; } search{DWORD(process.processId())};
+            EnumWindows([](HWND hwnd, LPARAM data) -> BOOL {
+                auto *s = reinterpret_cast<Search *>(data);
+                DWORD pid = 0;
+                GetWindowThreadProcessId(hwnd, &pid);
+                if (pid == s->pid && IsWindowVisible(hwnd) && !GetWindow(hwnd, GW_OWNER)) {
+                    s->result = hwnd;
+                    return FALSE;
+                }
+                return TRUE;
+            }, reinterpret_cast<LPARAM>(&search));
+            return search.result;
+        };
+        QProcess first, other, forwarded;
+        first.setWorkingDirectory(firstRoot + "/tests");
+        first.start(firstExe, {"01.wav"});
+        QVERIFY(first.waitForStarted());
+        QTRY_VERIFY_WITH_TIMEOUT(window(first), 30000);
+        other.setWorkingDirectory(otherRoot + "/tests");
+        other.start(otherExe, {"02.wav"});
+        QVERIFY(other.waitForStarted());
+        QTRY_VERIFY_WITH_TIMEOUT(window(other), 30000);
+        forwarded.setWorkingDirectory(firstRoot + "/tests");
+        forwarded.start(firstExe, {"02.wav"});
+        QVERIFY(forwarded.waitForStarted());
+        QTRY_COMPARE_WITH_TIMEOUT(forwarded.state(), QProcess::NotRunning, 10000);
+        QCOMPARE(forwarded.exitCode(), 0);
+        QCOMPARE(first.state(), QProcess::Running);
+        QCOMPARE(other.state(), QProcess::Running);
+        QTest::qWait(250);
+        QVERIFY(PostMessage(window(first), WM_CLOSE, 0, 0));
+        QVERIFY(PostMessage(window(other), WM_CLOSE, 0, 0));
+        QTRY_COMPARE_WITH_TIMEOUT(first.state(), QProcess::NotRunning, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(other.state(), QProcess::NotRunning, 10000);
+        QCOMPARE(first.exitCode(), 0);
+        QCOMPARE(other.exitCode(), 0);
+        const auto firstList = NPlaylistStorage::readM3u(firstRoot + "/Data/NulloyFork.m3u");
+        const auto otherList = NPlaylistStorage::readM3u(otherRoot + "/Data/NulloyFork.m3u");
+        QCOMPARE(firstList.size(), 2);
+        QCOMPARE(otherList.size(), 1);
+        QCOMPARE(QFileInfo(firstList[0].path).canonicalFilePath(), QFileInfo(firstRoot + "/tests/01.wav").canonicalFilePath());
+        QCOMPARE(QFileInfo(firstList[1].path).canonicalFilePath(), QFileInfo(firstRoot + "/tests/02.wav").canonicalFilePath());
+        QCOMPARE(QFileInfo(otherList[0].path).canonicalFilePath(), QFileInfo(otherRoot + "/tests/02.wav").canonicalFilePath());
+        qInfo() << "portable-process-isolation-relative-cli-and-ipc-passed";
+    }
     void playerWorkflow()
     {
         QCOMPARE(GetACP(), UINT(CP_UTF8));

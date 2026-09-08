@@ -16,6 +16,7 @@
 #include "containerGstreamer.h"
 #include <QCoreApplication>
 #include <QDir>
+#include <QFile>
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
 #endif
@@ -47,6 +48,18 @@ NContainerGstreamer::NContainerGstreamer(QObject *parent) : QObject(parent)
     if (QDir(bundledPlugins).exists()) {
         setPath("GST_PLUGIN_SYSTEM_PATH_1_0", bundledPlugins);
         setPath("GST_PLUGIN_SCANNER_1_0", appDir + "/gst-plugin-scanner.exe");
+#ifdef _N_PORTABLE_FORK_
+        // GStreamer 1.28 stores the supplied plugin paths in its registry.
+        // Relative paths let the packaged seed survive extraction/relocation.
+        // Keep the directory stable for plugins loaded later during playback.
+        if (QDir::setCurrent(appDir)) {
+            setPath("GST_PLUGIN_SYSTEM_PATH_1_0", "gstreamer-1.0");
+            setPath("GST_PLUGIN_PATH_1_0", "");
+            const QString cache = NCore::rcDir() + "/gstreamer-1.0.registry.bin";
+            if (!QFile::exists(cache))
+                QFile::copy(appDir + "/gstreamer-registry.seed.bin", cache);
+        }
+#endif
     }
     setPath("GST_REGISTRY", QString("%1/gstreamer-1.0.registry.bin").arg(NCore::rcDir()));
 

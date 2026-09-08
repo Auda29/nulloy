@@ -1,8 +1,8 @@
 # Migrationsplan für den Nulloy-Fork
 
-Stand: 6. September 2026
+Stand: 8. September 2026
 
-Status: Phase 0 abgeschlossen; Nachweise und bekannte Ausgangsfehler siehe [Prüfprotokoll](PHASE0_REPORT.md)
+Status: Phasen 0 bis 3 abgeschlossen und in Fork-`master` gemergt. Phase 4 technisch in Arbeit; Paketabnahme offen. Siehe [Phase-4-Bericht](PHASE4_REPORT.md).
 
 Repository: [Auda29/nulloy](https://github.com/Auda29/nulloy)
 
@@ -122,9 +122,9 @@ Die funktionale Abnahme ist abgeschlossen. Mit Zustimmung des Nutzers bleibt die
 
 - [ ] Den Erststart aus einem frisch entpackten Ordner beschleunigen. Der Aufbau des GStreamer-Plugin-Caches ist als Engpass nachgewiesen, auch im Qt-5-Vergleich. Erststart und Folgestarts getrennt messen, die bisher geprüften Audioformate beibehalten und die Pakettests erneut bestehen lassen. Ausgangswerte und Messbelege stehen im [Phase-3-Bericht](PHASE3_REPORT.md).
 - [ ] Ein portables Windows-x64-Testpaket erstellen und auf einem System ohne Entwicklungswerkzeuge starten.
-- [ ] Eigene Daten- und Einzelinstanz-Zuordnung für den Fork festlegen, damit er parallel zum Original geprüft werden kann. Übernahme alter Daten zunächst über Kopien, ohne das Originalprofil umzuschreiben.
-- [ ] Update-Prüfung eindeutig dem Fork zuordnen. Solange kein eigener Update-Kanal besteht, automatische Upstream-Prüfungen für Testpakete deaktivieren und dies dokumentieren. Sichtbare Änderungen am Update-Dialog separat entscheiden.
-- [ ] Versionskennung, Fork-Hinweis und mitzuliefernde Lizenztexte festlegen. Eine Änderung des Designs ist damit nicht verbunden.
+- [x] Eigene Daten- und Einzelinstanz-Zuordnung für den Fork festlegen, damit er parallel zum Original geprüft werden kann. Übernahme alter Daten zunächst über Kopien, ohne das Originalprofil umzuschreiben.
+- [x] Update-Prüfung eindeutig dem Fork zuordnen. Solange kein eigener Update-Kanal besteht, automatische Upstream-Prüfungen für Testpakete deaktivieren und dies dokumentieren. Sichtbare Änderungen am Update-Dialog separat entscheiden.
+- [x] Versionskennung, Fork-Hinweis und mitzuliefernde Lizenztexte festlegen. Eine Änderung des Designs ist damit nicht verbunden.
 - [ ] Ein versioniertes Prüfprotokoll mit Commit, Abhängigkeiten, Testergebnissen und bekannten Einschränkungen beilegen.
 - [ ] Das Paket im Alltag mit dem bisherigen Player vergleichen. Eine Veröffentlichung ist ein eigener Umsetzungsschritt.
 - [ ] Bei Veröffentlichung Tag, Quellstand, heruntergeladenes Release-Paket und SHA-256 prüfen. Ein erfolgreicher CI-Lauf allein gilt nicht als Paketabnahme.
