@@ -16,11 +16,14 @@
 #ifndef N_TRASH_H
 #define N_TRASH_H
 
-#include <QString>
+#include <QStringList>
 
 namespace NTrash
 {
+    // Returns unique paths successfully trashed or explicitly permanently deleted,
+    // in input order. Cancellation/failure returns only earlier successes; failed
+    // and unattempted paths remain in the playlist. Duplicate paths are tried once.
     QStringList moveToTrash(QStringList files);
-}
+} // namespace NTrash
 
 #endif

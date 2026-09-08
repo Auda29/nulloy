@@ -30,10 +30,14 @@ int _trash(const QString &file, QString *error)
     SHFILEOPSTRUCT shfo = SHFILEOPSTRUCT();
     shfo.wFunc = FO_DELETE;
     shfo.pFrom = (wchar_t *)(file_nul.utf16());
-    shfo.fFlags = FOF_NOCONFIRMATION | FOF_SIMPLEPROGRESS | FOF_NOERRORUI | FOF_ALLOWUNDO;
+    // Suppress ordinary recycle confirmation, never the permanent-delete warning.
+    shfo.fFlags = FOF_NOCONFIRMATION | FOF_SIMPLEPROGRESS | FOF_NOERRORUI | FOF_ALLOWUNDO |
+                  FOF_WANTNUKEWARNING;
     shfo.fAnyOperationsAborted = false;
     shfo.hNameMappings = NULL;
     shfo.pTo = NULL;
     shfo.lpszProgressTitle = NULL;
-    return SHFileOperation(&shfo);
+    const int result = SHFileOperation(&shfo);
+    // The shell can return zero even when the operation was cancelled.
+    return result != 0 ? result : (shfo.fAnyOperationsAborted ? 1 : 0);
 }
