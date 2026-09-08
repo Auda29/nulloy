@@ -1,0 +1,9 @@
+{
+  "run_url": "https://github.com/Auda29/nulloy/actions/runs/34194012324",
+  "code_commit": "ecfa168a6a248a22bb9982d53a4bf6d36ec6d730",
+  "conclusion": "success",
+  "artifact": "Nulloy-windows-x64",
+  "bytes": 53515672,
+  "downloaded_sha256": "bbea42800d44ea1c30c85d7e7b7de21797c2745ecca5c35ee17c8bbdb675e7cf",
+  "checksum_verified": true
+}

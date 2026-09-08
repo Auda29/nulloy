@@ -1,0 +1,14 @@
+{
+  "archive_sha256": "bbea42800d44ea1c30c85d7e7b7de21797c2745ecca5c35ee17c8bbdb675e7cf",
+  "file_hashes_verified": 411,
+  "x64_binaries": 210,
+  "path": "Windows System32 only",
+  "extraction_path": "temporary directory with spaces and umlaut",
+  "audio": "GStreamer no-device fallback",
+  "skins": [
+    "Slim/0.9",
+    "Silver/0.9",
+    "Metro/0.9",
+    "Native/0.9"
+  ]
+}

@@ -1,0 +1,19 @@
+********* Start testing of TrackInfoReaderTest *********
+Config: Using QtTest library 5.15.19, Qt 5.15.19 (x86_64-little_endian-llp64 shared (dynamic) release build; by GCC 16.1.0), windows 11
+PASS   : TrackInfoReaderTest::initTestCase()
+PASS   : TrackInfoReaderTest::test1()
+PASS   : TrackInfoReaderTest::test2()
+PASS   : TrackInfoReaderTest::test3()
+PASS   : TrackInfoReaderTest::test4()
+PASS   : TrackInfoReaderTest::test5()
+PASS   : TrackInfoReaderTest::test6()
+PASS   : TrackInfoReaderTest::test7()
+PASS   : TrackInfoReaderTest::test8()
+PASS   : TrackInfoReaderTest::test9()
+PASS   : TrackInfoReaderTest::test10()
+PASS   : TrackInfoReaderTest::test11()
+PASS   : TrackInfoReaderTest::test12()
+PASS   : TrackInfoReaderTest::test13()
+PASS   : TrackInfoReaderTest::cleanupTestCase()
+Totals: 15 passed, 0 failed, 0 skipped, 0 blacklisted, 1ms
+********* Finished testing of TrackInfoReaderTest *********

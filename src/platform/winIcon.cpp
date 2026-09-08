@@ -29,29 +29,33 @@ QList<QIcon> NWinIcon::getIcons(const QString &dllPath)
         return icons;
     }
 
-    const wchar_t *path = reinterpret_cast<const wchar_t *>(
-        QDir::toNativeSeparators(dllPath).utf16());
-    const UINT count = ExtractIconEx(path, -1, 0, 0, 0);
-    if (count == 0) {
+    const QString nativePath = QDir::toNativeSeparators(dllPath);
+    const wchar_t *path = reinterpret_cast<const wchar_t *>(nativePath.utf16());
+    const UINT count = ExtractIconExW(path, -1, 0, 0, 0);
+    if (count == 0 || count == UINT(-1)) {
         return icons;
     }
 
     QVector<HICON> large(count);
     QVector<HICON> small(count);
 
-    ExtractIconEx(path, 0, large.data(), small.data(), count);
+    ExtractIconExW(path, 0, large.data(), small.data(), count);
 
     for (int i = 0; i < count; ++i) {
         QIcon icon;
         HICON hIcon;
 
         hIcon = small[i];
-        icon.addPixmap(QtWin::fromHICON(hIcon));
-        DestroyIcon(hIcon);
+        if (hIcon) {
+            icon.addPixmap(QtWin::fromHICON(hIcon));
+            DestroyIcon(hIcon);
+        }
 
         hIcon = large[i];
-        icon.addPixmap(QtWin::fromHICON(hIcon));
-        DestroyIcon(hIcon);
+        if (hIcon) {
+            icon.addPixmap(QtWin::fromHICON(hIcon));
+            DestroyIcon(hIcon);
+        }
 
         icons.append(icon);
     }

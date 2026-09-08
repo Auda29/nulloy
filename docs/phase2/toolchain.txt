@@ -1,0 +1,15 @@
+mingw-w64-x86_64-cmake 4.4.2-2
+mingw-w64-x86_64-gcc 16.2.0-3
+mingw-w64-x86_64-gst-plugins-base 1.28.6-1
+mingw-w64-x86_64-gst-plugins-good 1.28.6-1
+mingw-w64-x86_64-gstreamer 1.28.6-1
+mingw-w64-x86_64-imagemagick 7.1.2.30-1
+mingw-w64-x86_64-librsvg 2.62.3-1
+mingw-w64-x86_64-ninja 1.13.2-1
+mingw-w64-x86_64-qt5-base 5.15.19+kde+r96-1
+mingw-w64-x86_64-qt5-script 5.15.19-1
+mingw-w64-x86_64-qt5-svg 5.15.19+kde+r5-1
+mingw-w64-x86_64-qt5-tools 5.15.19-1
+mingw-w64-x86_64-qt5-winextras 5.15.19-1
+mingw-w64-x86_64-taglib 2.2.1-1
+mingw-w64-x86_64-zlib 1.3.2-2
