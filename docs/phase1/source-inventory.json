@@ -1,0 +1,680 @@
+[
+  {
+    "category": "platform migration",
+    "file": "src/aboutDialog.cpp",
+    "line": 108,
+    "text": "thanksText.replace(QRegExp(\"(\\\\w)\\\\n(\\\\w)\"), \"\\\\1 \\\\2\");"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/aboutDialog.cpp",
+    "line": 130,
+    "text": "changelogHtml.replace(QRegExp(\"(\\\\*[^<]*)(<br>)\"), \"<b>\\\\1</b>\\\\2\");"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/mainWindow.cpp",
+    "line": 41,
+    "text": "#include <QDesktopWidget>"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/mainWindow.cpp",
+    "line": 548,
+    "text": "bool NMainWindow::nativeEvent(const QByteArray &eventType, void *message, qintptr *result)"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/mainWindow.cpp",
+    "line": 550,
+    "text": "bool NMainWindow::nativeEvent(const QByteArray &eventType, void *message, long *result)"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/mainWindow.cpp",
+    "line": 558,
+    "text": "return NW7TaskBar::instance()->nativeEvent(eventType, message, result);"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/mainWindow.h",
+    "line": 61,
+    "text": "bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/mainWindow.h",
+    "line": 63,
+    "text": "bool nativeEvent(const QByteArray &eventType, void *message, long *result);"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/platform/w7TaskBar.cpp",
+    "line": 27,
+    "text": "#include <QtWin>"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/platform/w7TaskBar.cpp",
+    "line": 80,
+    "text": "bool NW7TaskBar::nativeEvent(const QByteArray &eventType, void *message, qintptr *result)"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/platform/w7TaskBar.cpp",
+    "line": 82,
+    "text": "bool NW7TaskBar::nativeEvent(const QByteArray &eventType, void *message, long *result)"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/platform/w7TaskBar.cpp",
+    "line": 151,
+    "text": "hIcon = QtWin::toHICON(icon.pixmap(icon.availableSizes().first().width()));"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/platform/w7TaskBar.h",
+    "line": 46,
+    "text": "bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result);"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/platform/w7TaskBar.h",
+    "line": 48,
+    "text": "bool nativeEvent(const QByteArray &eventType, void *message, long *result);"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/platform/w7TaskBar.pri",
+    "line": 1,
+    "text": "QT += winextras"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/platform/winIcon.cpp",
+    "line": 20,
+    "text": "#include <QtWin>"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/platform/winIcon.cpp",
+    "line": 49,
+    "text": "icon.addPixmap(QtWin::fromHICON(hIcon));"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/platform/winIcon.cpp",
+    "line": 53,
+    "text": "icon.addPixmap(QtWin::fromHICON(hIcon));"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/platform/winIcon.pri",
+    "line": 1,
+    "text": "QT += winextras"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/player.cpp",
+    "line": 69,
+    "text": "qsrand((uint)QTime::currentTime().msec());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/player.cpp",
+    "line": 106,
+    "text": "QScriptValue skinProgram = m_scriptEngine->evaluate(\"Main\").construct();"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/player.cpp",
+    "line": 609,
+    "text": "QRegExp(\"^(cover|folder|front)\\\\..*$\", Qt::CaseInsensitive));"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/playlistStorage.cpp",
+    "line": 46,
+    "text": "in.setCodec(\"UTF-8\");"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/playlistStorage.cpp",
+    "line": 122,
+    "text": "out.setCodec(\"UTF-8\");"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/preferencesDialog.cpp",
+    "line": 401,
+    "text": "ui.languageRestartLabel->text().replace(QRegExp(\"(.*)&nbsp;.*\"), \"\\\\1&nbsp;\" + newText));"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.cpp",
+    "line": 45,
+    "text": "template <typename T> QScriptValue qObjectToScriptVlaue(QScriptEngine *engine, T const &obj)"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.cpp",
+    "line": 50,
+    "text": "template <typename T> void qObjectFromScriptValue(const QScriptValue &value, T &obj)"
+  },
+  {
+    "category": "Qt internals",
+    "file": "src/scriptEngine.cpp",
+    "line": 58,
+    "text": "static const QMetaObject *get() { return &static_cast<QtMetaObject *>(0)->staticQtMetaObject; }"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.cpp",
+    "line": 61,
+    "text": "template <typename T> QScriptValue enumToScriptValue(QScriptEngine *engine, T const &en)"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.cpp",
+    "line": 66,
+    "text": "template <typename T> void enumFromScriptValue(const QScriptValue &value, T &en)"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.cpp",
+    "line": 72,
+    "text": "QScriptValue readFile(QScriptContext *context, QScriptEngine *)"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.cpp",
+    "line": 87,
+    "text": "QScriptValue maskImage(QScriptContext *context, QScriptEngine *)"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.cpp",
+    "line": 90,
+    "text": "return QScriptValue();"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.cpp",
+    "line": 127,
+    "text": "return QScriptValue();"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.cpp",
+    "line": 130,
+    "text": "QScriptValue addApplicationFont(QScriptContext *context, QScriptEngine *)"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.cpp",
+    "line": 148,
+    "text": "NScriptEngine::NScriptEngine(NPlayer *player) : QScriptEngine(player)"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.cpp",
+    "line": 150,
+    "text": "QScriptValue global = globalObject();"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.cpp",
+    "line": 152,
+    "text": "QScriptValue Qt = newQMetaObject(QtMetaObject::get());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.cpp",
+    "line": 200,
+    "text": "qScriptRegisterMetaType(this, NMarginsPrototype::toScriptValue,"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.cpp",
+    "line": 202,
+    "text": "qScriptRegisterMetaType(this, NPointPrototype::toScriptValue, NPointPrototype::fromScriptValue);"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.cpp",
+    "line": 206,
+    "text": "qScriptRegisterSequenceMetaType<QList<QWidget *>>(this);"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.cpp",
+    "line": 208,
+    "text": "qScriptRegisterMetaType<N::PlaybackState>(this, enumToScriptValue, enumFromScriptValue);"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.cpp",
+    "line": 209,
+    "text": "QScriptValue N = newQMetaObject(&N::staticMetaObject);"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.cpp",
+    "line": 212,
+    "text": "qScriptRegisterMetaType<NMainWindow *>(this, qObjectToScriptVlaue, qObjectFromScriptValue);"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.cpp",
+    "line": 213,
+    "text": "QScriptValue ui = newObject();"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.cpp",
+    "line": 221,
+    "text": "qScriptRegisterMetaType<NPlayer *>(this, qObjectToScriptVlaue, qObjectFromScriptValue);"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.cpp",
+    "line": 224,
+    "text": "qScriptRegisterMetaType<NPlaybackEngineInterface *>(this, qObjectToScriptVlaue,"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.cpp",
+    "line": 228,
+    "text": "qScriptRegisterMetaType<NSettings *>(this, qObjectToScriptVlaue, qObjectFromScriptValue);"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.h",
+    "line": 19,
+    "text": "#include <QScriptEngine>"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptEngine.h",
+    "line": 23,
+    "text": "class NScriptEngine : public QScriptEngine"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 26,
+    "text": "QWidget *widget = qscriptvalue_cast<QWidget *>(thisObject());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 49,
+    "text": "QWidget *widget = qscriptvalue_cast<QWidget *>(thisObject());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 57,
+    "text": "QWidget *widget = qscriptvalue_cast<QWidget *>(thisObject());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 67,
+    "text": "QWidget *widget = qscriptvalue_cast<QWidget *>(thisObject());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 75,
+    "text": "QWidget *widget = qscriptvalue_cast<QWidget *>(thisObject());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 83,
+    "text": "QWidget *widget = qscriptvalue_cast<QWidget *>(thisObject());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 93,
+    "text": "QWidget *widget = qscriptvalue_cast<QWidget *>(thisObject());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 101,
+    "text": "QWidget *widget = qscriptvalue_cast<QWidget *>(thisObject());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 109,
+    "text": "QAbstractButton *button = qscriptvalue_cast<QAbstractButton *>(thisObject());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 117,
+    "text": "QDialog *dialog = qscriptvalue_cast<QDialog *>(thisObject());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 125,
+    "text": "QWidget *widget = qscriptvalue_cast<QWidget *>(thisObject());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 135,
+    "text": "QWidget *widget = qscriptvalue_cast<QWidget *>(thisObject());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 147,
+    "text": "QLayout *layout = qscriptvalue_cast<QLayout *>(thisObject());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 157,
+    "text": "QLayout *layout = qscriptvalue_cast<QLayout *>(thisObject());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 165,
+    "text": "QLayout *layout = qscriptvalue_cast<QLayout *>(thisObject());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 173,
+    "text": "QLayout *layout = qscriptvalue_cast<QLayout *>(thisObject());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 181,
+    "text": "QLayout *layout = qscriptvalue_cast<QLayout *>(thisObject());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 190,
+    "text": "QLayout *layout = qscriptvalue_cast<QLayout *>(thisObject());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 198,
+    "text": "QLayout *layout = qscriptvalue_cast<QLayout *>(thisObject());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 208,
+    "text": "QSplitter *splitter = qscriptvalue_cast<QSplitter *>(thisObject());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 218,
+    "text": "QSplitter *splitter = qscriptvalue_cast<QSplitter *>(thisObject());"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 224,
+    "text": "QScriptValue NMarginsPrototype::toScriptValue(QScriptEngine *engine, const QMargins &m)"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 226,
+    "text": "QScriptValue obj = engine->newObject();"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 234,
+    "text": "void NMarginsPrototype::fromScriptValue(const QScriptValue &obj, QMargins &m)"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 242,
+    "text": "QScriptValue NPointPrototype::toScriptValue(QScriptEngine *engine, const QPoint &p)"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 244,
+    "text": "QScriptValue obj = engine->newObject();"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.cpp",
+    "line": 250,
+    "text": "void NPointPrototype::fromScriptValue(const QScriptValue &obj, QPoint &p)"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.h",
+    "line": 23,
+    "text": "#include <QScriptEngine>"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.h",
+    "line": 24,
+    "text": "#include <QScriptValue>"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.h",
+    "line": 25,
+    "text": "#include <QScriptable>"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.h",
+    "line": 38,
+    "text": "class NWidgetPrototype : public QObject, public QScriptable"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.h",
+    "line": 67,
+    "text": "class NLayoutPrototype : public QObject, public QScriptable"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.h",
+    "line": 82,
+    "text": "class NSplitterPrototype : public QObject, public QScriptable"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.h",
+    "line": 94,
+    "text": "QScriptValue toScriptValue(QScriptEngine *engine, const QMargins &m);"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.h",
+    "line": 95,
+    "text": "void fromScriptValue(const QScriptValue &obj, QMargins &m);"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.h",
+    "line": 100,
+    "text": "QScriptValue toScriptValue(QScriptEngine *engine, const QPoint &p);"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/scriptQtPrototypes.h",
+    "line": 101,
+    "text": "void fromScriptValue(const QScriptValue &obj, QPoint &p);"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/settings.cpp",
+    "line": 40,
+    "text": "setIniCodec(\"UTF-8\");"
+  },
+  {
+    "category": "Qt internals",
+    "file": "src/skinFileSystem.cpp",
+    "line": 18,
+    "text": "#include <QtCore/private/qabstractfileengine_p.h>"
+  },
+  {
+    "category": "Qt internals",
+    "file": "src/skinFileSystem.cpp",
+    "line": 28,
+    "text": "class NSkinFileEngine : public QAbstractFileEngine"
+  },
+  {
+    "category": "Qt internals",
+    "file": "src/skinFileSystem.cpp",
+    "line": 74,
+    "text": "QAbstractFileEngine *NSkinFileSystem::create(const QString &fileName) const"
+  },
+  {
+    "category": "Qt internals",
+    "file": "src/skinFileSystem.cpp",
+    "line": 130,
+    "text": "QAbstractFileEngine::FileFlags NSkinFileEngine::fileFlags(QAbstractFileEngine::FileFlags flags) const"
+  },
+  {
+    "category": "Qt internals",
+    "file": "src/skinFileSystem.h",
+    "line": 19,
+    "text": "//#include <QAbstractFileEngineHandler>"
+  },
+  {
+    "category": "Qt internals",
+    "file": "src/skinFileSystem.h",
+    "line": 20,
+    "text": "#include <QtCore/private/qabstractfileengine_p.h>"
+  },
+  {
+    "category": "Qt internals",
+    "file": "src/skinFileSystem.h",
+    "line": 26,
+    "text": "// class QAbstractFileEngineHandler;"
+  },
+  {
+    "category": "Qt internals",
+    "file": "src/skinFileSystem.h",
+    "line": 28,
+    "text": "class NSkinFileSystem : public QAbstractFileEngineHandler"
+  },
+  {
+    "category": "Qt internals",
+    "file": "src/skinFileSystem.h",
+    "line": 31,
+    "text": "QAbstractFileEngine *create(const QString &fileName) const;"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/skinLoader.cpp",
+    "line": 168,
+    "text": "index = values.indexOf(QRegExp(QString() + \"Nulloy/Skin/\" + _skinPrefer + \".*\"));"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/skinLoader.cpp",
+    "line": 193,
+    "text": "QRegExp rx(\"(url\\\\()([^:])\");"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/skinLoader.cpp",
+    "line": 215,
+    "text": "QRegExp rx(\"(url\\\\()([^:])\");"
+  },
+  {
+    "category": "QtScript",
+    "file": "src/src.pri",
+    "line": 1,
+    "text": "QT += script gui svg core-private"
+  },
+  {
+    "category": "Qt internals",
+    "file": "src/src.pri",
+    "line": 1,
+    "text": "QT += script gui svg core-private"
+  },
+  {
+    "category": "platform migration",
+    "file": "src/widgetCollection/playlistWidget.cpp",
+    "line": 510,
+    "text": "qsrand(QDateTime::currentMSecsSinceEpoch() % UINT_MAX);"
+  },
+  {
+    "category": "platform migration",
+    "file": "3rdParty/qtsingleapplication-8fd81b2/src/qtlocalpeer.cpp",
+    "line": 81,
+    "text": "prefix.remove(QRegExp(\"[^a-zA-Z]\"));"
+  },
+  {
+    "category": "platform migration",
+    "file": "3rdParty/qxt-696423b-patched/qxt-x11.patch",
+    "line": 420,
+    "text": "+    Display* display = QX11Info::display();"
+  },
+  {
+    "category": "Qt internals",
+    "file": "3rdParty/qxt-696423b-patched/qxtglobalshortcut.pri",
+    "line": 2,
+    "text": "QT += gui-private"
+  },
+  {
+    "category": "platform migration",
+    "file": "3rdParty/qxt-696423b-patched/qxtglobalshortcut_p.h",
+    "line": 68,
+    "text": "virtual bool nativeEventFilter(const QByteArray & eventType, void * message, long * result);"
+  },
+  {
+    "category": "platform migration",
+    "file": "3rdParty/qxt-696423b-patched/qxtglobalshortcut_win.cpp",
+    "line": 39,
+    "text": "bool QxtGlobalShortcutPrivate::nativeEventFilter(const QByteArray & eventType,"
+  },
+  {
+    "category": "platform migration",
+    "file": "3rdParty/qxt-696423b-patched/qxtglobalshortcut_x11.cpp",
+    "line": 34,
+    "text": "#   include <QX11Info>"
+  },
+  {
+    "category": "Qt internals",
+    "file": "3rdParty/qxt-696423b-patched/qxtglobalshortcut_x11.cpp",
+    "line": 37,
+    "text": "#   include <qpa/qplatformnativeinterface.h>"
+  },
+  {
+    "category": "platform migration",
+    "file": "3rdParty/qxt-696423b-patched/qxtglobalshortcut_x11.cpp",
+    "line": 97,
+    "text": "m_display = QX11Info::display();"
+  },
+  {
+    "category": "Qt internals",
+    "file": "3rdParty/qxt-696423b-patched/qxtglobalshortcut_x11.cpp",
+    "line": 99,
+    "text": "QPlatformNativeInterface *native = qApp->platformNativeInterface();"
+  },
+  {
+    "category": "platform migration",
+    "file": "3rdParty/qxt-696423b-patched/qxtglobalshortcut_x11.cpp",
+    "line": 166,
+    "text": "bool QxtGlobalShortcutPrivate::nativeEventFilter(const QByteArray & eventType,"
+  }
+]

@@ -506,9 +506,15 @@ void NPlaylistWidget::shufflePlaylist()
     for (int i = 0; i < count(); ++i) {
         items.append(takeItem(0));
     }
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
     qsrand(QDateTime::currentMSecsSinceEpoch() % UINT_MAX);
+#endif
     for (int i = items.count() - 1; i > 0; --i) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+        items.swapItemsAt(i, QRandomGenerator::global()->bounded(i + 1));
+#else
         items.swap(i, qrand() % (i + 1));
+#endif
     }
     for (int i = 0; i < items.count(); ++i) {
         QListWidget::addItem(items[i]);

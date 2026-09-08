@@ -1,0 +1,17 @@
+********* Start testing of SkinRuntimeTest *********
+Config: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-llp64 shared (dynamic) release build; by GCC 16.2.0), windows 11
+PASS   : SkinRuntimeTest::initTestCase()
+PASS   : SkinRuntimeTest::originalSkins(slim-directory)
+PASS   : SkinRuntimeTest::originalSkins(slim-nzs)
+PASS   : SkinRuntimeTest::originalSkins(native-directory)
+PASS   : SkinRuntimeTest::originalSkins(native-nzs)
+PASS   : SkinRuntimeTest::originalSkins(silver-directory)
+PASS   : SkinRuntimeTest::originalSkins(silver-nzs)
+PASS   : SkinRuntimeTest::originalSkins(metro-directory)
+PASS   : SkinRuntimeTest::originalSkins(metro-nzs)
+PASS   : SkinRuntimeTest::originalSkins(slim-reference-099)
+PASS   : SkinRuntimeTest::originalSkins(silver-reference-099)
+PASS   : SkinRuntimeTest::originalSkins(metro-reference-099)
+PASS   : SkinRuntimeTest::cleanupTestCase()
+Totals: 13 passed, 0 failed, 0 skipped, 0 blacklisted, 2399ms
+********* Finished testing of SkinRuntimeTest *********

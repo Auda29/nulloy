@@ -19,6 +19,7 @@
 #include <QAbstractSlider>
 #include <QPainter>
 #include <QVector>
+#include "playlistDataItem.h"
 
 class NPlaylistDataItem;
 class NWaveformBuilderInterface;

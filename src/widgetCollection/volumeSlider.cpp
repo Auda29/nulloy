@@ -53,7 +53,11 @@ void NVolumeSlider::wheelEvent(QWheelEvent *event)
 {
     NSlider::wheelEvent(event);
     event->accept();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    showToolTip(event->position().x(), event->position().y());
+#else
     showToolTip(event->x(), event->y());
+#endif
 }
 
 QString NVolumeSlider::toolTipText(int value) const

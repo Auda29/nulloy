@@ -21,6 +21,7 @@
 #include <QPointer>
 
 #include "global.h"
+#include "playlistDataItem.h"
 
 class NPlaylistDataItem;
 class NPlaylistWidgetItem;
@@ -30,7 +31,6 @@ class QContextMenuEvent;
 class QDropEvent;
 class QMenu;
 class QString;
-class QStringList;
 
 class NPlaylistWidget : public QListWidget
 {

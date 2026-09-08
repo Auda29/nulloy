@@ -1,0 +1,14 @@
+QtSingleApplication, Qt 6.11.2 / GCC 16.2.0, expected compile failure:
+cmake --build .phase1/build --target probe_single
+D:/Benutzer Dateien/Benutzer/ChatGPT/Nulloy-Fork/3rdParty/qtsingleapplication-8fd81b2/src/qtlocalpeer.cpp:81:19: error: 'QRegExp' was not declared in this scope
+   81 |     prefix.remove(QRegExp("[^a-zA-Z]"));
+
+Qxt, Qt 6.11.2 / GCC 16.2.0, expected compile failure:
+cmake --build .phase1/build --target probe_qxt
+D:/Benutzer Dateien/Benutzer/ChatGPT/Nulloy-Fork/3rdParty/qxt-696423b-patched/qxtglobal.h:200:15: error: invalid new-expression of abstract class type 'QxtGlobalShortcutPrivate'
+  • 'virtual bool QAbstractNativeEventFilter::nativeEventFilter(const QByteArray&, void*, qintptr*)'
+       22 |     virtual bool nativeEventFilter(const QByteArray &eventType, void *message, qintptr *result) = 0;
+
+Changed production sources, Qt 5.15.19 / GCC 16.2.0:
+cmake --build .phase1/qt5-compat -j 4
+Verified process exit code: 0

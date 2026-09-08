@@ -1,0 +1,27 @@
+********* Start testing of SkinResourceTest *********
+Config: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-llp64 shared (dynamic) release build; by GCC 16.2.0), windows 11
+PASS   : SkinResourceTest::initTestCase()
+PASS   : SkinResourceTest::containers(slim-directory)
+PASS   : SkinResourceTest::containers(slim-stored)
+PASS   : SkinResourceTest::containers(slim-deflated)
+PASS   : SkinResourceTest::containers(native-directory)
+PASS   : SkinResourceTest::containers(native-stored)
+PASS   : SkinResourceTest::containers(native-deflated)
+PASS   : SkinResourceTest::containers(silver-directory)
+PASS   : SkinResourceTest::containers(silver-stored)
+PASS   : SkinResourceTest::containers(silver-deflated)
+PASS   : SkinResourceTest::containers(metro-directory)
+PASS   : SkinResourceTest::containers(metro-stored)
+PASS   : SkinResourceTest::containers(metro-deflated)
+PASS   : SkinResourceTest::containers(data-descriptor)
+PASS   : SkinResourceTest::containers(nested)
+PASS   : SkinResourceTest::invalidArchives(traversal)
+PASS   : SkinResourceTest::invalidArchives(duplicate)
+PASS   : SkinResourceTest::invalidArchives(corrupt)
+PASS   : SkinResourceTest::pathsAndMasks()
+QWARN  : SkinResourceTest::fonts() QFSFileEngine::open: No file name specified
+QWARN  : SkinResourceTest::fonts() qt.qpa.fonts: Cannot open "" for reading.
+PASS   : SkinResourceTest::fonts()
+PASS   : SkinResourceTest::cleanupTestCase()
+Totals: 21 passed, 0 failed, 0 skipped, 0 blacklisted, 119ms
+********* Finished testing of SkinResourceTest *********

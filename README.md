@@ -1,5 +1,10 @@
 # Nulloy Music Player
 
+This fork is being migrated while preserving the existing interface. See the
+[migration plan](MIGRATION_PLAN.md), [Phase 0 baseline](PHASE0_REPORT.md), and
+[Phase 1 Qt 6 skin prototype](PHASE1_REPORT.md). The prototype is a separate
+test application; the build instructions below describe the upstream player.
+
 ![Screenshot](http://nulloy.com/files/screen.png)
 
 More screenshots: https://nulloy.com/screenshots/
