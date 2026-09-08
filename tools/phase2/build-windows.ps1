@@ -13,7 +13,7 @@ $cmake = Join-Path $nativeBin 'cmake.exe'
 $originalPath = $env:PATH
 try {
     $env:PATH = "$nativeBin;$originalPath"
-    & $cmake -S $projectRoot -B $BuildDirectory -G Ninja -DCMAKE_BUILD_TYPE=Release "-DCMAKE_PREFIX_PATH=$nativeRoot"
+    & $cmake --preset windows-x64 -S $projectRoot -B $BuildDirectory "-DCMAKE_PREFIX_PATH=$nativeRoot"
     if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed' }
     & $cmake --build $BuildDirectory -j 4
     if ($LASTEXITCODE -ne 0) { throw 'CMake build failed' }

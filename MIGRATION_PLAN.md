@@ -91,12 +91,14 @@ Nachweis: [Phase-1-Bericht](PHASE1_REPORT.md) und [Architekturentscheidung](docs
 
 ### Phase 2: CMake und Windows x64
 
-- [ ] CMake-Ziele für Anwendung, Widget-Sammlung, Plugins, Tests, Übersetzungen, Icons und Skin-Pakete anlegen.
-- [ ] Den CMake-Aufbau zunächst gegen die Qt-5-Vergleichsbasis prüfen, soweit die in Phase 1 gewählte Werkzeugkette dies erlaubt. Ausnahmen dokumentieren.
-- [ ] Architekturwechsel separat prüfen. Anwendung, Qt, Plugins und native Bibliotheken müssen dieselbe Architektur und eine kompatible Compiler-/Runtime-Kombination verwenden.
-- [ ] Bestehende Build-Optionen ausdrücklich abbilden. Den bisherigen Skin-Umfang als Standard erhalten.
-- [ ] Einen sauberen Windows-CI-Build mit Tests und herunterladbarem Testpaket einrichten. Abhängigkeiten und Build-Befehle dokumentieren.
-- [ ] qmake erst entfernen, wenn CMake die benötigten Funktionen nachweislich abdeckt. Die Übergangsphase bewusst kurz halten.
+- [x] CMake-Ziele für Anwendung, Widget-Sammlung, Plugins, Tests, Übersetzungen, Icons und Skin-Pakete anlegen.
+- [x] Den CMake-Aufbau zunächst gegen die Qt-5-Vergleichsbasis prüfen, soweit die in Phase 1 gewählte Werkzeugkette dies erlaubt. Ausnahmen dokumentieren.
+- [x] Architekturwechsel separat prüfen. Anwendung, Qt, Plugins und native Bibliotheken müssen dieselbe Architektur und eine kompatible Compiler-/Runtime-Kombination verwenden.
+- [x] Bestehende Build-Optionen ausdrücklich abbilden. Den bisherigen Skin-Umfang als Standard erhalten.
+- [x] Einen sauberen Windows-CI-Build mit Tests und herunterladbarem Testpaket einrichten. Abhängigkeiten und Build-Befehle dokumentieren.
+- [x] qmake erst entfernen, wenn CMake die benötigten Funktionen nachweislich abdeckt. Für Linux/macOS und den bisherigen Vergleich bleibt es vorerst erhalten.
+
+Nachweis: [Phase-2-Bericht](PHASE2_REPORT.md) und [Windows-Build-Leitfaden](docs/phase2/BUILD_WINDOWS.md). Qt-5-x64-Build, bestehende Tests und Paket-Workflows für alle vier Skins bestehen lokal und in der Windows-CI. Das heruntergeladene Testpaket wurde verifiziert. Erststartkosten, erneuter manueller Explorer-Drop und umfassende Leistungs-/Darstellungsvergleiche bleiben ausdrücklich offen; die technische Build-Abnahme ersetzt diese Prüfungen nicht.
 
 **Abnahme:** Ein Windows-x64-Build entsteht auf einer sauberen Umgebung nach dokumentierten Schritten. Das Paket enthält alle benötigten Ressourcen und Bibliotheken. Vorhandene Tests und die wesentlichen Referenzabläufe bestehen.
 
@@ -187,7 +189,7 @@ Jede Phase endet mit einem dokumentierten Commit und einem kurzen Prüfprotokoll
 | Erste Rust-Komponente und Art der Anbindung | Phase 5 |
 | Linux-/macOS-Paketierung, endgültiger Name und spätere Funktionen | Nach Windows-Migrationsetappe |
 
-Der nächste Umsetzungsschritt ist der Qt-6-Skin-Prototyp aus Phase 1. Er beginnt mit dem persönlich verwendeten Slim-Skin. Erst dessen Ergebnisse erlauben eine belastbare Aufwandsplanung. Dieser Plan enthält daher keine festen Terminzusagen.
+Phase 0 und Phase 1 sind in den Fork gemergt. Die technische Windows-x64-Build-Etappe aus Phase 2 liegt auf einem eigenen Branch vor. Der nächste größere Umsetzungsschritt ist die vollständige Qt-6-Integration aus Phase 3. Die offenen Bedien- und Leistungspunkte aus dem Phase-2-Bericht bleiben dabei Teil der Abnahme. Dieser Plan enthält keine festen Terminzusagen.
 
 ## 8. Quellen
 

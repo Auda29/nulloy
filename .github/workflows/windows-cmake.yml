@@ -42,9 +42,9 @@ jobs:
         run: |
           mkdir -p .phase2/build
           pacman -Q > .phase2/build/toolchain.txt
-          cmake -S . -B .phase2/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$(cygpath -m /mingw64)"
-          cmake --build .phase2/build -j 4
-          ctest --test-dir .phase2/build --output-on-failure
+          cmake --preset windows-x64 -DCMAKE_PREFIX_PATH="$(cygpath -m /mingw64)"
+          cmake --build --preset windows-x64
+          ctest --preset windows-x64
       - name: Package and verify without toolchain PATH
         shell: msys2 {0}
         run: |

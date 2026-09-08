@@ -4,9 +4,11 @@ Phase 2 baut den vollständigen bisherigen Player mit Qt 5.15. Die Qt-6-Integrat
 
 ## Werkzeugkette
 
-Eine eigenständige MSYS2-Installation mit MINGW64 verwenden. UCRT64, MSVC, Qt 6 und die DLLs der alten x86-Installation gehören nicht in diesen Build. In der MINGW64-Shell installieren:
+Eine eigenständige MSYS2-Installation mit MINGW64 verwenden. UCRT64, MSVC, Qt 6 und die DLLs der alten x86-Installation gehören nicht in diesen Build.
 
 Das Testpaket zielt auf Windows 10 ab Version 1903 und Windows 11, jeweils x64. Sein Manifest aktiviert UTF-8 ausschließlich für den Playerprozess. Systemweite Spracheinstellungen werden nicht geändert.
+
+In der MINGW64-Shell installieren:
 
 ```bash
 pacman -Syu
@@ -24,6 +26,8 @@ In PowerShell im Checkout:
 ```
 
 Der Helfer setzt PATH nur im laufenden Prozess. Er konfiguriert CMake, baut die Anwendung und Tests, führt CTest aus, protokolliert die Paketversionen und erstellt sowie prüft das ZIP. Fehler in einem Schritt brechen den Ablauf ab.
+
+Der Helfer und die CI verwenden das Preset `windows-x64` aus `CMakePresets.json`. In einer MINGW64-Shell kann es direkt mit `cmake --preset windows-x64`, `cmake --build --preset windows-x64` und `ctest --preset windows-x64` verwendet werden. Falls Qt nicht automatisch gefunden wird, beim Konfigurieren `-DCMAKE_PREFIX_PATH="$(cygpath -m /mingw64)"` ergänzen.
 
 Ausgaben im standardmäßig ignorierten Verzeichnis `.phase2/build`:
 
