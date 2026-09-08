@@ -129,6 +129,8 @@ void NWaveformBuilderGstreamer::stop()
 void NWaveformBuilderGstreamer::start(const QString &file)
 {
     stop();
+    // Clear the previous track even when the new path no longer exists.
+    reset();
 
     if (peaksFindFromCache(file)) {
         return;
@@ -156,7 +158,6 @@ void NWaveformBuilderGstreamer::start(const QString &file)
     gst_object_unref(sink);
     gst_object_unref(pad);
 
-    reset();
     QThread::start();
 
     if (!m_timer->isActive()) {
@@ -208,6 +209,8 @@ void NWaveformBuilderGstreamer::update()
                 if (err) {
                     g_error_free(err);
                 }
+                // A failed decode cannot reach EOS; release its pipeline and worker.
+                stop();
                 break;
             }
             default:
