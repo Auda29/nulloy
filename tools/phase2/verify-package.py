@@ -14,6 +14,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--build", required=True)
 parser.add_argument("--prefix", required=True)
 parser.add_argument("--media", nargs=2, help="Optional private media copies for a Slim reference run")
+parser.add_argument("--headless-audio", action="store_true", help="Use GStreamer's no-device fallback on CI")
 args = parser.parse_args()
 build, prefix = Path(args.build).resolve(), Path(args.prefix).resolve()
 evidence = build / ("private-media-check" if args.media else "package-check")
@@ -38,6 +39,12 @@ with tempfile.TemporaryDirectory(prefix="package check ä ", dir=build) as temp:
             del env[name]
     env["QT_QPA_PLATFORM"] = "windows"
     env["GST_DEBUG"] = "2"
+    if args.headless_audio:
+        env["GST_PLUGIN_FEATURE_RANK"] = "directsoundsink:0,waveformsink:0,wasapisink:0,wasapi2sink:0"
+    version = subprocess.run([str(root / "Nulloy.exe"), "--version"], cwd=temp, env=env,
+                             timeout=30, capture_output=True, check=True)
+    assert version.stdout.strip(), "The packaged executable did not report its version"
+    (evidence / "version.txt").write_bytes(version.stdout)
     skins = ("Slim/0.9",) if args.media else ("Slim/0.9", "Silver/0.9", "Metro/0.9", "Native/0.9")
     if args.media:
         media = []
@@ -68,5 +75,6 @@ with tempfile.TemporaryDirectory(prefix="package check ä ", dir=build) as temp:
         "archive_sha256": actual_hash, "file_hashes_verified": len(manifest["files"]),
         "x64_binaries": len(manifest["binaries"]), "path": "Windows System32 only",
         "extraction_path": "temporary directory with spaces and umlaut",
+        "audio": "GStreamer no-device fallback" if args.headless_audio else "normal device selection, muted",
         "skins": skins
     }, indent=2) + "\n", encoding="utf-8")

@@ -54,6 +54,9 @@ def pe_imports(path):
 def package(args):
     prefix, build, source = (Path(p).resolve() for p in (args.prefix, args.build, args.source))
     run = build / "run"
+    cache = dict(line.split("=", 1) for line in (build / "CMakeCache.txt").read_text().splitlines()
+                 if "=" in line and not line.startswith(("#", "//")))
+    enabled = lambda option: cache.get(option + ":BOOL", "OFF").upper() in ("ON", "YES", "TRUE", "1")
     output = build / "Nulloy-windows-x64.zip"
     binaries = {p.name.lower(): p for p in (prefix / "bin").glob("*.dll")}
     system = Path(os.environ["SystemRoot"]) / "System32"
@@ -61,7 +64,13 @@ def package(args):
         stage = Path(temp) / "Nulloy"
         stage.mkdir()
         shutil.copy2(run / args.executable, stage)
-        for folder in ("Plugins", "Skins", "i18n"):
+        (stage / "Plugins").mkdir()
+        for option, filename in (("NULLOY_GSTREAMER", "PluginGStreamer.dll"),
+                                 ("NULLOY_TAGLIB", "PluginTagLib.dll"), ("NULLOY_VLC", "PluginVLC.dll")):
+            if enabled(option):
+                shutil.copy2(run / "Plugins" / filename, stage / "Plugins")
+        folders = ["i18n"] + (["Skins"] if enabled("NULLOY_SKINS") else [])
+        for folder in folders:
             if (run / folder).exists():
                 shutil.copytree(run / folder, stage / folder)
         for filename in ("LICENSE.GPL3", "COPYING", "THANKS", "ChangeLog"):

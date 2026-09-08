@@ -38,7 +38,7 @@ void NCore::cArgs(int *argc, const char ***argv)
 {
     if (!_cArgs_init) {
         foreach (const QString &s, QCoreApplication::arguments()) {
-            _argList << s.toLatin1();
+            _argList << s.toUtf8();
             _argVector << _argList.last().constData();
         }
         _cArgs_init = true;

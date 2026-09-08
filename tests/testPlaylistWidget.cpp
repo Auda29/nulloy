@@ -25,7 +25,6 @@
 #include "action.h"
 
 #define INPUT_DELAY_MSEC 50
-#define PLAY_WAIT_MSEC 100
 #define CROSSFADING_POS 0.99 // 100 msec till the end (samples are 10 seconds)
 #define PLAYNEXT_WAIT_MSEC 300
 

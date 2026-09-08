@@ -6,6 +6,8 @@ Phase 2 baut den vollständigen bisherigen Player mit Qt 5.15. Die Qt-6-Integrat
 
 Eine eigenständige MSYS2-Installation mit MINGW64 verwenden. UCRT64, MSVC, Qt 6 und die DLLs der alten x86-Installation gehören nicht in diesen Build. In der MINGW64-Shell installieren:
 
+Das Testpaket zielt auf Windows 10 ab Version 1903 und Windows 11, jeweils x64. Sein Manifest aktiviert UTF-8 ausschließlich für den Playerprozess. Systemweite Spracheinstellungen werden nicht geändert.
+
 ```bash
 pacman -Syu
 pacman -S --needed mingw-w64-x86_64-{gcc,cmake,ninja,pkgconf,python,imagemagick,librsvg,zlib,qt5-base,qt5-script,qt5-svg,qt5-tools,qt5-winextras,gstreamer,gst-plugins-base,gst-plugins-good,taglib}
@@ -66,6 +68,22 @@ Der Laufzeittest entpackt das ZIP in einen temporären Pfad mit Leerzeichen und 
 
 Die erzeugten Zeitmessungen beschreiben diesen Testlauf. Sie sind noch kein Vergleich belastbarer Perzentile mit der alten Installation. Das Testpaket in einen beschreibbaren eigenen Ordner entpacken. Die bestehende Installation und das persönliche Profil werden für diese Prüfungen nicht benötigt.
 
+Ein optionaler lokaler Lauf mit bereits vorhandenen Medienkopien:
+
+```bash
+python tools/phase2/verify-package.py --prefix "$(cygpath -m /mingw64)" --build .phase2/build --media /path/reference-1.mp3 /path/reference-2.mp3
+```
+
+Dieser Lauf kopiert die Dateien ausschließlich in sein temporäres Testverzeichnis. Seine Nachweise bleiben unter `.phase2/build/private-media-check` und werden nicht von der CI hochgeladen.
+
 ## CI
 
 Der Workflow `Windows x64 CMake` baut auf einem frischen Windows-2022-Runner. Nur nach erfolgreichen Tests und Paketprüfungen wird das Testpaket als GitHub-Actions-Artefakt hochgeladen. Testprotokolle werden auch bei Fehlern gesichert. Dies ist ein Testartefakt, kein öffentlich zugesagtes Release für alle bisherigen Plattformen oder Audioformate.
+
+GitHub-Runner besitzen kein Audiogerät. Ausschließlich der Pakettest wird dort mit `--headless-audio` ausgeführt. Über `GST_PLUGIN_FEATURE_RANK` werden die Windows-Geräte-Sinks für diesen Prozess deaktiviert; GStreamer verwendet dann seinen Fakesink-Fallback. Der Player und das paketierte Playbackplugin bleiben unverändert. Lokale Prüfungen ohne diesen Schalter verwenden die normale Geräteauswahl bei Lautstärke null. CI allein belegt daher keine funktionierende Hardware-Audioausgabe.
+
+## Unicode-Pfade
+
+GStreamer-Pfade werden über die Unicode-Umgebung von Windows gesetzt. Zusätzlich verwendet der Player UTF-8 für seine an native Bibliotheken übergebenen Argumente. Das Prozessmanifest ist nötig, weil GStreamer 1.28.6 den eigenen Programmpfad noch über eine ANSI-Windows-API ermittelt und der externe Scanner anschließend UTF-8 erwartet. Der Pakettest prüft die aktive Prozesscodierung und einen Entpackpfad mit Umlaut.
+
+Quellen: [GStreamer-Pfadermittlung](https://github.com/GStreamer/gstreamer/blob/1.28.6/subprojects/gstreamer/gst/gst.c), [Windows-Plugin-Scanner](https://github.com/GStreamer/gstreamer/blob/1.28.6/subprojects/gstreamer/gst/gstpluginloader-win32.c), [Microsofts UTF-8-Prozessmanifest](https://learn.microsoft.com/en-us/windows/apps/design/globalizing/use-utf8-code-page).

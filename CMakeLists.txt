@@ -82,6 +82,10 @@ if(NOT NULLOY_UPDATE_CHECK)
 endif()
 
 file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/generated")
+file(GENERATE OUTPUT "${PROJECT_BINARY_DIR}/generated/manifest.rc"
+    CONTENT "1 24 \"${PROJECT_SOURCE_DIR}/src/platform/windows.manifest\"\n")
+set_source_files_properties("${PROJECT_BINARY_DIR}/generated/manifest.rc" PROPERTIES
+    OBJECT_DEPENDS "${PROJECT_SOURCE_DIR}/src/platform/windows.manifest")
 set(ICON_ICO "${PROJECT_BINARY_DIR}/generated/icon.ico")
 set(FILE_ICO "${PROJECT_BINARY_DIR}/generated/file.ico")
 add_custom_command(OUTPUT "${ICON_ICO}" "${FILE_ICO}"
@@ -92,7 +96,8 @@ add_custom_command(OUTPUT "${ICON_ICO}" "${FILE_ICO}"
 file(GENERATE OUTPUT "${PROJECT_BINARY_DIR}/generated/icon.rc"
     CONTENT "IDI_ICON1 ICON \"${ICON_ICO}\"\nIDI_ICON2 ICON \"${FILE_ICO}\"\n")
 set_source_files_properties("${PROJECT_BINARY_DIR}/generated/icon.rc" PROPERTIES OBJECT_DEPENDS "${ICON_ICO};${FILE_ICO}")
-add_executable(nulloy src/main.cpp "${PROJECT_BINARY_DIR}/generated/icon.rc" "${ICON_ICO}" "${FILE_ICO}")
+add_executable(nulloy src/main.cpp "${PROJECT_BINARY_DIR}/generated/icon.rc" "${ICON_ICO}" "${FILE_ICO}"
+    "${PROJECT_BINARY_DIR}/generated/manifest.rc")
 set_target_properties(nulloy PROPERTIES OUTPUT_NAME "${NULLOY_APP_NAME}" RUNTIME_OUTPUT_DIRECTORY "${NULLOY_RUN_DIR}")
 if(NOT NULLOY_CONSOLE)
     set_target_properties(nulloy PROPERTIES WIN32_EXECUTABLE TRUE)
@@ -147,7 +152,7 @@ if(NULLOY_VLC)
 endif()
 
 if(BUILD_TESTING)
-    add_executable(testPlayerPackage tests/testPlayerPackage.cpp)
+    add_executable(testPlayerPackage tests/testPlayerPackage.cpp "${PROJECT_BINARY_DIR}/generated/manifest.rc")
     target_link_libraries(testPlayerPackage PRIVATE nulloy_core Qt5::Test)
     set_target_properties(testPlayerPackage PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${NULLOY_TEST_DIR}")
     if(NOT NULLOY_GSTREAMER)
@@ -170,7 +175,7 @@ if(BUILD_TESTING)
             "${PROJECT_SOURCE_DIR}/tests" "${NULLOY_TEST_DIR}/tests"
         VERBATIM)
     foreach(test IN ITEMS testTrackInfoReader testPlaylistWidget testFileDrop)
-        add_executable(${test} "tests/${test}.cpp")
+        add_executable(${test} "tests/${test}.cpp" "${PROJECT_BINARY_DIR}/generated/manifest.rc")
         target_link_libraries(${test} PRIVATE nulloy_core Qt5::Test)
         set_target_properties(${test} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${NULLOY_TEST_DIR}")
         add_dependencies(${test} test_gstreamer nulloy_test_data)

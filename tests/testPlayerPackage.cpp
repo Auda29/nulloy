@@ -7,6 +7,7 @@
 #include <QMessageBox>
 #include <QMimeData>
 #include <memory>
+#include <qt_windows.h>
 #include "action.h"
 #include "common.h"
 #include "mainWindow.h"
@@ -28,6 +29,7 @@ class TestPlayerPackage : public QObject
 private slots:
     void playerWorkflow()
     {
+        QCOMPARE(GetACP(), UINT(CP_UTF8));
         NSettings::instance()->clear();
         delete NSettings::instance();
         auto *settings = NSettings::instance();

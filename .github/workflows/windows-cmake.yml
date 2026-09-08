@@ -49,7 +49,7 @@ jobs:
         shell: msys2 {0}
         run: |
           python tools/phase2/package-windows.py --prefix "$(cygpath -m /mingw64)" --build .phase2/build --source .
-          python tools/phase2/verify-package.py --prefix "$(cygpath -m /mingw64)" --build .phase2/build
+          python tools/phase2/verify-package.py --prefix "$(cygpath -m /mingw64)" --build .phase2/build --headless-audio
       - name: Upload test package
         uses: actions/upload-artifact@v4
         with:
