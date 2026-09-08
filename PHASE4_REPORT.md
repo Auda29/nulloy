@@ -1,6 +1,6 @@
 # Phase 4: Portabler Player
 
-Status: technische Umsetzung, lokale Paketprüfung und manuelle Nutzerabnahme abgeschlossen. Prüfung auf separatem Windows-Rechner offen. Keine Veröffentlichung.
+Status: technische Umsetzung, lokale Paketprüfung und manuelle Nutzerabnahme abgeschlossen. Alpha `v0.10.0-alpha.1` veröffentlicht. Prüfung auf separatem Windows-Rechner offen.
 Branch: `codex/phase-4-portable-player`, Basis `683783cc2d260c92405c8b2b65b0904740c2c46a`.
 
 ## Änderungen
@@ -53,7 +53,7 @@ Diese Zahlen beschreiben den Diagnoseprozess, nicht den vollständigen Playersta
 
 Das genaue Paket nennt seinen Quellstand in `build-info.json`; die Prüfbelege enthalten
 den jeweiligen ZIP-SHA-256. Dokumentations- und Belegcommits können danach folgen.
-CI wurde für Phase 4 erweitert, aber noch nicht auf GitHub ausgeführt.
+Zum Zeitpunkt der lokalen Paketprüfung war die erweiterte CI noch nicht auf GitHub ausgeführt. Die späteren erfolgreichen CI- und Release-Läufe sind unten dokumentiert.
 
 ## Abschließendes Testpaket
 
@@ -102,6 +102,27 @@ keine Auffälligkeiten gemeldet. Sie ist eine qualitative Abnahme, keine zusätz
 Zeitmessung oder gesondert nachgewiesene Langzeitprüfung.
 
 Paketzuordnung und Rückmeldung: [Nutzerabnahme](docs/phase4/evidence/final/user-acceptance.json).
+
+## Alpha-Veröffentlichung
+
+Am 8. September 2026 wurde [v0.10.0-alpha.1](https://github.com/Auda29/nulloy/releases/tag/v0.10.0-alpha.1)
+als öffentliches GitHub-Prerelease veröffentlicht. Der annotierte Tag verweist auf
+`9a68db416f6689043c5a9423b768e5e4feaa5db9` und löste den
+[erfolgreichen Release-Workflow](https://github.com/Auda29/nulloy/actions/runs/34230352711) aus.
+Beide Windows-Varianten, alle Paketprüfungen und die Veröffentlichung bestanden.
+
+Der CI-Build des veröffentlichten Windows-ZIPs hat den SHA-256
+`0f3632ce3db6d713879033d6f1519e58b3cd327a107406105207b09b6f271972`.
+Alle sechs Release-Dateien wurden ohne Anmeldung erneut heruntergeladen. Die
+Prüfsummen, 490 Paketdateien, 236 x64-Binärdateien, der Quellcode-Snapshot und die
+Commit-Zuordnung stimmen. Beleg: [öffentliche Downloadprüfung](docs/releases/v0.10.0-alpha.1.json).
+Die unterschiedliche Dateizahl zum lokalen Paket betrifft die CI-Paketierung;
+dieses Release hat eigene Prüfnachweise und ersetzt nicht die frühere Nutzerabnahme.
+
+Der Workflow verwendet für die Herkunftsprüfung dieselbe Git-Installation wie beim
+Checkout. Die vorher zusätzlich installierte MSYS2-Git-Umgebung hatte den Quellstand
+als verändert gemeldet. Der Release-Build weist einen unveränderten Quellstand aus.
+Weitere Releases sind in [RELEASING.md](docs/RELEASING.md) beschrieben.
 
 ## Offene Prüfung
 

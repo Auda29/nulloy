@@ -1,0 +1,18 @@
+{
+  "tag": "v0.10.0-alpha.1",
+  "source_commit": "9a68db416f6689043c5a9423b768e5e4feaa5db9",
+  "release_url": "https://github.com/Auda29/nulloy/releases/tag/v0.10.0-alpha.1",
+  "workflow_url": "https://github.com/Auda29/nulloy/actions/runs/34230352711",
+  "draft": false,
+  "prerelease": true,
+  "anonymous_api_and_downloads": true,
+  "asset_sha256": {
+    "NulloyFork-0.10.0-alpha.1-source.zip": "1f44ba02b9c78120d72517cdf7cceb3e91d6e58a249a2988e4ce87186d9c1813",
+    "NulloyFork-0.10.0-alpha.1-test-evidence.zip": "a42efc358a7331eb1297e21c8350c731d1c097f9bafa8c6f77326bea455962e0",
+    "NulloyFork-0.10.0-alpha.1-windows-x64.zip": "0f3632ce3db6d713879033d6f1519e58b3cd327a107406105207b09b6f271972",
+    "NulloyFork-0.10.0-alpha.1-windows-x64.zip.sha256": "52dded8f63fd870ae55abeaaae0851e44a6cd2fe9166d48d0a70ced0ee5ad6eb",
+    "release-validation.json": "064833d1240650dea9e3983963bb4cdfb1fa4abc80c3515591455b2c14f94f90"
+  },
+  "package_files_verified": 490,
+  "x64_binaries": 236
+}

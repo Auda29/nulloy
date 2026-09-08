@@ -128,7 +128,7 @@ Die funktionale Abnahme ist abgeschlossen. Mit Zustimmung des Nutzers bleibt die
 - [x] Versionskennung, Fork-Hinweis und mitzuliefernde Lizenztexte festlegen. Eine Änderung des Designs ist damit nicht verbunden.
 - [x] Ein versioniertes Prüfprotokoll mit Commit, Abhängigkeiten, Testergebnissen und bekannten Einschränkungen beilegen.
 - [x] Das konkrete Paket manuell mit dem bisherigen Player vergleichen und vom Nutzer abnehmen lassen. Am 8. September bestätigt der Nutzer die Abnahme ohne Auffälligkeiten im Test. Eine Langzeitprüfung ist damit nicht nachgewiesen; eine Veröffentlichung ist ein eigener Umsetzungsschritt.
-- [ ] Bei Veröffentlichung Tag, Quellstand, heruntergeladenes Release-Paket und SHA-256 prüfen. Ein erfolgreicher CI-Lauf allein gilt nicht als Paketabnahme.
+- [x] Bei Veröffentlichung Tag, Quellstand, heruntergeladenes Release-Paket und SHA-256 prüfen. Alpha `v0.10.0-alpha.1` wurde über den Tag-Workflow veröffentlicht; alle sechs öffentlichen Downloads und die Paketdateien sind geprüft. Beleg: [Release-Verifikation](docs/releases/v0.10.0-alpha.1.json). Die frühere manuelle Abnahme bleibt dem lokalen Testpaket zugeordnet.
 
 Stand vom 8. September: Testpaket erstellt, lokal mit bereinigtem PATH geprüft und vom Nutzer ohne gemeldete Auffälligkeiten abgenommen. Erststarts der abschließenden automatischen Messungen lagen bei 1,67 bis 1,92 Sekunden. Der separate Windows-Rechner bleibt offen. Details und Ausreißer stehen im [Phase-4-Bericht](PHASE4_REPORT.md).
 
