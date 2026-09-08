@@ -2,7 +2,7 @@ name: Windows x64 CMake
 
 on:
   push:
-    branches: [master, 'codex/phase-2-*']
+    branches: [master, 'codex/phase-2-*', 'codex/phase-3-*']
   pull_request:
   workflow_dispatch:
 
@@ -11,6 +11,18 @@ permissions:
 
 jobs:
   windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - qt: 5
+            preset: windows-x64
+            build: .phase2/build
+            qt-packages: mingw-w64-x86_64-qt5-base mingw-w64-x86_64-qt5-script mingw-w64-x86_64-qt5-svg mingw-w64-x86_64-qt5-tools mingw-w64-x86_64-qt5-winextras
+          - qt: 6
+            preset: windows-qt6-x64
+            build: .phase3/build
+            qt-packages: mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-declarative mingw-w64-x86_64-qt6-svg mingw-w64-x86_64-qt6-tools mingw-w64-x86_64-qt6-5compat
     runs-on: windows-2022
     timeout-minutes: 40
     steps:
@@ -27,11 +39,7 @@ jobs:
             mingw-w64-x86_64-python
             mingw-w64-x86_64-imagemagick
             mingw-w64-x86_64-librsvg
-            mingw-w64-x86_64-qt5-base
-            mingw-w64-x86_64-qt5-script
-            mingw-w64-x86_64-qt5-svg
-            mingw-w64-x86_64-qt5-tools
-            mingw-w64-x86_64-qt5-winextras
+            ${{ matrix.qt-packages }}
             mingw-w64-x86_64-gstreamer
             mingw-w64-x86_64-gst-plugins-base
             mingw-w64-x86_64-gst-plugins-good
@@ -40,31 +48,39 @@ jobs:
       - name: Configure, build and test
         shell: msys2 {0}
         run: |
-          mkdir -p .phase2/build
-          pacman -Q > .phase2/build/toolchain.txt
-          cmake --preset windows-x64 -DCMAKE_PREFIX_PATH="$(cygpath -m /mingw64)"
-          cmake --build --preset windows-x64
-          ctest --preset windows-x64
+          mkdir -p ${{ matrix.build }}
+          pacman -Q > ${{ matrix.build }}/toolchain.txt
+          cmake --preset ${{ matrix.preset }} -DCMAKE_PREFIX_PATH="$(cygpath -m /mingw64)"
+          cmake --build --preset ${{ matrix.preset }}
+          ctest --preset ${{ matrix.preset }}
       - name: Package and verify without toolchain PATH
         shell: msys2 {0}
         run: |
-          python tools/phase2/package-windows.py --prefix "$(cygpath -m /mingw64)" --build .phase2/build --source .
-          python tools/phase2/verify-package.py --prefix "$(cygpath -m /mingw64)" --build .phase2/build --headless-audio
+          python tools/phase2/package-windows.py --prefix "$(cygpath -m /mingw64)" --build ${{ matrix.build }} --source .
+          python tools/phase2/verify-package.py --prefix "$(cygpath -m /mingw64)" --build ${{ matrix.build }} --headless-audio
+      - name: Test shared Qt 6 skin adapters
+        if: matrix.qt == 6
+        shell: msys2 {0}
+        run: |
+          cmake -S experiments/qt6-skins -B .phase3/skin-probe -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$(cygpath -m /mingw64)"
+          cmake --build .phase3/skin-probe -j 4
+          ctest --test-dir .phase3/skin-probe --output-on-failure
       - name: Upload test package
         uses: actions/upload-artifact@v4
         with:
-          name: Nulloy-windows-x64
+          name: Nulloy-Qt${{ matrix.qt }}-windows-x64
           path: |
-            .phase2/build/Nulloy-windows-x64.zip
-            .phase2/build/Nulloy-windows-x64.zip.sha256
+            ${{ matrix.build }}/Nulloy-windows-x64.zip
+            ${{ matrix.build }}/Nulloy-windows-x64.zip.sha256
           if-no-files-found: error
       - name: Upload test evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Windows-test-evidence
+          name: Windows-Qt${{ matrix.qt }}-test-evidence
           path: |
-            .phase2/build/*-results.txt
-            .phase2/build/toolchain.txt
-            .phase2/build/package-check/
-            .phase2/build/Testing/Temporary/LastTest.log
+            ${{ matrix.build }}/*-results.txt
+            ${{ matrix.build }}/toolchain.txt
+            ${{ matrix.build }}/package-check/
+            ${{ matrix.build }}/Testing/Temporary/LastTest.log
+            .phase3/skin-probe/*-results.txt

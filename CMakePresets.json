@@ -1,6 +1,10 @@
 {
   "version": 5,
-  "cmakeMinimumRequired": { "major": 3, "minor": 24, "patch": 0 },
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
   "configurePresets": [
     {
       "name": "windows-x64",
@@ -16,10 +20,46 @@
         "NULLOY_TAGLIB": true,
         "NULLOY_VLC": false,
         "NULLOY_UPDATE_CHECK": false,
-        "NULLOY_CONSOLE": false
+        "NULLOY_CONSOLE": false,
+        "NULLOY_QT_MAJOR": "5"
+      }
+    },
+    {
+      "name": "windows-qt6-x64",
+      "inherits": "windows-x64",
+      "displayName": "Windows x64 / Qt 6 / GStreamer",
+      "binaryDir": "${sourceDir}/.phase3/build",
+      "cacheVariables": {
+        "NULLOY_QT_MAJOR": "6"
       }
     }
   ],
-  "buildPresets": [{ "name": "windows-x64", "configurePreset": "windows-x64", "jobs": 4 }],
-  "testPresets": [{ "name": "windows-x64", "configurePreset": "windows-x64", "output": { "outputOnFailure": true } }]
+  "buildPresets": [
+    {
+      "name": "windows-x64",
+      "configurePreset": "windows-x64",
+      "jobs": 4
+    },
+    {
+      "name": "windows-qt6-x64",
+      "configurePreset": "windows-qt6-x64",
+      "jobs": 4
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "windows-x64",
+      "configurePreset": "windows-x64",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-qt6-x64",
+      "configurePreset": "windows-qt6-x64",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
 }

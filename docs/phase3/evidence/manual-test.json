@@ -1,0 +1,20 @@
+{
+  "package_sha256": "893757650ddc43ddc91e722385379a70d15e54d487945983e9e8f98c417818a7",
+  "test_directory": ".phase3/manual-test-89375765/Nulloy",
+  "evidence_type": "user_report",
+  "requested_scope": [
+    "single-file and multiple-file drag and drop",
+    "playback, pause and seek",
+    "waveform loading, closing and reopening",
+    "comparison of the familiar interface and controls"
+  ],
+  "reported_result": "successful",
+  "loading_times_subjectively_acceptable": true,
+  "loading_times_measured_by_user": false,
+  "user_statement": "ok habe getestet und sieht alles erfolgreich aus auch die ladezeiten. genau messen konnte ich sie natürlich nicht",
+  "limits": [
+    "No quantitative performance threshold established",
+    "Previously measured fresh-extraction startup delay not proven resolved",
+    "Monitor switching, taskbar and global hotkeys with another application focused not individually confirmed"
+  ]
+}

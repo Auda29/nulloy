@@ -37,7 +37,9 @@ NSettings::NSettings(QObject *parent)
     Q_ASSERT_X(!m_instance, "NSettings", "NSettings instance already exists.");
     m_instance = this;
 
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
     setIniCodec("UTF-8");
+#endif
 
     QString version = value("SettingsVersion").toString();
     if (version.isEmpty() || version < MIN_VERSION) {
@@ -178,7 +180,11 @@ void NSettings::setValue(const QString &key, const QVariant &value)
 void NSettings::initValue(const QString &key, const QVariant &defaultValue)
 {
     QVariant val = value(key, defaultValue);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    val.convert(defaultValue.metaType());
+#else
     val.convert(defaultValue.type());
+#endif
     setValue(key, val);
 }
 

@@ -14,6 +14,7 @@
 *********************************************************************/
 
 #include "tagEditorDialog.h"
+#include <QTextCodec>
 
 #include "coverWidget.h"
 #include "pluginLoader.h"

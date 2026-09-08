@@ -8,6 +8,7 @@
 #include <QMouseEvent>
 #include <QMetaMethod>
 #include <QSplitter>
+#include <QSettings>
 
 ScriptBridge::ScriptBridge(QJSEngine *engine) : engine_(engine)
 {
@@ -32,7 +33,9 @@ ScriptBridge::ScriptBridge(QJSEngine *engine) : engine_(engine)
         return new Proxy({}, {
           get: function(target, key) {
             if (key === '__qobject') return raw;
+            if (key === 'setValue' && bridge.settings) return bridge.setSetting;
             if (key === 'pos') return bridge.position();
+            if (key === 'showContextMenu') return bridge.showContextMenu;
             if (key === 'windowFlags') return bridge.windowFlags;
             if (key === 'doubleClicked') return signal(bridge.doubleClicked);
             if (key === 'clicked' || key === 'clicked()' || key === 'clicked(bool)')
@@ -88,6 +91,15 @@ ObjectBridge::ObjectBridge(QObject *object, ScriptBridge *owner)
         connect(button, &QAbstractButton::clicked, this, &ObjectBridge::clicked);
 }
 QWidget *ObjectBridge::widget() const { return qobject_cast<QWidget *>(object_); }
+bool ObjectBridge::isSettings() const { return qobject_cast<QSettings *>(object_) != nullptr; }
+void ObjectBridge::setSetting(QString key, QJSValue value)
+{
+    if (!object_) return;
+    // QJSEngine otherwise wraps JS arrays/objects in QVariant(QJSValue), which
+    // cannot be serialized by QSettings. Invoke the real setter to keep signals.
+    const QVariant native = value.toVariant();
+    QMetaObject::invokeMethod(object_, "setValue", Q_ARG(QString, key), Q_ARG(QVariant, native));
+}
 int ObjectBridge::windowFlags() const { return widget() ? int(widget()->windowFlags()) : 0; }
 void ObjectBridge::setWindowFlags(int flags) { if (widget()) widget()->setWindowFlags(Qt::WindowFlags(flags)); }
 void ObjectBridge::setAttribute(int a, bool b) { if (widget()) widget()->setAttribute(Qt::WidgetAttribute(a), b); }
@@ -148,6 +160,15 @@ void ObjectBridge::setSizes(QList<int> sizes)
 { if (auto splitter = qobject_cast<QSplitter *>(object_)) splitter->setSizes(sizes); }
 QVariantMap ObjectBridge::position() const
 { auto p = widget() ? widget()->pos() : QPoint(); return {{"x", p.x()}, {"y", p.y()}}; }
+void ObjectBridge::showContextMenu(QVariantMap position)
+{
+    if (!object_) return;
+    const QPoint point(position.value("x").toInt(), position.value("y").toInt());
+    if (object_->metaObject()->indexOfMethod("showContextMenu(QPoint)") >= 0)
+        QMetaObject::invokeMethod(object_, "showContextMenu", Q_ARG(QPoint, point));
+    else // The independent skin probe provides a recording fixture.
+        QMetaObject::invokeMethod(object_, "showContextMenu", Q_ARG(QVariantMap, position));
+}
 QString ObjectBridge::signalName(QString signature) const
 {
     if (!object_) return {};

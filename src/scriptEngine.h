@@ -16,12 +16,25 @@
 #ifndef N_SCRIPT_ENGINE_H
 #define N_SCRIPT_ENGINE_H
 
+#include <QtGlobal>
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+#include <QJSEngine>
+#include "qt6/scriptBridge.h"
+#else
 #include <QScriptEngine>
+#endif
 
 class NPlayer;
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+class NScriptEngine : public QJSEngine
+#else
 class NScriptEngine : public QScriptEngine
+#endif
 {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    ScriptBridge m_bridge;
+#endif
 public:
     NScriptEngine(NPlayer *player);
     virtual ~NScriptEngine(){};

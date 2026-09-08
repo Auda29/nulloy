@@ -166,7 +166,6 @@ void NMainWindow::show()
 void NMainWindow::toggleMaximize()
 {
     if (isMaximized()) {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
         // Native window state notifications can clear these during showNormal().
         const QSize normalSize = m_unmaximizedSize;
         const QPoint normalPos = m_unmaximizedPos;
@@ -175,11 +174,6 @@ void NMainWindow::toggleMaximize()
             resize(normalSize);
             move(normalPos);
         }
-#else
-        showNormal();
-        resize(m_unmaximizedSize);
-        move(m_unmaximizedPos);
-#endif
         m_unmaximizedPos = QPoint();
         m_unmaximizedSize = QSize();
     } else {

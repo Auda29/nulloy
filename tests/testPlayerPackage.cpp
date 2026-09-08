@@ -6,6 +6,9 @@
 #include <QDropEvent>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QMenu>
+#include <QAbstractButton>
+#include <QThread>
 #include <memory>
 #include <qt_windows.h>
 #include "action.h"
@@ -18,7 +21,7 @@
 #include "settings.h"
 #include "tagReaderInterface.h"
 #include "waveformBuilderInterface.h"
-#ifndef _N_NO_SKINS_
+#if !defined(_N_NO_SKINS_) && QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 #include "skinFileSystem.h"
 Q_IMPORT_PLUGIN(NWidgetCollection)
 #endif
@@ -46,7 +49,7 @@ private slots:
         settings->setValue("TrayIcon", false);
         settings->setValue("DisplayLogDialog", false);
         settings->setValue("ShowPlaylist", true);
-#ifndef _N_NO_SKINS_
+#if !defined(_N_NO_SKINS_) && QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
         NSkinFileSystem::init();
 #endif
         QElapsedTimer clock;
@@ -58,6 +61,11 @@ private slots:
         QCOMPARE(settings->value("Skin").toString(), skin);
         auto *playlist = player->playlistWidget();
         QVERIFY(playlist);
+        qInfo() << "ui-font" << QApplication::font().toString()
+                << "playlist-text" << playlist->palette().color(QPalette::Text).name()
+                << "inactive-text" << playlist->palette().color(QPalette::Inactive, QPalette::Text).name()
+                << "logical-size" << player->mainWindow()->size()
+                << "device-scale" << player->mainWindow()->devicePixelRatioF();
         QCOMPARE(playlist->count(), 0);
         const QDir samples(QCoreApplication::applicationDirPath() + "/tests");
         QStringList files = qEnvironmentVariable("NULLOY_TEST_MEDIA").split('|', Qt::SkipEmptyParts);
@@ -124,18 +132,71 @@ private slots:
         QCOMPARE(playlist->count(), 2);
         QVERIFY(QFile::exists(files[1]));
         QVERIFY(player->mainWindow()->grab().save(QCoreApplication::applicationDirPath() + "/render.png"));
+        if (auto menuButton = player->mainWindow()->findChild<QAbstractButton *>("menuButton")) {
+            bool menuOpened = false;
+            QTimer closeMenu;
+            closeMenu.setSingleShot(true);
+            connect(&closeMenu, &QTimer::timeout, [&] {
+                if (auto menu = qobject_cast<QMenu *>(QApplication::activePopupWidget())) {
+                    menuOpened = true;
+                    menu->close();
+                }
+            });
+            closeMenu.start(150);
+            menuButton->click();
+            QVERIFY(menuOpened);
+        }
+        const QSize normalSize = player->mainWindow()->size();
+        player->mainWindow()->toggleMaximize();
+        QTRY_VERIFY(player->mainWindow()->isMaximized());
+        player->mainWindow()->toggleMaximize();
+        QTRY_VERIFY(!player->mainWindow()->isMaximized());
+        QCOMPARE(player->mainWindow()->size(), normalSize);
+        player->mainWindow()->toggleFullScreen();
+        QTRY_VERIFY(player->mainWindow()->isFullSceen());
+        player->mainWindow()->toggleFullScreen();
+        QTRY_VERIFY(!player->mainWindow()->isFullSceen());
+        QCOMPARE(player->mainWindow()->size(), normalSize);
+        auto tray = player->findChild<QSystemTrayIcon *>();
+        QVERIFY(tray && tray->contextMenu() && !tray->icon().isNull());
+        tray->show();
+        QVERIFY(tray->isVisible());
+        tray->hide();
         engine->stop();
         waveform->stop();
+        // Same parser used for messages delivered by QtSingleApplication.
+        player->readMessage(files.join(MSG_SPLITTER));
+        QCOMPARE(playlist->count(), 4);
+        QCOMPARE(playlist->item(3)->data(N::PathRole).toString(), files[1]);
         player->quit();
         QVERIFY(QFile::exists(NCore::defaultPlaylistPath()));
+        settings->sync();
+        QSettings persisted(NCore::settingsPath(), QSettings::IniFormat);
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+        persisted.setIniCodec("UTF-8");
+#endif
+        if (skin.startsWith("Slim")) {
+            QCOMPARE(persisted.value("SlimSkin/Splitter").toList().size(), 2);
+        }
+        // Close while a previously uncomputed track is still being processed.
+        waveform->start(files[1]);
+        auto *worker = dynamic_cast<QThread *>(waveform);
+        QVERIFY(worker && worker->isRunning());
+        QVERIFY(!waveform->peaks().isCompleted());
         clock.restart();
         player.reset();
-        qInfo() << "player-destruction-ms" << clock.elapsed();
+        qInfo() << "shutdown-during-waveform-ms" << clock.elapsed();
+        QVERIFY(clock.elapsed() < 5000);
     }
 };
 
 int main(int argc, char **argv)
 {
+    QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::Round);
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+    QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
+    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+#endif
     QApplication app(argc, argv);
     app.setApplicationName("Nulloy package test");
     app.setApplicationVersion(_N_VERSION_);

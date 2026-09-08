@@ -57,6 +57,7 @@ def package(args):
     cache = dict(line.split("=", 1) for line in (build / "CMakeCache.txt").read_text().splitlines()
                  if "=" in line and not line.startswith(("#", "//")))
     enabled = lambda option: cache.get(option + ":BOOL", "OFF").upper() in ("ON", "YES", "TRUE", "1")
+    qt_major = cache.get("NULLOY_QT_MAJOR:STRING", "5")
     output = build / "Nulloy-windows-x64.zip"
     binaries = {p.name.lower(): p for p in (prefix / "bin").glob("*.dll")}
     system = Path(os.environ["SystemRoot"]) / "System32"
@@ -76,9 +77,11 @@ def package(args):
         for filename in ("LICENSE.GPL3", "COPYING", "THANKS", "ChangeLog"):
             if (source / filename).exists():
                 shutil.copy2(source / filename, stage)
-        subprocess.run([str(prefix / "bin/windeployqt-qt5.exe"), "--release",
-                        "--no-translations", "--no-compiler-runtime", "--no-angle",
-                        "--no-opengl-sw", "--no-system-d3d-compiler", str(stage / args.executable)], check=True)
+        deploy = "windeployqt6.exe" if qt_major == "6" else "windeployqt-qt5.exe"
+        options = ["--release", "--no-translations", "--no-compiler-runtime", "--no-opengl-sw"]
+        if qt_major == "5":
+            options += ["--no-angle", "--no-system-d3d-compiler"]
+        subprocess.run([str(prefix / "bin" / deploy), *options, str(stage / args.executable)], check=True)
         if (stage / "Plugins/PluginGStreamer.dll").exists():
             shutil.copytree(prefix / "lib/gstreamer-1.0", stage / "gstreamer-1.0",
                             ignore=shutil.ignore_patterns("*.a", "*.la", "include", "pkgconfig"))
@@ -93,6 +96,8 @@ def package(args):
             if relative in checked:
                 continue
             imports = pe_imports(binary)
+            if any(dll.startswith("qt" + ("5" if qt_major == "6" else "6")) for dll in imports):
+                raise RuntimeError(f"Mixed Qt major versions in {relative}: {imports}")
             checked[relative] = {"machine": "AMD64", "imports": imports}
             for dll in imports:
                 if (stage / dll).exists():
@@ -109,7 +114,7 @@ def package(args):
         if (prefix / "share/licenses").exists():
             shutil.copytree(prefix / "share/licenses", stage / "licenses/msys2")
         (stage / "TEST-BUILD.txt").write_text(
-            "Nulloy community fork: Windows x64 / Qt 5 CMake test build.\n"
+            f"Nulloy community fork: Windows x64 / Qt {qt_major} CMake test build.\n"
             "Source: https://github.com/Auda29/nulloy\n"
             "Extract into a writable folder. Settings stay next to the executable.\n"
             "Do not replace an existing installation or copy personal profiles into this archive.\n"
@@ -117,7 +122,7 @@ def package(args):
             "Third-party binaries come from MSYS2 MINGW64. Package versions are in toolchain.txt.\n"
             "Corresponding MSYS2 package recipes and source locations: https://github.com/msys2/MINGW-packages\n",
             encoding="utf-8")
-        manifest = {"binaries": checked, "files": {}}
+        manifest = {"qt_major": qt_major, "binaries": checked, "files": {}}
         toolchain = build / "toolchain.txt"
         if toolchain.exists():
             shutil.copy2(toolchain, stage)

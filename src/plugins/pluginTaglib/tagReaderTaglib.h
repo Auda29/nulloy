@@ -18,6 +18,7 @@
 
 #include "plugin.h"
 #include "tagReaderInterface.h"
+#include <QTextCodec>
 
 #include <fileref.h>
 #include <tag.h>
