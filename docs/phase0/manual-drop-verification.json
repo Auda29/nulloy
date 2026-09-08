@@ -1,0 +1,15 @@
+{
+  "userConfirmation": "ok test war erfolgreich",
+  "evidence": "Saved playlist after user-operated Explorer drag and drop; original UI windows already closed at verification",
+  "entryCount": 6,
+  "entries": [
+    "reference-1.mp3",
+    "reference-2.mp3",
+    "reference-1.mp3",
+    "reference-2.mp3",
+    "reference-1.mp3",
+    "reference-2.mp3"
+  ],
+  "playlistSHA256": "43262780a1df270e8a5b5f0dd9432d68c46df65c40c9e195a79471d8e3d3ae74",
+  "scope": "Confirms user-operated multiple-file drop and persisted entries; number of individual drag gestures was not recorded"
+}

@@ -8,3 +8,6 @@ moc_*
 *.o
 .qmake.*
 .cache
+
+# Local migration evidence, copied profiles, media and build tools
+/.phase0/

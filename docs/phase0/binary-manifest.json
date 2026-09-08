@@ -1,0 +1,20 @@
+[
+  {
+    "Artifact": "installed-0.9.9",
+    "PEMachine": "0x014C",
+    "Bytes": 2007040,
+    "SHA256": "4D6A88924589B96F1D34E49F991544A011A00EB67F7B920547670B7F5D49F64B"
+  },
+  {
+    "Artifact": "installed-Qt5Core",
+    "PEMachine": "0x014C",
+    "Bytes": 7837184,
+    "SHA256": "2F0B53BCCAC05831C9D7E6E0A73043CD9CD4D2AD3214801B7F056F892D6CF0F0"
+  },
+  {
+    "Artifact": "built-f4eddff",
+    "PEMachine": "0x8664",
+    "Bytes": 2355200,
+    "SHA256": "BA00B34ED4B9BB617D7A5C2A61C7F5D50C26A6C0EA25CBD96E849988AA7E6DAF"
+  }
+]

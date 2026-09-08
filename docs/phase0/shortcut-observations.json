@@ -1,0 +1,38 @@
+[
+  {
+    "key": "Shift+Right",
+    "before": "320 kbps/44.1 kHz\nreference-1.mp3\n1:11/3:19",
+    "after": "320 kbps/44.1 kHz\nreference-1.mp3\n1:23/3:19",
+    "elapsedMs": 7755
+  },
+  {
+    "key": "Right",
+    "before": "320 kbps/44.1 kHz\nreference-1.mp3\n1:30/3:19",
+    "after": "320 kbps/44.1 kHz\nreference-1.mp3\n2:06/3:19",
+    "elapsedMs": 6279
+  },
+  {
+    "key": "Ctrl+Left",
+    "before": "320 kbps/44.1 kHz\nreference-1.mp3\n2:18/3:19",
+    "after": "320 kbps/44.1 kHz\nreference-1.mp3\n0:44/3:19",
+    "elapsedMs": 6581
+  },
+  {
+    "key": "Ctrl+Right",
+    "before": "320 kbps/44.1 kHz\nreference-1.mp3\n0:51/3:19",
+    "after": "320 kbps/44.1 kHz\nreference-1.mp3\n2:37/3:19",
+    "elapsedMs": 6750
+  },
+  {
+    "key": "Left",
+    "before": "320 kbps/44.1 kHz\nreference-1.mp3\n2:44/3:19",
+    "after": "320 kbps/44.1 kHz\nreference-1.mp3\n2:21/3:19",
+    "elapsedMs": 7255
+  },
+  {
+    "key": "Shift+Left",
+    "before": "320 kbps/44.1 kHz\nreference-1.mp3\n2:28/3:19",
+    "after": "320 kbps/44.1 kHz\nreference-1.mp3\n2:32/3:19",
+    "elapsedMs": 8646
+  }
+]
