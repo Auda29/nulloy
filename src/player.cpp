@@ -150,6 +150,11 @@ NPlayer::NPlayer()
     m_waveformSlider->setLayout(trackInfoLayout);
 
 #ifdef Q_OS_WIN
+    // Frameless skins inherit QDialog flags without minimize support. Windows
+    // needs this capability for taskbar clicks; the skin still draws its buttons.
+    if (m_mainWindow->windowFlags() & Qt::FramelessWindowHint) {
+        m_mainWindow->setWindowFlag(Qt::WindowMinimizeButtonHint, true);
+    }
     NW7TaskBar::instance()->setWindow(m_mainWindow);
     NW7TaskBar::instance()->setEnabled(NSettings::instance()->value("TaskbarProgress").toBool());
     connect(m_playbackEngine, SIGNAL(positionChanged(qreal)), NW7TaskBar::instance(),

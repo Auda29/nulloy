@@ -1,0 +1,23 @@
+********* Start testing of TestPlayerPackage *********
+Config: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-llp64 shared (dynamic) release build; by GCC 16.2.0), windows 11
+PASS   : TestPlayerPackage::initTestCase()
+QDEBUG : TestPlayerPackage::playerWorkflow() found container "GStreamer" :
+QDEBUG : TestPlayerPackage::playerWorkflow() * PlaybackEngine
+QDEBUG : TestPlayerPackage::playerWorkflow() * WaveformBuilder
+QDEBUG : TestPlayerPackage::playerWorkflow() found container "TagLib" :
+QDEBUG : TestPlayerPackage::playerWorkflow() * TagReader
+QDEBUG : TestPlayerPackage::playerWorkflow() * CoverReader
+QDEBUG : TestPlayerPackage::playerWorkflow() registering plugin: "NPlaybackEngineGStreamer"
+QDEBUG : TestPlayerPackage::playerWorkflow() registering plugin: "NWaveformBuilderGstreamer"
+QDEBUG : TestPlayerPackage::playerWorkflow() registering plugin: "NTagReaderTaglib"
+QDEBUG : TestPlayerPackage::playerWorkflow() registering plugin: "NCoverReaderTaglib"
+QINFO  : TestPlayerPackage::playerWorkflow() window-exposed-ms 1220
+QINFO  : TestPlayerPackage::playerWorkflow() ui-font "MS Shell Dlg 2,7.85455,-1,5,400,0,0,0,0,0,0,0,0,0,0,1,,0,0" playlist-text "#000000" inactive-text "#000000" logical-size QSize(430, 350) device-scale 1
+QINFO  : TestPlayerPackage::playerWorkflow() native-taskbar-minimize-restore-passed
+QINFO  : TestPlayerPackage::playerWorkflow() full-waveform-ms 402
+QINFO  : TestPlayerPackage::playerWorkflow() cached-waveform-ms 0
+QINFO  : TestPlayerPackage::playerWorkflow() shutdown-during-waveform-ms 18
+PASS   : TestPlayerPackage::playerWorkflow()
+PASS   : TestPlayerPackage::cleanupTestCase()
+Totals: 3 passed, 0 failed, 0 skipped, 0 blacklisted, 2020ms
+********* Finished testing of TestPlayerPackage *********

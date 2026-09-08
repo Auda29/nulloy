@@ -5,9 +5,11 @@ GStreamer 1.28.6 und TagLib 2.2.1. Die technische Integration und der manuelle
 Test der Kernbedienung sind erfolgreich. Der Nutzer meldet auch unauffällige
 Ladezeiten, hat diese aber nicht gemessen. Die ergänzenden Format- und
 Tag-Schreibtests bestehen. Der langsame Erststart wurde auf den Aufbau des
-GStreamer-Plugin-Caches eingegrenzt, aber noch nicht behoben. Die vollständige
-Abnahme bleibt wegen dieses Befunds und spezieller manueller Windows-Prüfungen
-offen. Dies ist ein Teststand, keine veröffentlichte Migrationsversion.
+GStreamer-Plugin-Caches eingegrenzt, aber noch nicht behoben. Nach der Korrektur
+bestätigt der Nutzer auch den Taskleisten-Klicktest. Die funktionale Migration
+ist damit abgenommen. Mit seiner Zustimmung wird die Erststart-Optimierung
+als offener Punkt in Phase 4 übernommen. Dies ist ein Teststand, keine
+veröffentlichte Migrationsversion.
 
 Basis ist Phase 2, Commit `b0ab67a4fa1ae2c4e38f6df85a8a97ea4a9285a2`.
 Phase 3 liegt auf `codex/phase-3-qt6-player`. Phase 2 wird dadurch nicht gemergt.
@@ -126,8 +128,35 @@ ob der zuvor beobachtete langsame Erststart aus einem frisch entpackten Ordner
 behoben ist.
 
 Die Rückmeldung ist in [manual-test.json](docs/phase3/evidence/manual-test.json)
-dem geprüften Paket zugeordnet. Spezielle Tests für Monitorwechsel, Taskleiste
-und Hotkeys bei Fokus in anderen Programmen wurden nicht einzeln bestätigt.
+dem geprüften Paket zugeordnet. In der anschließenden Windows-Prüfung meldet der
+Nutzer alle angefragten Punkte als erfolgreich, mit einer Ausnahme: Ein Klick
+auf das Taskleisten-Symbol stellt das Fenster wieder her, minimiert es aber
+nicht. Details zum verwendeten Monitoraufbau wurden nicht angegeben.
+
+### Korrektur für den Taskleisten-Klick
+
+Der neue Pakettest reproduziert die fehlende native Fähigkeit `WS_MINIMIZEBOX`
+am bisherigen Slim-Fenster. Die rahmenlosen Skins übernehmen Fensterflags von
+QDialog ohne Minimier-Unterstützung. Vor der Taskleisten-Registrierung setzt der
+Player nun für diese Fenster `Qt::WindowMinimizeButtonHint`. Die ursprünglichen
+Skin-Dateien und der Native-Skin bleiben unverändert. Qt setzt daraus das native
+Minimier-Flag, siehe [Qt-Windows-Implementierung](https://github.com/qt/qtbase/blob/6.11/src/plugins/platforms/windows/qwindowswindow.cpp#L781).
+
+Der Regressionstest prüft die nativen Flags und sendet `SC_MINIMIZE` sowie
+`SC_RESTORE` an das eigene Testfenster. Native und Qt-Fensterzustände sowie die
+wiederhergestellte Größe müssen übereinstimmen. Alle vier Paket-Skins unter Qt 5 und Qt 6
+bestehen. Zusätzlich bestätigt der Nutzer den echten Klicktest mit der
+korrigierten Testversion: "jetzt gehts top. also phase 3 abgeschlossen?"
+
+Das korrigierte Qt-6-Testpaket hat SHA-256
+`78f90756241a2c2d6186223a46465ce2b5f2e38df9a04851995fbe9b3e94d53e`.
+Der separate Testordner `.phase3/manual-test-taskbar-78f90756/Nulloy` enthält
+die geprüften Dateien. Alle 516 Datei-Prüfsummen wurden nach dem Entpacken geprüft.
+
+Belege und Nutzer-Rückmeldung: [evidence/taskbar](docs/phase3/evidence/taskbar).
+Die früheren grünen CI-Läufe beziehen sich auf den Stand vor dieser Korrektur.
+Die Checks des [Phase-3-PRs](https://github.com/Auda29/nulloy/pull/4) prüfen
+den jeweils gepushten Abschlussstand.
 
 ## Leistung und verbleibende Prüfungen
 
@@ -164,12 +193,13 @@ Der Qt-5-Vergleich zeigt denselben Engpass: 11.612 ms Registry-Aufbau bei
 13.446 ms bis zum sichtbaren Fenster. Die Verzögerung tritt somit auch ohne
 die Qt-6-Migration in der neuen Paket-Toolchain auf.
 
-Weiter offen:
+Für Phase 4 übernommen:
 
-- Ergänzende manuelle Prüfungen für Fensterziehen, Monitorwechsel,
-  Taskleistenanzeige und Hotkeys bei Fokus in anderen Programmen.
 - Erststart aus einem frisch entpackten Ordner beschleunigen und erneut messen.
-  Die Diagnose ist abgeschlossen, die Optimierung nicht.
+  Die Diagnose ist abgeschlossen, die Optimierung nicht. Der Nutzer hat der
+  Übernahme als offenem Phase-4-Punkt zugestimmt. Im heruntergeladenen CI-Paket
+  vor dem Taskleisten-Fix betrug der erste lokale Start 29.940 ms. Dieser Befund
+  gehört ebenfalls zur Ausgangsmessung und bleibt trotz funktionaler Abnahme offen.
 
 Die aktuelle Rückmeldung bezieht sich auf das oben benannte Qt-6-Paket. Die
 frühere Bestätigung des Referenzplayers wird dafür nicht herangezogen. Der

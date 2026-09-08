@@ -102,6 +102,21 @@ private slots:
                 << "logical-size" << player->mainWindow()->size()
                 << "device-scale" << player->mainWindow()->devicePixelRatioF();
         QCOMPARE(playlist->count(), 0);
+        // The taskbar requires a native minimize capability even for skins
+        // that draw their own window buttons. showMinimized() alone misses it.
+        const auto hwnd = reinterpret_cast<HWND>(player->mainWindow()->winId());
+        QVERIFY2(GetWindowLongPtr(hwnd, GWL_STYLE) & WS_MINIMIZEBOX,
+                 "The Windows taskbar cannot minimize a window without WS_MINIMIZEBOX");
+        QVERIFY(GetWindowLongPtr(hwnd, GWL_STYLE) & WS_SYSMENU);
+        const QSize beforeMinimize = player->mainWindow()->size();
+        SendMessage(hwnd, WM_SYSCOMMAND, SC_MINIMIZE, 0);
+        QTRY_VERIFY(IsIconic(hwnd));
+        QTRY_VERIFY(player->mainWindow()->isMinimized());
+        SendMessage(hwnd, WM_SYSCOMMAND, SC_RESTORE, 0);
+        QTRY_VERIFY(!IsIconic(hwnd));
+        QTRY_VERIFY(!player->mainWindow()->isMinimized());
+        QCOMPARE(player->mainWindow()->size(), beforeMinimize);
+        qInfo() << "native-taskbar-minimize-restore-passed";
         const QDir samples(QCoreApplication::applicationDirPath() + "/tests");
         QStringList files = qEnvironmentVariable("NULLOY_TEST_MEDIA").split('|', Qt::SkipEmptyParts);
         const bool referenceMedia = !files.isEmpty();

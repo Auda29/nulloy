@@ -1,0 +1,20 @@
+{
+  "evidence_type": "user_report",
+  "provided_test_package_sha256": "0c16e15be2fee722f2798896c260791f89c1fee185065ec344493552f9555c98",
+  "user_statement": "ok funktioniert alles bis auf das minimiren über das klicken in der taskleiste. das entminimieren geht aber das minimieren über die taskleiste nicht",
+  "reported_result": "requested Windows checks passed except taskbar-click minimization",
+  "taskbar_restore": "passed",
+  "taskbar_minimize": "failed",
+  "follow_up": {
+    "package_sha256": "78f90756241a2c2d6186223a46465ce2b5f2e38df9a04851995fbe9b3e94d53e",
+    "test_directory": ".phase3/manual-test-taskbar-78f90756/Nulloy",
+    "requested_scope": "Minimize the foreground player by clicking its taskbar icon, then restore by clicking again",
+    "user_statement": "jetzt gehts top. also phase 3 abgeschlossen?",
+    "taskbar_minimize": "passed",
+    "taskbar_restore": "passed",
+    "phase3_functional_acceptance": "confirmed"
+  },
+  "limits": [
+    "User did not specify monitor topology or scaling values"
+  ]
+}
