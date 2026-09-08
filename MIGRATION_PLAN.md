@@ -120,14 +120,16 @@ Die funktionale Abnahme ist abgeschlossen. Mit Zustimmung des Nutzers bleibt die
 
 ### Phase 4: Erste nutzbare Migrationsversion
 
-- [ ] Den Erststart aus einem frisch entpackten Ordner beschleunigen. Der Aufbau des GStreamer-Plugin-Caches ist als Engpass nachgewiesen, auch im Qt-5-Vergleich. Erststart und Folgestarts getrennt messen, die bisher geprüften Audioformate beibehalten und die Pakettests erneut bestehen lassen. Ausgangswerte und Messbelege stehen im [Phase-3-Bericht](PHASE3_REPORT.md).
+- [x] Den Erststart aus einem frisch entpackten Ordner beschleunigen. Der Aufbau des GStreamer-Plugin-Caches ist als Engpass nachgewiesen, auch im Qt-5-Vergleich. Erststart und Folgestarts getrennt messen, die bisher geprüften Audioformate beibehalten und die Pakettests erneut bestehen lassen. Ausgangswerte und Messbelege stehen im [Phase-3-Bericht](PHASE3_REPORT.md).
 - [ ] Ein portables Windows-x64-Testpaket erstellen und auf einem System ohne Entwicklungswerkzeuge starten.
 - [x] Eigene Daten- und Einzelinstanz-Zuordnung für den Fork festlegen, damit er parallel zum Original geprüft werden kann. Übernahme alter Daten zunächst über Kopien, ohne das Originalprofil umzuschreiben.
 - [x] Update-Prüfung eindeutig dem Fork zuordnen. Solange kein eigener Update-Kanal besteht, automatische Upstream-Prüfungen für Testpakete deaktivieren und dies dokumentieren. Sichtbare Änderungen am Update-Dialog separat entscheiden.
 - [x] Versionskennung, Fork-Hinweis und mitzuliefernde Lizenztexte festlegen. Eine Änderung des Designs ist damit nicht verbunden.
-- [ ] Ein versioniertes Prüfprotokoll mit Commit, Abhängigkeiten, Testergebnissen und bekannten Einschränkungen beilegen.
+- [x] Ein versioniertes Prüfprotokoll mit Commit, Abhängigkeiten, Testergebnissen und bekannten Einschränkungen beilegen.
 - [ ] Das Paket im Alltag mit dem bisherigen Player vergleichen. Eine Veröffentlichung ist ein eigener Umsetzungsschritt.
 - [ ] Bei Veröffentlichung Tag, Quellstand, heruntergeladenes Release-Paket und SHA-256 prüfen. Ein erfolgreicher CI-Lauf allein gilt nicht als Paketabnahme.
+
+Technischer Stand vom 8. September: Testpaket erstellt und lokal mit bereinigtem PATH geprüft; Erststarts der abschließenden Messungen bei 1,67 bis 1,92 Sekunden. Der separate Windows-Rechner und die manuelle Paketabnahme bleiben offen. Details und Ausreißer stehen im [Phase-4-Bericht](PHASE4_REPORT.md).
 
 **Abnahme:** Ein eigenständig startbares Paket mit nachvollziehbarer Herkunft ist vorhanden. Der Nutzer bestätigt den Erhalt seines bisherigen UI- und Bedienverhaltens. Diese Bestätigung betrifft das konkrete Testpaket; die vorangehenden technischen Arbeiten können unabhängig davon erfolgen.
 

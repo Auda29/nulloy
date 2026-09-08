@@ -1,6 +1,6 @@
 # Phase 4: Portabler Player
 
-Status: portable Umsetzung vorhanden, abschließende Paketprüfung läuft. Keine Veröffentlichung.
+Status: technische Umsetzung und lokale Paketprüfung abgeschlossen. Manuelle Abnahme und separater Windows-Rechner offen. Keine Veröffentlichung.
 Branch: `codex/phase-4-portable-player`, Basis `683783cc2d260c92405c8b2b65b0904740c2c46a`.
 
 ## Änderungen
@@ -54,6 +54,41 @@ Diese Zahlen beschreiben den Diagnoseprozess, nicht den vollständigen Playersta
 Das genaue Paket nennt seinen Quellstand in `build-info.json`; die Prüfbelege enthalten
 den jeweiligen ZIP-SHA-256. Dokumentations- und Belegcommits können danach folgen.
 CI wurde für Phase 4 erweitert, aber noch nicht auf GitHub ausgeführt.
+
+## Abschließendes Testpaket
+
+Quellstand des Pakets: `aafa738632d6e6196c9f95e07b2ea3308ea4294c`, ohne uncommittete Änderungen beim Paketbau.
+ZIP: `NulloyFork-0.10.0-alpha.1-windows-x64.zip`.
+SHA-256: `9733d197da77a73bb8ba40392df117b49934aca0137e9bfee0e194af0f0ba272`.
+EXE-SHA-256: `04c58b54bae9bd921e666f7f9ddfaf0058e5dd3756cd226d679a0b547f732dc8`.
+
+Das endgültige ZIP besteht die vier Skin-Workflows jeweils dreimal in zwei frischen
+Extraktionen, die Prozess-/IPC-Prüfung und die sechs Formatprüfungen. 521 Dateihashes
+und 236 x64-Binärdateien wurden geprüft. Alle 98 mitgelieferten GStreamer-Module und
+die drei externen Skin-Archive sind bytegleich zum Phase-3-Paket. Die vier
+Qt-5-Vergleichssuiten bestehen ebenfalls mit Qt 5.15.19.
+
+| Messung am endgültigen ZIP | Fenster sichtbar ab Beginn des Player-Konstruktors |
+|---|---:|
+| Frische Extraktion 1 | 1.920 ms |
+| Folgestarts derselben Kopie | 844 / 543 ms |
+| Frische Extraktion 2 | 1.671 ms |
+| Folgestarts derselben Kopie | 537 / 547 ms |
+| Weitere frische Extraktion für Formatprüfung | 1.888 ms |
+
+Das sind lokale Messungen auf einem laufenden Windows-System. Die Zeit vor dem
+Player-Konstruktor, etwa das Laden des Testprogramms und der Qt-DLLs, gehört nicht zu
+diesen Zahlen. Die GStreamer-Registry-Prüfung benötigte im zweiten Erststart 23 ms.
+Die früher beobachtete Verzögerung vor dem Laden des Containers bleibt als Ausreißer
+dokumentiert; eine allgemeine Obergrenze für Erststarts wird nicht behauptet.
+
+Belege: [abschließende Paketprüfung](docs/phase4/evidence/final).
+Das Archiv bleibt nach der Prüfung unverändert. Dieser ergänzte Bericht wird neben
+das ZIP gelegt; der im ZIP enthaltene Bericht dokumentiert den Stand beim Paketbau.
+
+Für den manuellen Test wurde `.phase4/manual-test-aafa738/NulloyFork` vorbereitet.
+Die Einstellungen stammen aus einer unveränderten Kopie des abgenommenen Phase-3-Tests.
+Die Playlist beginnt leer. Die neue EXE wurde noch nicht für den Nutzer gestartet.
 
 ## Offene Abnahme
 

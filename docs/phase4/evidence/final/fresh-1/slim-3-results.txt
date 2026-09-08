@@ -1,0 +1,31 @@
+********* Start testing of TestPlayerPackage *********
+Config: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-llp64 shared (dynamic) release build; by GCC 16.2.0), windows 11
+PASS   : TestPlayerPackage::initTestCase()
+SKIP   : TestPlayerPackage::portableProcesses() Separate portable process check
+D:/Benutzer Dateien/Benutzer/ChatGPT/Nulloy-Fork/tests/testPlayerPackage.cpp(64) : failure location
+QINFO  : TestPlayerPackage::playerWorkflow() startup-ms 2: found container "GStreamer" :
+QDEBUG : TestPlayerPackage::playerWorkflow() found container "GStreamer" :
+QDEBUG : TestPlayerPackage::playerWorkflow() * PlaybackEngine
+QDEBUG : TestPlayerPackage::playerWorkflow() * WaveformBuilder
+QINFO  : TestPlayerPackage::playerWorkflow() startup-ms 3: found container "TagLib" :
+QDEBUG : TestPlayerPackage::playerWorkflow() found container "TagLib" :
+QDEBUG : TestPlayerPackage::playerWorkflow() * TagReader
+QDEBUG : TestPlayerPackage::playerWorkflow() * CoverReader
+QINFO  : TestPlayerPackage::playerWorkflow() startup-ms 18: registering plugin: "NPlaybackEngineGStreamer"
+QDEBUG : TestPlayerPackage::playerWorkflow() registering plugin: "NPlaybackEngineGStreamer"
+QINFO  : TestPlayerPackage::playerWorkflow() startup-ms 18: registering plugin: "NWaveformBuilderGstreamer"
+QDEBUG : TestPlayerPackage::playerWorkflow() registering plugin: "NWaveformBuilderGstreamer"
+QINFO  : TestPlayerPackage::playerWorkflow() startup-ms 18: registering plugin: "NTagReaderTaglib"
+QDEBUG : TestPlayerPackage::playerWorkflow() registering plugin: "NTagReaderTaglib"
+QINFO  : TestPlayerPackage::playerWorkflow() startup-ms 18: registering plugin: "NCoverReaderTaglib"
+QDEBUG : TestPlayerPackage::playerWorkflow() registering plugin: "NCoverReaderTaglib"
+QINFO  : TestPlayerPackage::playerWorkflow() window-exposed-ms 543
+QINFO  : TestPlayerPackage::playerWorkflow() ui-font "MS Shell Dlg 2,7.85455,-1,5,400,0,0,0,0,0,0,0,0,0,0,1,,0,0" playlist-text "#b6c0c6" inactive-text "#b6c0c6" logical-size QSize(430, 350) device-scale 1
+QINFO  : TestPlayerPackage::playerWorkflow() native-taskbar-minimize-restore-passed
+QINFO  : TestPlayerPackage::playerWorkflow() full-waveform-ms 248
+QINFO  : TestPlayerPackage::playerWorkflow() cached-waveform-ms 0
+QINFO  : TestPlayerPackage::playerWorkflow() shutdown-during-waveform-ms 22
+PASS   : TestPlayerPackage::playerWorkflow()
+PASS   : TestPlayerPackage::cleanupTestCase()
+Totals: 3 passed, 0 failed, 1 skipped, 0 blacklisted, 1197ms
+********* Finished testing of TestPlayerPackage *********
