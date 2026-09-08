@@ -7,7 +7,7 @@ enable_testing()
 set(SKIN_TEST_PLATFORM "offscreen" CACHE STRING "Qt platform plugin used by tests")
 set(SKIN_REFERENCE_DIR "" CACHE PATH "Optional copied 0.9.9 Skins directory")
 find_package(ZLIB REQUIRED)
-add_library(skin_resources STATIC skinResources.cpp skinResources.h
+add_library(skin_resources STATIC ../../src/qt6/skinResources.cpp ../../src/qt6/skinResources.h
     ../../3rdParty/qtiocompressor-2.3.1/src/qtiocompressor.cpp
     ../../3rdParty/qtiocompressor-2.3.1/src/qtiocompressor.h)
 target_include_directories(skin_resources PUBLIC . ../../3rdParty/qtiocompressor-2.3.1/src)
@@ -26,7 +26,7 @@ target_compile_definitions(test_skin_resources PRIVATE
 add_dependencies(test_skin_resources skin_fixtures)
 add_test(NAME skin_resources COMMAND test_skin_resources -o ${CMAKE_CURRENT_BINARY_DIR}/resource-results.txt,txt)
 set_tests_properties(skin_resources PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=${SKIN_TEST_PLATFORM}")
-add_library(skin_bridge STATIC scriptBridge.cpp scriptBridge.h
+add_library(skin_bridge STATIC ../../src/qt6/scriptBridge.cpp ../../src/qt6/scriptBridge.h
     ../../src/widgetCollection/label.cpp ../../src/widgetCollection/label.h)
 target_link_libraries(skin_bridge PUBLIC Qt6::Widgets Qt6::Qml)
 target_include_directories(skin_bridge PUBLIC . ../../src/widgetCollection)

@@ -17,8 +17,13 @@
 #include <QDir>
 #include <QPixmap>
 #include <QVector>
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+#include <QImage>
+#else
 #include <QtWin>
+#endif
 
+#include <qt_windows.h>
 #include <shellapi.h>
 
 QList<QIcon> NWinIcon::getIcons(const QString &dllPath)
@@ -47,13 +52,21 @@ QList<QIcon> NWinIcon::getIcons(const QString &dllPath)
 
         hIcon = small[i];
         if (hIcon) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+            icon.addPixmap(QPixmap::fromImage(QImage::fromHICON(hIcon)));
+#else
             icon.addPixmap(QtWin::fromHICON(hIcon));
+#endif
             DestroyIcon(hIcon);
         }
 
         hIcon = large[i];
         if (hIcon) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+            icon.addPixmap(QPixmap::fromImage(QImage::fromHICON(hIcon)));
+#else
             icon.addPixmap(QtWin::fromHICON(hIcon));
+#endif
             DestroyIcon(hIcon);
         }
 

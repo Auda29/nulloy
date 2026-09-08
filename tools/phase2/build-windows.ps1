@@ -1,11 +1,15 @@
 param(
     [Parameter(Mandatory = $true)][string]$ToolchainRoot,
     [string]$BuildDirectory,
+    [ValidateSet('windows-x64', 'windows-qt6-x64')][string]$Preset = 'windows-x64',
     [switch]$Package
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
-if (-not $BuildDirectory) { $BuildDirectory = Join-Path $projectRoot '.phase2/build' }
+if (-not $BuildDirectory) {
+    $folder = if ($Preset -eq 'windows-qt6-x64') { '.phase3/build' } else { '.phase2/build' }
+    $BuildDirectory = Join-Path $projectRoot $folder
+}
 $BuildDirectory = [IO.Path]::GetFullPath($BuildDirectory)
 $nativeRoot = Join-Path $ToolchainRoot 'mingw64'
 $nativeBin = Join-Path $nativeRoot 'bin'
@@ -13,7 +17,7 @@ $cmake = Join-Path $nativeBin 'cmake.exe'
 $originalPath = $env:PATH
 try {
     $env:PATH = "$nativeBin;$originalPath"
-    & $cmake --preset windows-x64 -S $projectRoot -B $BuildDirectory "-DCMAKE_PREFIX_PATH=$nativeRoot"
+    & $cmake --preset $Preset -S $projectRoot -B $BuildDirectory "-DCMAKE_PREFIX_PATH=$nativeRoot"
     if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed' }
     & $cmake --build $BuildDirectory -j 4
     if ($LASTEXITCODE -ne 0) { throw 'CMake build failed' }

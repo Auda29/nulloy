@@ -1,3 +1,4 @@
+#include <QRegularExpression>
 /********************************************************************
 **  Nulloy Music Player, http://nulloy.com
 **  Copyright (C) 2010-2024 Sergey Vlasov <sergey@vlasov.me>
@@ -20,7 +21,7 @@
 #include "player.h"
 #include "plugin.h"
 #include "settings.h"
-#include "skinFileSystem.h"
+
 #ifndef _N_NO_UPDATE_CHECK_
 #include "updateChecker.h"
 #endif
@@ -398,7 +399,7 @@ void NPreferencesDialog::on_languageComboBox_activated(int index)
     QString newText = NI18NLoader::translate(locale.language(), "PreferencesDialog",
                                              "Switching languages requires restart");
     ui.languageRestartLabel->setText(
-        ui.languageRestartLabel->text().replace(QRegExp("(.*)&nbsp;.*"), "\\1&nbsp;" + newText));
+        ui.languageRestartLabel->text().replace(QRegularExpression("(.*)&nbsp;.*"), "\\1&nbsp;" + newText));
 }
 
 QString NPreferencesDialog::selectedContainer(N::PluginType type)

@@ -1,0 +1,24 @@
+********* Start testing of TestPlayerPackage *********
+Config: Using QtTest library 5.15.19, Qt 5.15.19 (x86_64-little_endian-llp64 shared (dynamic) release build; by GCC 16.1.0), windows 11
+PASS   : TestPlayerPackage::initTestCase()
+QDEBUG : TestPlayerPackage::playerWorkflow() found container "GStreamer" :
+QDEBUG : TestPlayerPackage::playerWorkflow() * PlaybackEngine
+QDEBUG : TestPlayerPackage::playerWorkflow() * WaveformBuilder
+QDEBUG : TestPlayerPackage::playerWorkflow() found container "TagLib" :
+QDEBUG : TestPlayerPackage::playerWorkflow() * TagReader
+QDEBUG : TestPlayerPackage::playerWorkflow() * CoverReader
+QDEBUG : TestPlayerPackage::playerWorkflow() registering plugin: "NPlaybackEngineGStreamer"
+QDEBUG : TestPlayerPackage::playerWorkflow() registering plugin: "NWaveformBuilderGstreamer"
+QDEBUG : TestPlayerPackage::playerWorkflow() registering plugin: "NTagReaderTaglib"
+QDEBUG : TestPlayerPackage::playerWorkflow() registering plugin: "NCoverReaderTaglib"
+QINFO  : TestPlayerPackage::playerWorkflow() window-exposed-ms 560
+QINFO  : TestPlayerPackage::playerWorkflow() ui-font "MS Shell Dlg 2,7.85455,-1,5,50,0,0,0,0,0" playlist-text "#000000" inactive-text "#000000" logical-size QSize(430, 350) device-scale 1
+QINFO  : TestPlayerPackage::playerWorkflow() native-taskbar-minimize-restore-passed
+QINFO  : TestPlayerPackage::playerWorkflow() full-waveform-ms 279
+QINFO  : TestPlayerPackage::playerWorkflow() cached-waveform-ms 0
+QWARN  : TestPlayerPackage::playerWorkflow() setGeometry: Unable to set geometry 1920x1080+0+0 (frame: 1938x1124-9-35) on QWidgetWindow/"mainWindowWindow" on "\\.\DISPLAY1". Resulting geometry: 1920x1054+0+26 (frame: 1938x1098-9-9) margins: 9, 35, 9, 9 minimum size: 426x197 MINMAXINFO maxSize=0,0 maxpos=0,0 mintrack=444,241 maxtrack=0,0)
+QINFO  : TestPlayerPackage::playerWorkflow() shutdown-during-waveform-ms 21
+PASS   : TestPlayerPackage::playerWorkflow()
+PASS   : TestPlayerPackage::cleanupTestCase()
+Totals: 3 passed, 0 failed, 0 skipped, 0 blacklisted, 1510ms
+********* Finished testing of TestPlayerPackage *********

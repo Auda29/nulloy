@@ -41,6 +41,12 @@
 #endif
 
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+using QxtNativeEventResult = qintptr;
+#else
+using QxtNativeEventResult = long;
+#endif
+
 class QxtGlobalShortcutPrivate : public QxtPrivate<QxtGlobalShortcut>
 #if QT_VERSION >= QT_VERSION_CHECK(5,0,0) && !defined(Q_OS_MAC)
         ,public QAbstractNativeEventFilter
@@ -65,7 +71,7 @@ public:
     static QAbstractEventDispatcher::EventFilter prevEventFilter;
     static bool eventFilter(void* message);
 #else
-    virtual bool nativeEventFilter(const QByteArray & eventType, void * message, long * result);
+    virtual bool nativeEventFilter(const QByteArray & eventType, void * message, QxtNativeEventResult * result);
 #endif // QT_VERSION < QT_VERSION_CHECK(5,0,0)
 #endif // Q_OS_MAC
 

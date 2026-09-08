@@ -16,12 +16,18 @@
 #ifndef N_SKIN_LOADER_H
 #define N_SKIN_LOADER_H
 
-class QString;
-class QStringList;
+#include <QStringList>
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+class SkinResources;
+#endif
 
 namespace NSkinLoader
 {
     QStringList skinIdentifiers();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    SkinResources *resources();
+    void releaseResources();
+#endif
     QString skinUiFormFile();
     QString skinScriptFile();
 } // namespace NSkinLoader

@@ -14,6 +14,7 @@
 *********************************************************************/
 
 #include "actionManager.h"
+#include <QActionGroup>
 
 #ifdef Q_OS_WIN
 #include "winIcon.h"

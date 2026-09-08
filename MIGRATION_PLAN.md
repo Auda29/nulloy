@@ -104,18 +104,23 @@ Nachweis: [Phase-2-Bericht](PHASE2_REPORT.md) und [Windows-Build-Leitfaden](docs
 
 ### Phase 3: Vollständiger Player auf Qt 6
 
-- [ ] Den in Phase 1 erprobten Skript- und Ressourcenadapter integrieren.
-- [ ] Qt-5-APIs gezielt ersetzen. Bereits sichtbar sind `QRegExp`, `QTextStream::setCodec`, `QSettings::setIniCodec` und ältere QVariant-Aufrufe; die vollständige Liste entsteht durch Quellcodeprüfung und Compilerdiagnosen.
-- [ ] Playback-, Waveform- und Metadaten-Plugins gegen die neue Toolchain bauen. Alte Plugin-DLLs nicht als binär kompatibel behandeln.
-- [ ] Einstellungen und M3U-Daten einschließlich Nulloy-Zusatzfeldern anhand kopierter Profile vergleichen.
-- [ ] Fensterrahmen, Tray, Taskleiste, globale Hotkeys, Einzelinstanz-Verhalten und Dateiübergabe prüfen.
-- [ ] Lebensdauer von Qt-Objekten, Abbruch von Hintergrundarbeit und Beenden während der Waveform-Berechnung prüfen.
-- [ ] Die Vergleichsmatrix aus Abschnitt 5 ausführen; Unterschiede korrigieren oder als offene Abweichung festhalten.
+- [x] Den in Phase 1 erprobten Skript- und Ressourcenadapter integrieren.
+- [x] Die für den vollständigen Windows-Build benötigten Qt-5-APIs ersetzen; Core5Compat erhält ältere Tag-Zeichencodierungen.
+- [x] Playback-, Waveform- und Metadaten-Plugins gegen die neue Toolchain bauen; Paket auf gemischte Qt-Hauptversionen prüfen.
+- [x] Einstellungen und M3U-Daten einschließlich Nulloy-Zusatzfeldern anhand kopierter Profile vergleichen: 83 Werte und 48 Playlist-Einträge identisch.
+- [x] Fensterrahmen, Tray, Taskleiste und globale Hotkeys manuell abnehmen. Der Nutzer bestätigt die angefragten Prüfungen und nach der Korrektur auch Minimieren/Wiederherstellen durch Taskleisten-Klick.
+- [x] Lebensdauer von Qt-Objekten, Abbruch von Hintergrundarbeit und Beenden während der Waveform-Berechnung prüfen.
+- [x] Die Kernbedienung manuell vergleichen. Der Nutzer bestätigt den vorgeschlagenen Testablauf für das Qt-6-Paket als erfolgreich, einschließlich subjektiv unauffälliger Ladezeiten. Exakte Zeiten wurden nicht gemessen.
+- [x] WAV, MP3, FLAC, Ogg/Vorbis, Opus und WavPack mit Wiedergabe, Waveform und Unicode-Tag-Schreiben im Paket prüfen; Prüfung in beide CI-Jobs aufnehmen.
+- [x] Erststart messen und eingrenzen: Der Aufbau des GStreamer-Plugin-Caches dominiert die Verzögerung. Folgestarts liegen in der letzten Slim-Messreihe bei 574 und 556 ms.
 
 **Abnahme:** Der komplette Player läuft unter Windows x64 mit Qt 6. Die bisherigen Kernfunktionen bestehen den Vergleich. Es gibt keine ungeklärten Änderungen an Darstellung, Bedienung oder gespeicherten Nutzerdaten.
 
+Die funktionale Abnahme ist abgeschlossen. Mit Zustimmung des Nutzers bleibt die Erststart-Optimierung ein offener Punkt in Phase 4. Der langsame Erststart gilt damit ausdrücklich nicht als behoben. Siehe [Phase-3-Bericht](PHASE3_REPORT.md).
+
 ### Phase 4: Erste nutzbare Migrationsversion
 
+- [ ] Den Erststart aus einem frisch entpackten Ordner beschleunigen. Der Aufbau des GStreamer-Plugin-Caches ist als Engpass nachgewiesen, auch im Qt-5-Vergleich. Erststart und Folgestarts getrennt messen, die bisher geprüften Audioformate beibehalten und die Pakettests erneut bestehen lassen. Ausgangswerte und Messbelege stehen im [Phase-3-Bericht](PHASE3_REPORT.md).
 - [ ] Ein portables Windows-x64-Testpaket erstellen und auf einem System ohne Entwicklungswerkzeuge starten.
 - [ ] Eigene Daten- und Einzelinstanz-Zuordnung für den Fork festlegen, damit er parallel zum Original geprüft werden kann. Übernahme alter Daten zunächst über Kopien, ohne das Originalprofil umzuschreiben.
 - [ ] Update-Prüfung eindeutig dem Fork zuordnen. Solange kein eigener Update-Kanal besteht, automatische Upstream-Prüfungen für Testpakete deaktivieren und dies dokumentieren. Sichtbare Änderungen am Update-Dialog separat entscheiden.
@@ -189,7 +194,7 @@ Jede Phase endet mit einem dokumentierten Commit und einem kurzen Prüfprotokoll
 | Erste Rust-Komponente und Art der Anbindung | Phase 5 |
 | Linux-/macOS-Paketierung, endgültiger Name und spätere Funktionen | Nach Windows-Migrationsetappe |
 
-Phase 0 und Phase 1 sind in den Fork gemergt. Die technische Windows-x64-Build-Etappe aus Phase 2 liegt auf einem eigenen Branch vor. Der nächste größere Umsetzungsschritt ist die vollständige Qt-6-Integration aus Phase 3. Die offenen Bedien- und Leistungspunkte aus dem Phase-2-Bericht bleiben dabei Teil der Abnahme. Dieser Plan enthält keine festen Terminzusagen.
+Phase 0 und Phase 1 sind in den Fork gemergt. Phase 2 liegt auf einem eigenen Branch vor. Die vollständige Qt-6-Integration aus Phase 3 ist umgesetzt, getestet und vom Nutzer funktional abgenommen, einschließlich des korrigierten Taskleisten-Klicks. Die Erststart-Optimierung wurde ausdrücklich als offener Punkt in Phase 4 übernommen. Der [Phase-3-Bericht](PHASE3_REPORT.md) hält den Stand fest. Dieser Plan enthält keine festen Terminzusagen.
 
 ## 8. Quellen
 

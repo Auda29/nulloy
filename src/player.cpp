@@ -1,3 +1,4 @@
+#include <QRegularExpression>
 /********************************************************************
 **  Nulloy Music Player, http://nulloy.com
 **  Copyright (C) 2010-2024 Sergey Vlasov <sergey@vlasov.me>
@@ -31,6 +32,9 @@
 #include "pluginLoader.h"
 #include "preferencesDialog.h"
 #include "scriptEngine.h"
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+#include "qt6/appearance.h"
+#endif
 #include "settings.h"
 #include "tagEditorDialog.h"
 #include "trackInfoReader.h"
@@ -43,7 +47,9 @@
 #include "waveformSlider.h"
 
 #ifndef _N_NO_SKINS_
-#include "skinFileSystem.h"
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+#include "qt6/widgetLoader.h"
+#endif
 #include "skinLoader.h"
 #endif
 
@@ -66,7 +72,12 @@
 
 NPlayer::NPlayer()
 {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    preserveLegacyWindowsAppearance();
+#endif
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
     qsrand((uint)QTime::currentTime().msec());
+#endif
     m_settings = NSettings::instance();
 
     QString styleName = m_settings->value("Style").toString();
@@ -87,7 +98,12 @@ NPlayer::NPlayer()
     m_playbackEngine->setParent(this);
 
 #ifndef _N_NO_SKINS_
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    OriginalWidgetLoader loader;
+    m_mainWindow = new NMainWindow(NSkinLoader::skinUiFormFile(), nullptr, &loader);
+#else
     m_mainWindow = new NMainWindow(NSkinLoader::skinUiFormFile());
+#endif
 #else
     m_mainWindow = new NMainWindow();
 #endif
@@ -103,7 +119,12 @@ NPlayer::NPlayer()
     scriptFile.open(QIODevice::ReadOnly);
     m_scriptEngine->evaluate(scriptFile.readAll(), scriptFileName);
     scriptFile.close();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    QJSValue skinProgram = m_scriptEngine->globalObject().property("Main").callAsConstructor();
+    if (skinProgram.isError()) qFatal("Skin constructor failed: %s", qPrintable(skinProgram.toString()));
+#else
     QScriptValue skinProgram = m_scriptEngine->evaluate("Main").construct();
+#endif
 
     m_aboutDialog = NULL;
     m_logDialog = new NLogDialog(m_mainWindow);
@@ -129,6 +150,11 @@ NPlayer::NPlayer()
     m_waveformSlider->setLayout(trackInfoLayout);
 
 #ifdef Q_OS_WIN
+    // Frameless skins inherit QDialog flags without minimize support. Windows
+    // needs this capability for taskbar clicks; the skin still draws its buttons.
+    if (m_mainWindow->windowFlags() & Qt::FramelessWindowHint) {
+        m_mainWindow->setWindowFlag(Qt::WindowMinimizeButtonHint, true);
+    }
     NW7TaskBar::instance()->setWindow(m_mainWindow);
     NW7TaskBar::instance()->setEnabled(NSettings::instance()->value("TaskbarProgress").toBool());
     connect(m_playbackEngine, SIGNAL(positionChanged(qreal)), NW7TaskBar::instance(),
@@ -166,7 +192,12 @@ NPlayer::NPlayer()
 
     loadSettings();
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    auto afterShow = skinProgram.property("afterShow").callWithInstance(skinProgram);
+    if (afterShow.isError()) qFatal("Skin afterShow failed: %s", qPrintable(afterShow.toString()));
+#else
     skinProgram.property("afterShow").call(skinProgram);
+#endif
 
     if (NSettings::instance()->value("RestorePlaylist").toBool()) {
         loadDefaultPlaylist();
@@ -186,8 +217,13 @@ NPlayer::NPlayer()
 
 NPlayer::~NPlayer()
 {
+    delete m_scriptEngine;
     NPluginLoader::deinit();
     delete m_mainWindow;
+#if !defined(_N_NO_SKINS_) && QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    // Remove temporary overlays and application fonts before Qt GUI teardown.
+    NSkinLoader::releaseResources();
+#endif
     delete m_settings;
 }
 
@@ -606,7 +642,7 @@ void NPlayer::loadCoverArt(const QString &file)
         // search for cover.* or folder.* or front.*:
         if (imageFile.isEmpty()) {
             QStringList matchedImages = images.filter(
-                QRegExp("^(cover|folder|front)\\..*$", Qt::CaseInsensitive));
+                QRegularExpression("^(cover|folder|front)\\..*$", QRegularExpression::CaseInsensitiveOption));
             if (!matchedImages.isEmpty()) {
                 imageFile = dir.absolutePath() + "/" + matchedImages.first();
             }
@@ -730,7 +766,8 @@ void NPlayer::showOpenFileDialog()
 
 void NPlayer::on_mainWindow_scrolled(int delta)
 {
-    QWheelEvent event(QPoint(), delta, Qt::NoButton, Qt::NoModifier);
+    QWheelEvent event(QPointF(), QPointF(), QPoint(), QPoint(0, delta),
+                      Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
     QApplication::sendEvent(m_volumeSlider, &event);
 }
 

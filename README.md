@@ -1,9 +1,11 @@
 # Nulloy Music Player
 
 This fork is being migrated while preserving the existing interface. See the
-[migration plan](MIGRATION_PLAN.md), [Phase 0 baseline](PHASE0_REPORT.md), and
-[Phase 1 Qt 6 skin prototype](PHASE1_REPORT.md). The prototype is a separate
-test application; the build instructions below describe the upstream player.
+[migration plan](MIGRATION_PLAN.md), [Phase 0 baseline](PHASE0_REPORT.md),
+[Phase 1 skin prototype](PHASE1_REPORT.md), [Phase 2 CMake build](PHASE2_REPORT.md),
+and [Phase 3 Qt 6 integration](PHASE3_REPORT.md). For the current Windows x64
+build, use the [Qt 6 build guide](docs/phase3/BUILD_WINDOWS_QT6.md).
+The instructions below are retained for the upstream qmake build.
 
 ![Screenshot](http://nulloy.com/files/screen.png)
 
