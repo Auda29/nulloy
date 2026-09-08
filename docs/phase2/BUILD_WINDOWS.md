@@ -8,7 +8,7 @@ Eine eigenständige MSYS2-Installation mit MINGW64 verwenden. UCRT64, MSVC, Qt 6
 
 ```bash
 pacman -Syu
-pacman -S --needed mingw-w64-x86_64-{gcc,cmake,ninja,pkgconf,python,imagemagick,zlib,qt5-base,qt5-script,qt5-svg,qt5-tools,qt5-winextras,gstreamer,gst-plugins-base,gst-plugins-good,taglib}
+pacman -S --needed mingw-w64-x86_64-{gcc,cmake,ninja,pkgconf,python,imagemagick,librsvg,zlib,qt5-base,qt5-script,qt5-svg,qt5-tools,qt5-winextras,gstreamer,gst-plugins-base,gst-plugins-good,taglib}
 ```
 
 Falls MSYS2 während des Updates einen Neustart der Shell verlangt, diesen vor dem zweiten Befehl durchführen. Die CI verwendet dieselben Paketnamen. MSYS2 ist eine Rolling-Release-Distribution; die tatsächlich installierten Versionen stehen in jedem Testpaket unter `toolchain.txt`. Das ist eine dokumentierte Werkzeugkette, kein Versprechen bitidentischer Builds mit beliebigen späteren Repository-Ständen.

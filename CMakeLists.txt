@@ -30,6 +30,7 @@ find_package(ZLIB REQUIRED)
 find_package(PkgConfig REQUIRED)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 find_program(MAGICK_EXECUTABLE NAMES magick REQUIRED)
+find_program(RSVG_CONVERT_EXECUTABLE NAMES rsvg-convert REQUIRED)
 
 add_library(nulloy_options INTERFACE)
 target_include_directories(nulloy_options INTERFACE src src/interfaces src/platform src/plugins src/widgetCollection)

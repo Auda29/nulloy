@@ -58,7 +58,12 @@ private slots:
         QVERIFY(playlist);
         QCOMPARE(playlist->count(), 0);
         const QDir samples(QCoreApplication::applicationDirPath() + "/tests");
-        const QStringList files = {samples.absoluteFilePath("01.wav"), samples.absoluteFilePath("02.wav")};
+        QStringList files = qEnvironmentVariable("NULLOY_TEST_MEDIA").split('|', Qt::SkipEmptyParts);
+        const bool referenceMedia = !files.isEmpty();
+        if (!referenceMedia) {
+            files = QStringList{samples.absoluteFilePath("01.wav"), samples.absoluteFilePath("02.wav")};
+        }
+        QCOMPARE(files.size(), 2);
         for (const QString &file : files) {
             QVERIFY(QFile::exists(file));
         }
@@ -92,9 +97,14 @@ private slots:
         QVERIFY(waveform->peaks().size() > 0);
         qInfo() << "full-waveform-ms" << clock.elapsed();
         QTRY_VERIFY(engine->position() > 0);
-        QCOMPARE(engine->durationMsec(), qint64(10000));
         player->tagReader()->setSource(files[0]);
-        QCOMPARE(player->tagReader()->getTag('D'), QString("10"));
+        const qint64 tagDuration = player->tagReader()->getTag('D').toLongLong();
+        QVERIFY(tagDuration > 0);
+        QVERIFY(qAbs(engine->durationMsec() - tagDuration * 1000) < 2000);
+        if (!referenceMedia) {
+            QCOMPARE(engine->durationMsec(), qint64(10000));
+            QCOMPARE(tagDuration, qint64(10));
+        }
         engine->pause();
         QCOMPARE(engine->state(), N::PlaybackPaused);
         engine->setPosition(0.5);

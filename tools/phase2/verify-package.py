@@ -13,9 +13,10 @@ import zipfile
 parser = argparse.ArgumentParser()
 parser.add_argument("--build", required=True)
 parser.add_argument("--prefix", required=True)
+parser.add_argument("--media", nargs=2, help="Optional private media copies for a Slim reference run")
 args = parser.parse_args()
 build, prefix = Path(args.build).resolve(), Path(args.prefix).resolve()
-evidence = build / "package-check"
+evidence = build / ("private-media-check" if args.media else "package-check")
 evidence.mkdir(exist_ok=True)
 archive = build / "Nulloy-windows-x64.zip"
 actual_hash = hashlib.sha256(archive.read_bytes()).hexdigest()
@@ -37,7 +38,17 @@ with tempfile.TemporaryDirectory(prefix="package check ä ", dir=build) as temp:
             del env[name]
     env["QT_QPA_PLATFORM"] = "windows"
     env["GST_DEBUG"] = "2"
-    for skin in ("Slim/0.9", "Silver/0.9", "Metro/0.9", "Native/0.9"):
+    skins = ("Slim/0.9",) if args.media else ("Slim/0.9", "Silver/0.9", "Metro/0.9", "Native/0.9")
+    if args.media:
+        media = []
+        for index, filename in enumerate(args.media):
+            destination = root / "tests" / f"reference-{index + 1}{Path(filename).suffix}"
+            shutil.copy2(filename, destination)
+            media.append(destination.as_posix())
+        env["NULLOY_TEST_MEDIA"] = "|".join(media)
+    else:
+        env.pop("NULLOY_TEST_MEDIA", None)
+    for skin in skins:
         name = skin.split("/")[0].lower()
         env["NULLOY_TEST_SKIN"] = skin
         result = evidence / f"{name}-results.txt"
@@ -57,5 +68,5 @@ with tempfile.TemporaryDirectory(prefix="package check ä ", dir=build) as temp:
         "archive_sha256": actual_hash, "file_hashes_verified": len(manifest["files"]),
         "x64_binaries": len(manifest["binaries"]), "path": "Windows System32 only",
         "extraction_path": "temporary directory with spaces and umlaut",
-        "skins": ["Slim/0.9", "Silver/0.9", "Metro/0.9", "Native/0.9"]
+        "skins": skins
     }, indent=2) + "\n", encoding="utf-8")
