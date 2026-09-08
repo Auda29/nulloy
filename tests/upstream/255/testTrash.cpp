@@ -19,6 +19,7 @@ namespace
     QString trashDirectory;
     QStringList attempted;
     QSet<QString> refused;
+    int refusedError;
 } // namespace
 
 // Keep production NSettings, but isolate its storage from user preferences.
@@ -29,15 +30,15 @@ QString NCore::settingsPath()
 
 // The only replaced behavior is the native OS trash boundary. A successful
 // call really moves a generated file; no user file or system trash is touched.
-int _trash(const QString &file, QString *error)
+NTrash::NativeResult _trash(const QString &file, QString *error)
 {
     attempted << file;
     if (!refused.contains(file) &&
         QFile::rename(file, trashDirectory + "/" + QFileInfo(file).fileName())) {
-        return 0;
+        return {0, false};
     }
     *error = "Controlled trash failure";
-    return 1;
+    return {refusedError, false};
 }
 
 class TestTrash : public QObject
@@ -98,6 +99,7 @@ private slots:
     {
         attempted.clear();
         refused.clear();
+        refusedError = 1;
         m_answers.clear();
         m_defaults.clear();
         m_dialogTitles.clear();
@@ -176,14 +178,21 @@ private slots:
     void trashErrorDeclinedKeepsFailedAndUnattemptedFiles_data()
     {
         QTest::addColumn<int>("successes");
-        QTest::newRow("total-failure") << 0;
-        QTest::newRow("partial-success") << 1;
+        QTest::addColumn<int>("errorCode");
+        QTest::newRow("total-failure") << 0 << 1;
+        QTest::newRow("partial-success") << 1 << 1;
+        QTest::newRow("negative-error-first") << 0 << -1;
+        QTest::newRow("negative-error-after-success") << 1 << -1;
+        QTest::newRow("native-error-first") << 0 << -43;
+        QTest::newRow("native-error-after-success") << 1 << -43;
     }
 
     void trashErrorDeclinedKeepsFailedAndUnattemptedFiles()
     {
         QFETCH(int, successes);
-        const QString prefix = QString("error-%1-").arg(successes);
+        QFETCH(int, errorCode);
+        refusedError = errorCode;
+        const QString prefix = QString("error-%1-%2-").arg(successes).arg(errorCode);
         const QStringList files{makeFile(prefix + "first"), makeFile(prefix + "second"),
                                 makeFile(prefix + "last")};
         refused.insert(files.at(successes));

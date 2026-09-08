@@ -20,10 +20,19 @@
 
 namespace NTrash
 {
+    // Internal adapter result: cancellation must not collide with native error codes.
+    struct NativeResult
+    {
+        int errorCode;
+        bool cancelled;
+    };
+
     // Returns unique paths successfully trashed or explicitly permanently deleted,
     // in input order. Cancellation/failure returns only earlier successes; failed
     // and unattempted paths remain in the playlist. Duplicate paths are tried once.
     QStringList moveToTrash(QStringList files);
 } // namespace NTrash
+
+NTrash::NativeResult _trash(const QString &file, QString *error);
 
 #endif

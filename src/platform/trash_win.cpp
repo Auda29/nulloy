@@ -18,9 +18,9 @@
 #include <shellapi.h>
 // clang-format on
 
-#include <QString>
+#include "trash.h"
 
-int _trash(const QString &file, QString *error)
+NTrash::NativeResult _trash(const QString &file, QString *error)
 {
     Q_UNUSED(error);
     QString file_nul = file;
@@ -39,5 +39,5 @@ int _trash(const QString &file, QString *error)
     shfo.lpszProgressTitle = NULL;
     const int result = SHFileOperation(&shfo);
     // The shell can return zero even when the operation was cancelled.
-    return result != 0 ? result : (shfo.fAnyOperationsAborted ? 1 : 0);
+    return {result, shfo.fAnyOperationsAborted != 0};
 }

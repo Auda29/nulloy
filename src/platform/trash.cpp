@@ -23,8 +23,6 @@
 #include <QMessageBox>
 #include <QProcess>
 
-int _trash(const QString &file, QString *error);
-
 QStringList NTrash::moveToTrash(QStringList files)
 {
     files.removeDuplicates();
@@ -52,7 +50,11 @@ QStringList NTrash::moveToTrash(QStringList files)
         }
 
         QString error;
-        if (_trash(file, &error) != 0) {
+        const NativeResult result = _trash(file, &error);
+        if (result.cancelled) {
+            break;
+        }
+        if (result.errorCode != 0) {
             QMessageBox box(QMessageBox::Warning, QObject::tr("Trash Error"), "",
                             QMessageBox::Yes | QMessageBox::Cancel, NULL);
             box.setDefaultButton(QMessageBox::Cancel);

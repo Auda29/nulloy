@@ -24,9 +24,12 @@ set_tests_properties(trashContract PROPERTIES
 # Exercise the real Windows adapter against a controlled shell boundary on
 # Linux; this deliberately does not claim native Windows API/ABI coverage.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    add_executable(testWindowsTrash testWindowsTrash.cpp ${NULLOY_SRC}/platform/trash_win.cpp)
-    target_include_directories(testWindowsTrash PRIVATE win32-boundary)
-    target_link_libraries(testWindowsTrash PRIVATE Qt${QT_VERSION_MAJOR}::Test)
+    add_executable(testWindowsTrash testWindowsTrash.cpp
+        ${NULLOY_SRC}/platform/trash_win.cpp ${NULLOY_SRC}/platform/trash.cpp
+        ${NULLOY_SRC}/settings.cpp ${NULLOY_SRC}/settings.h)
+    target_include_directories(testWindowsTrash PRIVATE win32-boundary ${NULLOY_SRC})
+    target_link_libraries(testWindowsTrash PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Test)
     add_test(NAME windowsTrashBoundary COMMAND testWindowsTrash)
-    set_tests_properties(windowsTrashBoundary PROPERTIES TIMEOUT 30)
+    set_tests_properties(windowsTrashBoundary PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 30)
 endif()
