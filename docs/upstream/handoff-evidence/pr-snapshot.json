@@ -1,0 +1,851 @@
+{
+  "captured_at_utc": "2026-09-08T19:26:59.863269+00:00",
+  "scope": "Snapshot before publishing the handoff update to PR20. Not a claim about later CI or merges.",
+  "prs": [
+    {
+      "baseRefName": "integration/upstream-issues",
+      "headRefName": "ci/upstream-stabilization",
+      "headRefOid": "378b1f609a6de38dfeb2619d6d19dfed2e1aff91",
+      "isDraft": false,
+      "mergeCommit": {
+        "oid": "8238c9456373e9e8b1837bc426f0b85b08bb4d5e"
+      },
+      "number": 7,
+      "state": "MERGED",
+      "statusCheckRollup": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:02:45Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34254558033/job/102156950220",
+          "name": "native",
+          "startedAt": "2026-09-08T17:01:11Z",
+          "status": "COMPLETED",
+          "workflowName": "Upstream stabilization (native Linux components)"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:05:42Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34254558010/job/102156951122",
+          "name": "windows (5, windows-x64, .phase2/build, mingw-w64-x86_64-qt5-base mingw-w64-x86_64-qt5-script min...",
+          "startedAt": "2026-09-08T17:01:11Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:08:20Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34254558010/job/102156950828",
+          "name": "windows (6, windows-portable-x64, .phase4/build, mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-d...",
+          "startedAt": "2026-09-08T17:01:12Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        }
+      ],
+      "title": "ci: verify isolated upstream stabilization harnesses",
+      "url": "https://github.com/Auda29/nulloy/pull/7"
+    },
+    {
+      "baseRefName": "integration/upstream-issues",
+      "headRefName": "fix/upstream-238",
+      "headRefOid": "6b88da0d7f55b43c0450a7a5cbd7cc91e4315c5e",
+      "isDraft": false,
+      "mergeCommit": {
+        "oid": "4f683017816a547874686f92cc9e8ff6051c8089"
+      },
+      "number": 8,
+      "state": "MERGED",
+      "statusCheckRollup": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:17:09Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34255965041/job/102161723869",
+          "name": "native",
+          "startedAt": "2026-09-08T17:15:15Z",
+          "status": "COMPLETED",
+          "workflowName": "Upstream stabilization (native Linux components)"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:19:42Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34255965096/job/102161723838",
+          "name": "windows (5, windows-x64, .phase2/build, mingw-w64-x86_64-qt5-base mingw-w64-x86_64-qt5-script min...",
+          "startedAt": "2026-09-08T17:15:15Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:20:54Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34255965096/job/102161723547",
+          "name": "windows (6, windows-portable-x64, .phase4/build, mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-d...",
+          "startedAt": "2026-09-08T17:15:15Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        }
+      ],
+      "title": "test: measure decoded audio gain across resets and repeats (upstream #238)",
+      "url": "https://github.com/Auda29/nulloy/pull/8"
+    },
+    {
+      "baseRefName": "integration/upstream-issues",
+      "headRefName": "fix/upstream-245",
+      "headRefOid": "1e43b3251aec758d1197173fa8f719d47eecd162",
+      "isDraft": false,
+      "mergeCommit": {
+        "oid": "cb5ace06a6b81b6988bb5d9304addc29315fdc23"
+      },
+      "number": 9,
+      "state": "MERGED",
+      "statusCheckRollup": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:16:35Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34255973184/job/102161750811",
+          "name": "native",
+          "startedAt": "2026-09-08T17:15:19Z",
+          "status": "COMPLETED",
+          "workflowName": "Upstream stabilization (native Linux components)"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:19:46Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34255973133/job/102161750698",
+          "name": "windows (5, windows-x64, .phase2/build, mingw-w64-x86_64-qt5-base mingw-w64-x86_64-qt5-script min...",
+          "startedAt": "2026-09-08T17:15:19Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:21:53Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34255973133/job/102161750955",
+          "name": "windows (6, windows-portable-x64, .phase4/build, mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-d...",
+          "startedAt": "2026-09-08T17:15:19Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        }
+      ],
+      "title": "test: characterize bitrate metadata across formats (upstream #245)",
+      "url": "https://github.com/Auda29/nulloy/pull/9"
+    },
+    {
+      "baseRefName": "integration/upstream-issues",
+      "headRefName": "fix/upstream-241",
+      "headRefOid": "1aab840812feeb8983253f1be710a4573d418b85",
+      "isDraft": false,
+      "mergeCommit": {
+        "oid": "a048dee228463f2c9db0c5f41d8e01acb0da9301"
+      },
+      "number": 10,
+      "state": "MERGED",
+      "statusCheckRollup": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:16:33Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34255978088/job/102161767522",
+          "name": "native",
+          "startedAt": "2026-09-08T17:15:22Z",
+          "status": "COMPLETED",
+          "workflowName": "Upstream stabilization (native Linux components)"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:20:16Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34255978151/job/102161767701",
+          "name": "windows (5, windows-x64, .phase2/build, mingw-w64-x86_64-qt5-base mingw-w64-x86_64-qt5-script min...",
+          "startedAt": "2026-09-08T17:15:22Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:22:46Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34255978151/job/102161768029",
+          "name": "windows (6, windows-portable-x64, .phase4/build, mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-d...",
+          "startedAt": "2026-09-08T17:15:22Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        }
+      ],
+      "title": "fix: preserve Unicode tags with a legacy encoding selected (upstream #241)",
+      "url": "https://github.com/Auda29/nulloy/pull/10"
+    },
+    {
+      "baseRefName": "integration/upstream-issues",
+      "headRefName": "fix/upstream-240",
+      "headRefOid": "5726998594d0037f37c40bc73607e254831ce7f4",
+      "isDraft": false,
+      "mergeCommit": {
+        "oid": "4cad737e3d101b16017864b88502cbc88f24c589"
+      },
+      "number": 11,
+      "state": "MERGED",
+      "statusCheckRollup": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:17:07Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34255985970/job/102161798551",
+          "name": "native",
+          "startedAt": "2026-09-08T17:15:28Z",
+          "status": "COMPLETED",
+          "workflowName": "Upstream stabilization (native Linux components)"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:20:14Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34255985981/job/102161794673",
+          "name": "windows (5, windows-x64, .phase2/build, mingw-w64-x86_64-qt5-base mingw-w64-x86_64-qt5-script min...",
+          "startedAt": "2026-09-08T17:15:28Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:21:12Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34255985981/job/102161794223",
+          "name": "windows (6, windows-portable-x64, .phase4/build, mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-d...",
+          "startedAt": "2026-09-08T17:15:27Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        }
+      ],
+      "title": "test: measure repeat tails and playback rates (upstream #240)",
+      "url": "https://github.com/Auda29/nulloy/pull/11"
+    },
+    {
+      "baseRefName": "integration/upstream-issues",
+      "headRefName": "fix/upstream-129",
+      "headRefOid": "7d7b0206d143a442b6aed6b03982a441309af211",
+      "isDraft": false,
+      "mergeCommit": {
+        "oid": "4faa863179459b73c5995e56a420bbcf9ea783aa"
+      },
+      "number": 12,
+      "state": "MERGED",
+      "statusCheckRollup": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:18:37Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34255993079/job/102161820025",
+          "name": "native",
+          "startedAt": "2026-09-08T17:16:37Z",
+          "status": "COMPLETED",
+          "workflowName": "Upstream stabilization (native Linux components)"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:20:06Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34255993056/job/102161819617",
+          "name": "windows (5, windows-x64, .phase2/build, mingw-w64-x86_64-qt5-base mingw-w64-x86_64-qt5-script min...",
+          "startedAt": "2026-09-08T17:15:30Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:23:25Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34255993056/job/102161819540",
+          "name": "windows (6, windows-portable-x64, .phase4/build, mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-d...",
+          "startedAt": "2026-09-08T17:16:35Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        }
+      ],
+      "title": "fix: preserve pause when removing playlist entries (upstream #129)",
+      "url": "https://github.com/Auda29/nulloy/pull/12"
+    },
+    {
+      "baseRefName": "integration/upstream-issues",
+      "headRefName": "fix/upstream-176",
+      "headRefOid": "bdaf3bc25bdda7f0b8136d6cb8b585aad484f1c5",
+      "isDraft": false,
+      "mergeCommit": {
+        "oid": "2c18ab0a8e53e7ddab29edf8a8b44008ab1d96e5"
+      },
+      "number": 13,
+      "state": "MERGED",
+      "statusCheckRollup": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:18:34Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34255996721/job/102161831972",
+          "name": "native",
+          "startedAt": "2026-09-08T17:17:09Z",
+          "status": "COMPLETED",
+          "workflowName": "Upstream stabilization (native Linux components)"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:21:37Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34255996787/job/102161832283",
+          "name": "windows (5, windows-x64, .phase2/build, mingw-w64-x86_64-qt5-base mingw-w64-x86_64-qt5-script min...",
+          "startedAt": "2026-09-08T17:17:10Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:22:52Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34255996787/job/102161831829",
+          "name": "windows (6, windows-portable-x64, .phase4/build, mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-d...",
+          "startedAt": "2026-09-08T17:16:53Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        }
+      ],
+      "title": "test: characterize recorder codecs and missing plugins (upstream #176)",
+      "url": "https://github.com/Auda29/nulloy/pull/13"
+    },
+    {
+      "baseRefName": "integration/upstream-issues",
+      "headRefName": "fix/upstream-11",
+      "headRefOid": "c2db6d3bd7956dd4eece4e1d49f78fb2918a2d4d",
+      "isDraft": false,
+      "mergeCommit": {
+        "oid": "05c59cbffcaf80e9299a4d7afee9cdd294321301"
+      },
+      "number": 14,
+      "state": "MERGED",
+      "statusCheckRollup": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:19:10Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34256003360/job/102161856168",
+          "name": "native",
+          "startedAt": "2026-09-08T17:17:56Z",
+          "status": "COMPLETED",
+          "workflowName": "Upstream stabilization (native Linux components)"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:20:48Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34256003149/job/102161852103",
+          "name": "windows (5, windows-x64, .phase2/build, mingw-w64-x86_64-qt5-base mingw-w64-x86_64-qt5-script min...",
+          "startedAt": "2026-09-08T17:16:01Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:23:44Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34256003149/job/102161852386",
+          "name": "windows (6, windows-portable-x64, .phase4/build, mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-d...",
+          "startedAt": "2026-09-08T17:17:42Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        }
+      ],
+      "title": "test: characterize metadata file-handle release (upstream #11)",
+      "url": "https://github.com/Auda29/nulloy/pull/14"
+    },
+    {
+      "baseRefName": "integration/upstream-issues",
+      "headRefName": "fix/upstream-255",
+      "headRefOid": "eed97c21876de703a707a7e0080e01bed033373e",
+      "isDraft": true,
+      "mergeCommit": null,
+      "number": 15,
+      "state": "OPEN",
+      "statusCheckRollup": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:20:04Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34256233297/job/102162640227",
+          "name": "native",
+          "startedAt": "2026-09-08T17:18:36Z",
+          "status": "COMPLETED",
+          "workflowName": "Upstream stabilization (native Linux components)"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:23:15Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34256233388/job/102162640258",
+          "name": "windows (5, windows-x64, .phase2/build, mingw-w64-x86_64-qt5-base mingw-w64-x86_64-qt5-script min...",
+          "startedAt": "2026-09-08T17:18:39Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:26:49Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34256233388/job/102162640612",
+          "name": "windows (6, windows-portable-x64, .phase4/build, mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-d...",
+          "startedAt": "2026-09-08T17:19:46Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        }
+      ],
+      "title": "fix: preserve trash successes and native cancellation (upstream #255)",
+      "url": "https://github.com/Auda29/nulloy/pull/15"
+    },
+    {
+      "baseRefName": "integration/upstream-issues",
+      "headRefName": "fix/upstream-236",
+      "headRefOid": "791ea82705898652d15866be7b77e3ad5f720976",
+      "isDraft": true,
+      "mergeCommit": null,
+      "number": 16,
+      "state": "OPEN",
+      "statusCheckRollup": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:21:09Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34256243762/job/102162674315",
+          "name": "native",
+          "startedAt": "2026-09-08T17:19:55Z",
+          "status": "COMPLETED",
+          "workflowName": "Upstream stabilization (native Linux components)"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:24:37Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34256243738/job/102162674337",
+          "name": "windows (5, windows-x64, .phase2/build, mingw-w64-x86_64-qt5-base mingw-w64-x86_64-qt5-script min...",
+          "startedAt": "2026-09-08T17:20:11Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:26:19Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34256243738/job/102162673986",
+          "name": "windows (6, windows-portable-x64, .phase4/build, mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-d...",
+          "startedAt": "2026-09-08T17:19:12Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        }
+      ],
+      "title": "fix: restore reachable window geometry after monitor changes (upstream #236)",
+      "url": "https://github.com/Auda29/nulloy/pull/16"
+    },
+    {
+      "baseRefName": "integration/upstream-issues",
+      "headRefName": "fix/upstream-139",
+      "headRefOid": "c96c926e396e53a36cd5424fd3a34d763d6f8735",
+      "isDraft": false,
+      "mergeCommit": {
+        "oid": "46a35da1280bcf9debb85c56aca1e3a10d55f60c"
+      },
+      "number": 17,
+      "state": "MERGED",
+      "statusCheckRollup": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:22:06Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34256255919/job/102162714124",
+          "name": "native",
+          "startedAt": "2026-09-08T17:20:31Z",
+          "status": "COMPLETED",
+          "workflowName": "Upstream stabilization (native Linux components)"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:25:54Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34256255878/job/102162714236",
+          "name": "windows (5, windows-x64, .phase2/build, mingw-w64-x86_64-qt5-base mingw-w64-x86_64-qt5-script min...",
+          "startedAt": "2026-09-08T17:20:55Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:27:21Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34256255878/job/102162713994",
+          "name": "windows (6, windows-portable-x64, .phase4/build, mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-d...",
+          "startedAt": "2026-09-08T17:20:16Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        }
+      ],
+      "title": "fix: clear stale waveforms and stop failed decodes (upstream #139)",
+      "url": "https://github.com/Auda29/nulloy/pull/17"
+    },
+    {
+      "baseRefName": "integration/upstream-issues",
+      "headRefName": "fix/upstream-121",
+      "headRefOid": "ec445a36ab2b2c2a68f117e0a49a1af734e77ffe",
+      "isDraft": false,
+      "mergeCommit": {
+        "oid": "f10b99e0d83ff60e90167762ed71eea3df0cec18"
+      },
+      "number": 18,
+      "state": "MERGED",
+      "statusCheckRollup": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:21:55Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34256266125/job/102162747642",
+          "name": "native",
+          "startedAt": "2026-09-08T17:20:06Z",
+          "status": "COMPLETED",
+          "workflowName": "Upstream stabilization (native Linux components)"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:24:25Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34256266126/job/102162747052",
+          "name": "windows (5, windows-x64, .phase2/build, mingw-w64-x86_64-qt5-base mingw-w64-x86_64-qt5-script min...",
+          "startedAt": "2026-09-08T17:19:48Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:27:27Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34256266126/job/102162747568",
+          "name": "windows (6, windows-portable-x64, .phase4/build, mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-d...",
+          "startedAt": "2026-09-08T17:20:19Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        }
+      ],
+      "title": "test: preserve playlist shuffle invariants (upstream #121)",
+      "url": "https://github.com/Auda29/nulloy/pull/18"
+    },
+    {
+      "baseRefName": "integration/upstream-issues",
+      "headRefName": "fix/upstream-261",
+      "headRefOid": "647f47b5d05919cc41e888e9f83cbb2457776e05",
+      "isDraft": false,
+      "mergeCommit": {
+        "oid": "a10b5fff3676586b049c34a976dedba36b2d0b13"
+      },
+      "number": 19,
+      "state": "MERGED",
+      "statusCheckRollup": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:22:41Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34256277742/job/102162785670",
+          "name": "native",
+          "startedAt": "2026-09-08T17:20:50Z",
+          "status": "COMPLETED",
+          "workflowName": "Upstream stabilization (native Linux components)"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:26:16Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34256277818/job/102162786159",
+          "name": "windows (5, windows-x64, .phase2/build, mingw-w64-x86_64-qt5-base mingw-w64-x86_64-qt5-script min...",
+          "startedAt": "2026-09-08T17:21:11Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:27:13Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34256277818/job/102162785933",
+          "name": "windows (6, windows-portable-x64, .phase4/build, mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-d...",
+          "startedAt": "2026-09-08T17:20:08Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        }
+      ],
+      "title": "test: characterize rapid switching and seek recovery (upstream #261)",
+      "url": "https://github.com/Auda29/nulloy/pull/19"
+    },
+    {
+      "baseRefName": "integration/upstream-issues",
+      "headRefName": "docs/upstream-issue-register",
+      "headRefOid": "8aa35cffa03b4571930af59011cc0b2b91d70e3d",
+      "isDraft": true,
+      "mergeCommit": null,
+      "number": 20,
+      "state": "OPEN",
+      "statusCheckRollup": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:23:24Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34256679065/job/102164147118",
+          "name": "native",
+          "startedAt": "2026-09-08T17:22:21Z",
+          "status": "COMPLETED",
+          "workflowName": "Upstream stabilization (native Linux components)"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:27:00Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34256679023/job/102164146491",
+          "name": "windows (5, windows-x64, .phase2/build, mingw-w64-x86_64-qt5-base mingw-w64-x86_64-qt5-script min...",
+          "startedAt": "2026-09-08T17:22:20Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:29:40Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34256679023/job/102164146294",
+          "name": "windows (6, windows-portable-x64, .phase4/build, mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-d...",
+          "startedAt": "2026-09-08T17:22:20Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        }
+      ],
+      "title": "docs: track all 80 upstream issues, PRs and remaining acceptance",
+      "url": "https://github.com/Auda29/nulloy/pull/20"
+    },
+    {
+      "baseRefName": "integration/upstream-issues",
+      "headRefName": "fix/upstream-132",
+      "headRefOid": "67258f6ba225baa340c73a9726ddafec0fc2dd60",
+      "isDraft": false,
+      "mergeCommit": {
+        "oid": "67f26cba67e9e20c4a20407d978a64bc782886e4"
+      },
+      "number": 21,
+      "state": "MERGED",
+      "statusCheckRollup": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:32:16Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34257006934/job/102165243417",
+          "name": "native",
+          "startedAt": "2026-09-08T17:25:33Z",
+          "status": "COMPLETED",
+          "workflowName": "Upstream stabilization (native Linux components)"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:29:57Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34257006905/job/102165243304",
+          "name": "windows (5, windows-x64, .phase2/build, mingw-w64-x86_64-qt5-base mingw-w64-x86_64-qt5-script min...",
+          "startedAt": "2026-09-08T17:25:31Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:32:48Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34257006905/job/102165243652",
+          "name": "windows (6, windows-portable-x64, .phase4/build, mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-d...",
+          "startedAt": "2026-09-08T17:25:31Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        }
+      ],
+      "title": "fix: validate saved playlist restoration state (upstream #132)",
+      "url": "https://github.com/Auda29/nulloy/pull/21"
+    },
+    {
+      "baseRefName": "integration/upstream-issues",
+      "headRefName": "fix/upstream-218",
+      "headRefOid": "7fdb1434e998232510138eef2e6e690a087d2e28",
+      "isDraft": false,
+      "mergeCommit": {
+        "oid": "9f7b3d08de78ba79b113d19c14d9aababade5396"
+      },
+      "number": 22,
+      "state": "MERGED",
+      "statusCheckRollup": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:29:45Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34257017730/job/102165276607",
+          "name": "native",
+          "startedAt": "2026-09-08T17:25:38Z",
+          "status": "COMPLETED",
+          "workflowName": "Upstream stabilization (native Linux components)"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:29:36Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34257017868/job/102165277305",
+          "name": "windows (5, windows-x64, .phase2/build, mingw-w64-x86_64-qt5-base mingw-w64-x86_64-qt5-script min...",
+          "startedAt": "2026-09-08T17:25:38Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:32:31Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34257017868/job/102165277577",
+          "name": "windows (6, windows-portable-x64, .phase4/build, mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-d...",
+          "startedAt": "2026-09-08T17:25:37Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        }
+      ],
+      "title": "test: characterize selected-track keyboard actions (upstream #218)",
+      "url": "https://github.com/Auda29/nulloy/pull/22"
+    },
+    {
+      "baseRefName": "integration/upstream-issues",
+      "headRefName": "fix/upstream-141",
+      "headRefOid": "654bc9edbcfc7b79952e20070653baa50d12f1bf",
+      "isDraft": false,
+      "mergeCommit": {
+        "oid": "2d54d7d4ebd132add13cbdf1a64159357df5b42a"
+      },
+      "number": 23,
+      "state": "MERGED",
+      "statusCheckRollup": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:29:22Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34257028793/job/102165315182",
+          "name": "native",
+          "startedAt": "2026-09-08T17:25:44Z",
+          "status": "COMPLETED",
+          "workflowName": "Upstream stabilization (native Linux components)"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:29:58Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34257028723/job/102165322455",
+          "name": "windows (5, windows-x64, .phase2/build, mingw-w64-x86_64-qt5-base mingw-w64-x86_64-qt5-script min...",
+          "startedAt": "2026-09-08T17:25:47Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:32:33Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34257028723/job/102165322683",
+          "name": "windows (6, windows-portable-x64, .phase4/build, mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-d...",
+          "startedAt": "2026-09-08T17:25:47Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        }
+      ],
+      "title": "test: compare short-track positions with output clock (upstream #141)",
+      "url": "https://github.com/Auda29/nulloy/pull/23"
+    },
+    {
+      "baseRefName": "integration/upstream-issues",
+      "headRefName": "fix/upstream-211",
+      "headRefOid": "21848c11d6ca4dc1e1c8552285ffc1b84946a029",
+      "isDraft": true,
+      "mergeCommit": null,
+      "number": 24,
+      "state": "OPEN",
+      "statusCheckRollup": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:42:56Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34257859285/job/102168095119",
+          "name": "native",
+          "startedAt": "2026-09-08T17:33:52Z",
+          "status": "COMPLETED",
+          "workflowName": "Upstream stabilization (native Linux components)"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:38:35Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34257859258/job/102168095017",
+          "name": "windows (5, windows-x64, .phase2/build, mingw-w64-x86_64-qt5-base mingw-w64-x86_64-qt5-script min...",
+          "startedAt": "2026-09-08T17:33:53Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:39:58Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34257859258/job/102168094773",
+          "name": "windows (6, windows-portable-x64, .phase4/build, mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-d...",
+          "startedAt": "2026-09-08T17:33:53Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        }
+      ],
+      "title": "fix: preserve bounded external-open bursts (upstream #211; native acceptance pending)",
+      "url": "https://github.com/Auda29/nulloy/pull/24"
+    },
+    {
+      "baseRefName": "integration/upstream-issues",
+      "headRefName": "fix/upstream-146",
+      "headRefOid": "7bcc139562a7a207c5030ca1f629ebeb3f2542d7",
+      "isDraft": true,
+      "mergeCommit": null,
+      "number": 25,
+      "state": "OPEN",
+      "statusCheckRollup": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:51:31Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34258524271/job/102170335732",
+          "name": "native",
+          "startedAt": "2026-09-08T17:40:34Z",
+          "status": "COMPLETED",
+          "workflowName": "Upstream stabilization (native Linux components)"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:44:08Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34258524295/job/102170334935",
+          "name": "windows (5, windows-x64, .phase2/build, mingw-w64-x86_64-qt5-base mingw-w64-x86_64-qt5-script min...",
+          "startedAt": "2026-09-08T17:40:33Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-09-08T17:47:17Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/Auda29/nulloy/actions/runs/34258524295/job/102170335356",
+          "name": "windows (6, windows-portable-x64, .phase4/build, mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-d...",
+          "startedAt": "2026-09-08T17:40:33Z",
+          "status": "COMPLETED",
+          "workflowName": "Windows x64 CMake"
+        }
+      ],
+      "title": "test: characterize arrow shortcut metadata refresh (upstream #146)",
+      "url": "https://github.com/Auda29/nulloy/pull/25"
+    }
+  ]
+}

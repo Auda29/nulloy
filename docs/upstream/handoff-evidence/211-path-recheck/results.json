@@ -1,0 +1,47 @@
+[
+  {
+    "issue": 211,
+    "source": "/home/hermes/workspace/nulloy-swarm/issue-211/tests/upstream/211",
+    "steps": [
+      {
+        "command": [
+          "cmake",
+          "-S",
+          "/home/hermes/workspace/nulloy-swarm/issue-211/tests/upstream/211",
+          "-B",
+          "/home/hermes/workspace/nulloy-swarm/evidence/211-path-recheck/211/run-r53w9mty",
+          "-G",
+          "Ninja",
+          "-DCMAKE_BUILD_TYPE=Release"
+        ],
+        "exit_code": 0,
+        "log": "/home/hermes/workspace/nulloy-swarm/evidence/211-path-recheck/211/run-r53w9mty/step-0.log"
+      },
+      {
+        "command": [
+          "cmake",
+          "--build",
+          "/home/hermes/workspace/nulloy-swarm/evidence/211-path-recheck/211/run-r53w9mty",
+          "--parallel",
+          "1"
+        ],
+        "exit_code": 0,
+        "log": "/home/hermes/workspace/nulloy-swarm/evidence/211-path-recheck/211/run-r53w9mty/step-1.log"
+      },
+      {
+        "command": [
+          "ctest",
+          "--test-dir",
+          "/home/hermes/workspace/nulloy-swarm/evidence/211-path-recheck/211/run-r53w9mty",
+          "--output-on-failure",
+          "--no-tests=error",
+          "--timeout",
+          "180"
+        ],
+        "exit_code": 0,
+        "log": "/home/hermes/workspace/nulloy-swarm/evidence/211-path-recheck/211/run-r53w9mty/step-2.log"
+      }
+    ],
+    "passed": true
+  }
+]
