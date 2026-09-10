@@ -343,6 +343,18 @@ def explorer_row_names(display_names: Sequence[str], expected: Sequence[str]) ->
     return mapped
 
 
+def fixture_playlist_names(labels: Sequence[str], expected: Sequence[str]) -> list[str]:
+    """Accept only exact filenames or their observed one-second fixture labels."""
+    names = []
+    for label in labels:
+        matches = [name for name in expected if label in (name, name + " (0:01)")]
+        if len(matches) != 1:
+            raise ContractError(f"unknown or ambiguous fixture playlist label: {label!r}")
+        names.append(matches[0])
+    exact_playlist_rows(names, expected)
+    return names
+
+
 def verdict(assertions: Sequence[bool], cleanup_verified: bool) -> str:
     return "PASS" if bool(assertions) and all(assertions) and cleanup_verified else "FAIL"
 
@@ -753,7 +765,7 @@ class WindowsDesktopRun:
                 )
                 _write_text(self.evidence / "playlist-rows.txt", "\n".join(names) + "\n")
                 try:
-                    exact_playlist_rows(names, expected_names)
+                    fixture_playlist_names(names, expected_names)
                     stable_exact += 1
                     if stable_exact >= PLAYLIST_STABLE_SNAPSHOTS:
                         return list(expected_names)

@@ -141,6 +141,16 @@ class ReviewRegressions(unittest.TestCase):
         with patch.object(runtime, "_owned_player_windows", return_value=[main, Control(class_name="NMainWindow")]):
             self.assertIsNone(runtime._find_player())
 
+    def test_fixture_playlist_labels_allow_only_exact_one_second_suffix(self):
+        expected = ["desktop-probe-01.wav", "desktop-probe-02.wav"]
+        observed = [name + " (0:01)" for name in reversed(expected)]
+        self.assertEqual(probe.fixture_playlist_names(observed, expected), list(reversed(expected)))
+        for wrong in [observed + [observed[0]], [observed[0]] * 2,
+                      [expected[0] + " (0:02)", observed[0]],
+                      ["prefix" + observed[1], observed[0]]]:
+            with self.assertRaises(probe.ContractError):
+                probe.fixture_playlist_names(wrong, expected)
+
     def test_player_cleanup_closes_owned_main_window_and_dialog(self):
         class Window(Control):
             def __init__(self, name):
