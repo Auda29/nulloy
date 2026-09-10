@@ -145,13 +145,19 @@ jobs:
         run: |
           $packages = @(Get-ChildItem .desktop-probe/package -Filter '*.zip' -Recurse)
           if ($packages.Count -ne 1) { throw "Expected exactly one package, got $($packages.Count)" }
-          python tools/desktop-probe/probe.py --package $packages[0].FullName --output .desktop-probe/evidence --source-sha $env:PROBE_SOURCE_SHA
+          python tools/desktop-probe/probe.py --package $packages[0].FullName --output .desktop-probe/evidence --source-sha $env:PROBE_SOURCE_SHA --headless-audio
           exit $LASTEXITCODE
       - name: Upload desktop evidence even when blocked
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Windows-desktop-probe-evidence
-          path: .desktop-probe/evidence/
+          # Diagnostic files only: never re-upload a locked extracted DLL tree.
+          path: |
+            .desktop-probe/evidence/*.json
+            .desktop-probe/evidence/*.jsonl
+            .desktop-probe/evidence/*.txt
+            .desktop-probe/evidence/*.png
+            .desktop-probe/evidence/*.sha256
           if-no-files-found: error
           retention-days: 14
