@@ -89,16 +89,24 @@ class ContractTests(unittest.TestCase):
 
     def test_legacy_default_state_proves_default_without_focus(self) -> None:
         class Legacy:
-            CurrentState = 0x100
+            def __init__(self):
+                self.calls = 0
+
+            def __call__(self):
+                self.calls += 1
+                return {"State": 0x100}
 
         class Button:
-            iface_legacy = Legacy()
+            legacy = Legacy()
 
             def get_properties(self):
                 return {}
 
             def has_focus(self):
                 return False
+
+            def legacy_properties(self):
+                return self.legacy()
 
         self.assertTrue(probe.WindowsScenario._button_is_default(Button()))
 
@@ -121,9 +129,12 @@ class ContractTests(unittest.TestCase):
             def has_focus(self):
                 return False
 
-            def click_input(self):
+            def invoke(self):
                 if self.on_click:
                     self.on_click()
+
+            def click_input(self):
+                raise AssertionError("dialog buttons must not use click_input")
 
             def wrapper_object(self):
                 return self
@@ -191,9 +202,12 @@ class ContractTests(unittest.TestCase):
             def has_focus(self):
                 return False
 
-            def click_input(self):
+            def invoke(self):
                 if self.on_click:
                     self.on_click()
+
+            def click_input(self):
+                raise AssertionError("dialog buttons must not use click_input")
 
             def wrapper_object(self):
                 return self
@@ -278,6 +292,138 @@ class ContractTests(unittest.TestCase):
         with mock.patch.dict(sys.modules, {"pywinauto.keyboard": keyboard}):
             with self.assertRaises(probe.BlockedError):
                 scenario._stop_and_verify()
+
+    def test_stop_does_not_require_unobserved_stop_button(self) -> None:
+        class Slider:
+            element_info = type(
+                "Info", (), {"class_name": "NWaveformSlider", "automation_id": "waveformSlider"}
+            )()
+
+            def __init__(self):
+                self.values = iter((0.1, 0.2, 0.3, 0.0, 0.0, 0.0))
+
+            def get_value(self):
+                return next(self.values, 0.0)
+
+        class Window:
+            def __init__(self):
+                self.slider = Slider()
+
+            def descendants(self, control_type=None):
+                if control_type == "Button":
+                    return []
+                return [self.slider]
+
+        scenario = probe.WindowsScenario(Path("package.zip"), SOURCE_SHA, Path("evidence"), "test")
+        scenario.main_window = Window()
+        scenario._verify_process = lambda: None
+        sent = []
+        scenario._send_targeted_keys = lambda target, keys: sent.append((target, keys))
+        clock = type("Clock", (), {"now": 0.0})()
+        with mock.patch.object(probe.time, "monotonic", side_effect=lambda: clock.now), \
+             mock.patch.object(probe.time, "sleep", side_effect=lambda seconds: setattr(clock, "now", clock.now + seconds)):
+            scenario._stop_and_verify()
+        self.assertEqual(sent, [(scenario.main_window, "V")])
+
+    def test_stop_requires_repeated_zero_after_stop_operation(self) -> None:
+        class StopButton:
+            element_info = type("Info", (), {"automation_id": "stopButton"})()
+
+        class Slider:
+            element_info = type(
+                "Info", (), {"class_name": "NWaveformSlider", "automation_id": "waveformSlider"}
+            )()
+
+            def __init__(self):
+                self.values = iter((0.1, 0.2, 0.3, 0.0, 0.0, 0.1, 0.1, 0.1))
+
+            def get_value(self):
+                return next(self.values, 0.1)
+
+        class Window:
+            def __init__(self):
+                self.slider = Slider()
+
+            def descendants(self, control_type=None):
+                if control_type == "Button":
+                    return [StopButton()]
+                return [StopButton(), self.slider]
+
+            def set_focus(self):
+                return None
+
+        scenario = probe.WindowsScenario(Path("package.zip"), SOURCE_SHA, Path("evidence"), "test")
+        scenario.main_window = Window()
+        scenario._verify_process = lambda: None
+        scenario._send_targeted_keys = lambda target, keys: None
+        clock = type("Clock", (), {"now": 0.0})()
+        with mock.patch.object(probe.time, "monotonic", side_effect=lambda: clock.now), \
+             mock.patch.object(probe.time, "sleep", side_effect=lambda seconds: setattr(clock, "now", clock.now + seconds)):
+            with self.assertRaises(probe.BlockedError):
+                scenario._stop_and_verify()
+
+    def test_keyboard_shortcut_blocks_when_control_focus_is_not_owned(self) -> None:
+        class Playlist:
+            handle = 222
+
+            def set_focus(self):
+                return None
+
+            def has_keyboard_focus(self):
+                return False
+
+        scenario = probe.WindowsScenario(Path("package.zip"), SOURCE_SHA, Path("evidence"), "test")
+        scenario.identity = probe.ProcessIdentity(123, 1.0, "player.exe")
+        scenario.main_window = type("Window", (), {"handle": 111})()
+        scenario._verify_process = lambda: None
+        scenario._playlist = lambda: Playlist()
+        with mock.patch.object(probe.os, "name", "nt"), \
+             self.assertRaises(probe.BlockedError):
+            scenario._send_move_to_trash()
+
+    def test_keyboard_shortcut_blocks_when_foreground_pid_is_not_owned(self) -> None:
+        class Playlist:
+            handle = 222
+
+            def set_focus(self):
+                return None
+
+            def has_keyboard_focus(self):
+                return True
+
+        playlist = Playlist()
+        scenario = probe.WindowsScenario(Path("package.zip"), SOURCE_SHA, Path("evidence"), "test")
+        scenario.identity = probe.ProcessIdentity(123, 1.0, "player.exe")
+        scenario.main_window = type("Window", (), {"handle": 111})()
+        scenario._verify_process = lambda: None
+        scenario._playlist = lambda: playlist
+        with mock.patch.object(probe, "_win32_window_pid", side_effect=lambda hwnd: 999 if hwnd == 333 else 123), \
+             mock.patch.object(probe, "_win32_foreground_window", return_value=333), \
+             self.assertRaises(probe.BlockedError):
+            scenario._send_move_to_trash()
+
+    def test_keyboard_shortcut_messages_are_targeted_to_owned_hwnd(self) -> None:
+        class Playlist:
+            handle = 222
+
+            def set_focus(self):
+                return None
+
+            def has_keyboard_focus(self):
+                return True
+
+        playlist = Playlist()
+        scenario = probe.WindowsScenario(Path("package.zip"), SOURCE_SHA, Path("evidence"), "test")
+        scenario.identity = probe.ProcessIdentity(123, 1.0, "player.exe")
+        scenario.main_window = type("Window", (), {"handle": 111})()
+        scenario._verify_process = lambda: None
+        sent = []
+        with mock.patch.object(probe, "_win32_window_pid", return_value=123), \
+             mock.patch.object(probe, "_win32_foreground_window", return_value=333), \
+             mock.patch.object(probe, "_win32_root_window", return_value=111), \
+             mock.patch.object(probe, "_win32_send_key", side_effect=lambda *args: sent.append(args)):
+            scenario._send_targeted_keys(playlist, "Ctrl+Delete")
+        self.assertEqual([call[0] for call in sent], [222, 222, 222, 222])
 
     def test_cleanup_error_preserves_primary_and_blocks_remaining_scenarios(self) -> None:
         contract = probe.validate_manifest(valid_manifest(), SOURCE_SHA)

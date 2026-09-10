@@ -419,11 +419,70 @@ def recycle_metadata_original_path(raw: bytes) -> str | None:
 
 
 def _window_pid(window: Any) -> int:
-    return int(getattr(window.element_info, "process_id", 0))
+    element_info = getattr(window, "element_info", None)
+    return int(getattr(element_info, "process_id", 0))
+
+
+def _window_handle(window: Any) -> int:
+    try:
+        return int(getattr(window, "handle", 0))
+    except (AttributeError, TypeError, ValueError):
+        return 0
+
+
+def _win32_user32() -> Any:
+    if os.name != "nt":
+        raise BlockedError("targeted Windows keyboard delivery requires Windows")
+    try:
+        import ctypes
+    except ImportError as exc:
+        raise BlockedError("Win32 ctypes is unavailable") from exc
+
+    try:
+        return ctypes.windll.user32
+    except AttributeError as exc:
+        raise BlockedError("Win32 user32 is unavailable") from exc
+
+
+def _win32_window_pid(hwnd: int) -> int:
+    try:
+        import ctypes
+    except ImportError as exc:
+        raise BlockedError("Win32 ctypes is unavailable") from exc
+
+    if not hwnd:
+        raise BlockedError("targeted keyboard window has no HWND")
+    pid = ctypes.c_ulong()
+    if _win32_user32().GetWindowThreadProcessId(hwnd, ctypes.byref(pid)) == 0:
+        raise BlockedError(f"GetWindowThreadProcessId failed for HWND {hwnd}")
+    return int(pid.value)
+
+
+def _win32_root_window(hwnd: int) -> int:
+    if not hwnd:
+        raise BlockedError("targeted keyboard window has no HWND")
+    root = int(_win32_user32().GetAncestor(hwnd, 2))  # GA_ROOT
+    if not root:
+        raise BlockedError(f"GetAncestor failed for HWND {hwnd}")
+    return root
+
+
+def _win32_foreground_window() -> int:
+    hwnd = int(_win32_user32().GetForegroundWindow())
+    if not hwnd:
+        raise BlockedError("GetForegroundWindow returned no HWND")
+    return hwnd
+
+
+def _win32_send_key(hwnd: int, message: int, virtual_key: int) -> None:
+    # SendMessageW is targeted at the already validated player HWND; it is not
+    # pywinauto.keyboard.send_keys and cannot retarget an unrelated foreground app.
+    _win32_user32().SendMessageW(hwnd, message, virtual_key, 0)
 
 
 def _window_class(window: Any) -> str:
-    return str(getattr(window.element_info, "class_name", ""))
+    element_info = getattr(window, "element_info", None)
+    return str(getattr(element_info, "class_name", ""))
 
 
 def _window_text(window: Any) -> str:
@@ -685,12 +744,13 @@ class WindowsScenario:
         except Exception:
             pass
         try:
-            # UIA's LegacyIAccessible pattern exposes MSAA STATE_SYSTEM_DEFAULT.
-            legacy = getattr(button, "iface_legacy")
-            state = int(getattr(legacy, "CurrentState"))
-            if state & 0x100:  # STATE_SYSTEM_DEFAULT
+            # pywinauto 0.6.9 documents legacy_properties()['State'] for
+            # LegacyIAccessible STATE_SYSTEM_DEFAULT (MSAA bit 0x100).
+            legacy_properties = getattr(button, "legacy_properties")
+            state = int(legacy_properties().get("State", 0))
+            if state & 0x100:
                 return True
-        except (AttributeError, TypeError, ValueError, OSError):
+        except (AttributeError, TypeError, ValueError, OSError, RuntimeError):
             pass
         try:
             import ctypes
@@ -708,10 +768,34 @@ class WindowsScenario:
             pass
         return False
 
+    def _invoke_revalidated_button(self, title: str, expected_dialog_title: str | None = None) -> None:
+        """Invoke one freshly revalidated owned UIA button; never click by coordinates."""
+        self._verify_process()
+        dialogs = self._dialog_candidates()
+        if len(dialogs) != 1:
+            raise BlockedError(f"owned dialog count changed before invoking {title!r}")
+        dialog = dialogs[0]
+        if expected_dialog_title is not None and _window_text(dialog) != expected_dialog_title:
+            raise BlockedError(
+                f"owned dialog changed before invoking {title!r}: {_window_text(dialog)!r}"
+            )
+        button = dialog.child_window(title=title, control_type="Button").wrapper_object()
+        button_pid = _window_pid(button)
+        if self.identity is not None and button_pid not in (0, self.identity.pid):
+            raise BlockedError(f"dialog button {title!r} is not owned by the packaged player")
+        invoke = getattr(button, "invoke", None)
+        if not callable(invoke):
+            raise BlockedError(f"owned dialog button {title!r} has no UIA Invoke pattern")
+        try:
+            invoke()
+        except Exception as exc:
+            raise BlockedError(f"UIA Invoke failed for owned dialog button {title!r}: {exc}") from exc
+
     def _cancel_owned_dialog(self, dialog: Any) -> None:
         self._verify_process()
-        cancel = dialog.child_window(title="Cancel", control_type="Button").wrapper_object()
-        cancel.click_input()
+        if _window_text(dialog) not in {"Trash Error", "File Delete Error"}:
+            raise BlockedError(f"refusing to cancel unexpected owned dialog: {_window_text(dialog)!r}")
+        self._invoke_revalidated_button("Cancel", _window_text(dialog))
         _wait_for(lambda: not self._dialog_candidates(), 5, "owned dialog close")
 
     def _drive_confirmation(self, expected_name: str, answer: str) -> None:
@@ -721,9 +805,9 @@ class WindowsScenario:
             f"confirmation for {expected_name}",
         )
         self._verify_process()
-        # Re-find and revalidate the exact modal immediately before clicking.
-        dialog = self._verify_confirmation(expected_name)
-        dialog.child_window(title=answer, control_type="Button").wrapper_object().click_input()
+        # Re-find and revalidate the exact modal immediately before UIA Invoke.
+        self._verify_confirmation(expected_name)
+        self._invoke_revalidated_button(answer, "Confirmation")
         _wait_for(
             lambda: self._confirmation_transition_complete(expected_name),
             15,
@@ -731,16 +815,63 @@ class WindowsScenario:
         )
         _write_step(self.steps, "confirmation_answered", fixture=expected_name, answer=answer)
 
-    def _stop_and_verify(self) -> None:
-        """Send V only after proving the loaded fixture is actively playing."""
+    def _assert_keyboard_ownership(self, target: Any) -> int:
+        """Fail closed unless Win32 and UIA still identify the exact player target."""
+        if self.identity is None:
+            raise BlockedError("keyboard target ownership is not established")
+        target_hwnd = _window_handle(target)
+        main_hwnd = _window_handle(self.main_window)
+        if not target_hwnd or not main_hwnd:
+            raise BlockedError("owned keyboard target or main window has no HWND")
+        if _win32_window_pid(target_hwnd) != self.identity.pid:
+            raise BlockedError("keyboard target HWND is not owned by the packaged player")
+        if _win32_window_pid(main_hwnd) != self.identity.pid:
+            raise BlockedError("main window HWND is not owned by the packaged player")
+        foreground_hwnd = _win32_foreground_window()
+        if _win32_window_pid(foreground_hwnd) != self.identity.pid:
+            raise BlockedError("foreground HWND is not owned by the packaged player")
+        if _win32_root_window(foreground_hwnd) != _win32_root_window(main_hwnd):
+            raise BlockedError("foreground top-level window is not the packaged player")
+        try:
+            focused = bool(target.has_keyboard_focus())
+        except Exception as exc:
+            raise BlockedError("UIA could not prove keyboard focus for the owned target") from exc
+        if not focused:
+            raise BlockedError("UIA target does not have keyboard focus immediately before send")
+        return target_hwnd
+
+    def _send_targeted_keys(self, target: Any, keys: str) -> int:
+        """Send source-grounded shortcuts to a validated player HWND only."""
         self._verify_process()
-        stop_buttons = [
-            control
-            for control in self.main_window.descendants(control_type="Button")
-            if getattr(control.element_info, "automation_id", "") == "stopButton"
-        ]
-        if len(stop_buttons) != 1:
-            raise ContractError(f"owned stopButton count is {len(stop_buttons)}, expected one")
+        try:
+            target.set_focus()
+        except Exception as exc:
+            raise BlockedError("could not request focus for the owned keyboard target") from exc
+        sequences = {
+            "V": ((0x0100, 0x56), (0x0101, 0x56)),  # StopAction, source default V
+            "Ctrl+Delete": (
+                (0x0100, 0x11),
+                (0x0100, 0x2E),
+                (0x0101, 0x2E),
+                (0x0101, 0x11),
+            ),  # MoveToTrashAction, source default Ctrl+Delete
+        }
+        try:
+            sequence = sequences[keys]
+        except KeyError as exc:
+            raise ContractError(f"unsupported targeted shortcut: {keys!r}") from exc
+        last_hwnd = 0
+        for message, virtual_key in sequence:
+            # Recheck HWND, PID, foreground root, and UIA focus immediately
+            # before every targeted Win32 message. A focus race remains a
+            # reason to block, never a reason to send globally.
+            last_hwnd = self._assert_keyboard_ownership(target)
+            _win32_send_key(last_hwnd, message, virtual_key)
+        return last_hwnd
+
+    def _stop_and_verify(self) -> None:
+        """Send V only after proving increasing playback and stable stopped zero."""
+        self._verify_process()
         sliders = [
             control
             for control in self.main_window.descendants()
@@ -749,7 +880,6 @@ class WindowsScenario:
         ]
         if len(sliders) != 1:
             raise ContractError(f"owned waveformSlider count is {len(sliders)}, expected one")
-        self.main_window.set_focus()
 
         def position() -> float | None:
             slider = sliders[0]
@@ -769,49 +899,54 @@ class WindowsScenario:
             value = position()
             if value is not None:
                 before_samples.append(value)
-                if value > 1e-6:
+                if len(before_samples) >= 3 and all(
+                    later > earlier + 1e-6
+                    for earlier, later in zip(before_samples[-3:], before_samples[-2:])
+                ):
                     break
             time.sleep(0.2)
-        if not before_samples or before_samples[-1] <= 1e-6:
+        if len(before_samples) < 3 or not all(
+            later > earlier + 1e-6
+            for earlier, later in zip(before_samples[-3:], before_samples[-2:])
+        ):
             raise BlockedError(
-                "could not establish active playback of the loaded fixtures before V; "
-                "zero position is ambiguous between stopped and paused"
+                "could not establish increasing playback of the loaded fixtures before V; "
+                "zero or a single nonzero position is ambiguous"
             )
 
-        from pywinauto.keyboard import send_keys
-        send_keys("v")
+        self._send_targeted_keys(self.main_window, "V")
         after_samples: list[float] = []
+        stable_zero_samples = 0
         deadline = time.monotonic() + 3
         while time.monotonic() < deadline:
             self._verify_process()
             value = position()
             if value is not None:
                 after_samples.append(value)
-                if abs(value) <= 1e-6 and len(after_samples) >= 2:
+                if abs(value) <= 1e-6:
+                    stable_zero_samples += 1
+                else:
+                    stable_zero_samples = 0
+                if stable_zero_samples >= 3:
                     _write_json(self.evidence / "player-stopped.json", {
                         "shortcut": "V",
-                        "stop_button_automation_id": "stopButton",
-                        "waveform_slider_automation_id": "waveformSlider",
-                        "pre_stop_position_samples": before_samples,
                         "position_samples": after_samples,
                         "verified": True,
-                        "verification_basis": "active fixture playback reset to stable zero after V",
+                        "verification_basis": "increasing fixture playback reset to repeated zero after targeted V",
                     })
                     _write_step(self.steps, "player_stopped", shortcut="V", position=value)
                     return
             time.sleep(0.2)
         raise BlockedError(
-            f"V did not establish a stable stopped zero position after active playback: "
+            f"targeted V did not establish repeated stopped zero after increasing playback: "
             f"before={before_samples!r}, after={after_samples!r}"
         )
 
     def _send_move_to_trash(self) -> None:
         self._verify_process()
         playlist = self._playlist()
-        playlist.set_focus()
-        from pywinauto.keyboard import send_keys
-        send_keys("^({DEL})")
-        _write_step(self.steps, "shortcut_sent", shortcut="Ctrl+Delete")
+        hwnd = self._send_targeted_keys(playlist, "Ctrl+Delete")
+        _write_step(self.steps, "shortcut_sent", shortcut="Ctrl+Delete", delivery="Win32 SendMessageW", hwnd=hwnd)
 
     def _prepare_portable_config(self, root: Path) -> None:
         data = root / "Data"
