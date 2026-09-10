@@ -81,9 +81,24 @@ class ArchiveContractTests(unittest.TestCase):
         self.assertEqual(args.package, Path("package.zip"))
         self.assertEqual(args.output, Path("evidence"))
         self.assertEqual(args.source_sha, SOURCE_SHA)
+        self.assertFalse(args.headless_audio)
+        self.assertTrue(probe.parse_args([
+            "--package", "package.zip", "--output", "evidence", "--source-sha", SOURCE_SHA,
+            "--headless-audio",
+        ]).headless_audio)
 
 
 class ShellAndVerdictContractTests(unittest.TestCase):
+    def test_headless_audio_shell_profile_is_explicit_opt_in(self):
+        executable = Path(r"C:\pkg\Nulloy.exe")
+        normal = probe.shell_command(executable)
+        headless = probe.shell_command(executable, headless_audio=True)
+        self.assertNotIn("GST_PLUGIN_FEATURE_RANK", normal)
+        self.assertIn("GST_PLUGIN_FEATURE_RANK=directsoundsink:0,waveformsink:0,wasapisink:0,wasapi2sink:0", headless)
+        self.assertEqual(probe.shell_verb_profile("run", executable).audio_mode, "device")
+        self.assertEqual(probe.shell_verb_profile("run", executable, headless_audio=True).audio_mode,
+                         "no-device-fallback")
+
     def test_shell_command_is_per_file_not_multi_open(self):
         command = probe.shell_command(Path(r"C:\pkg\Nulloy.exe"))
         self.assertIn('"%1"', command)
