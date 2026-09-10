@@ -1006,8 +1006,20 @@ def run_probe(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
         evidence["error_traceback"] = traceback.format_exc()
     finally:
         if runtime is not None:
-            evidence.update(runtime._cleanup_evidence())
-            evidence["cleanup_verified"] = bool(getattr(runtime, "cleanup_verified", False))
+            cleanup_evidence_failed = False
+            try:
+                evidence.update(runtime._cleanup_evidence())
+            except Exception as exc:
+                cleanup_evidence_failed = True
+                evidence.setdefault("cleanup_errors", []).append(
+                    f"cleanup evidence: {exc}"
+                )
+                evidence["cleanup_error_traceback"] = traceback.format_exc()
+                evidence["status"] = "FAIL"
+            evidence["cleanup_verified"] = (
+                False if cleanup_evidence_failed
+                else bool(getattr(runtime, "cleanup_verified", False))
+            )
         preserve_package = bool(
             runtime is not None
             and runtime.owned_player_processes

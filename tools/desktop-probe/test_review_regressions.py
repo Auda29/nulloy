@@ -57,10 +57,7 @@ class ReviewRegressions(unittest.TestCase):
                     raise RuntimeError("primary probe failure")
 
                 def _cleanup_evidence(self):
-                    return {
-                        "cleanup_errors": ["injected cleanup failure"],
-                        "process_cleanup_verified": False,
-                    }
+                    raise OSError("injected cleanup failure")
 
             with patch.object(probe, "extract_and_validate", return_value=package), \
                     patch.object(probe, "WindowsDesktopRun", FailingRuntime):
@@ -70,10 +67,10 @@ class ReviewRegressions(unittest.TestCase):
             self.assertEqual(evidence["status"], "FAIL")
             self.assertEqual(evidence["error"], "primary probe failure")
             self.assertIn("RuntimeError: primary probe failure", evidence["error_traceback"])
-            self.assertEqual(evidence["cleanup_errors"], ["injected cleanup failure"])
+            self.assertTrue(any("injected cleanup failure" in item for item in evidence["cleanup_errors"]))
             result = json.loads((output / "result.json").read_text(encoding="utf-8"))
             self.assertIn("RuntimeError: primary probe failure", result["error_traceback"])
-            self.assertEqual(result["cleanup_errors"], ["injected cleanup failure"])
+            self.assertTrue(any("injected cleanup failure" in item for item in result["cleanup_errors"]))
 
     def test_playlist_waits_for_two_stable_exact_snapshots(self):
         with tempfile.TemporaryDirectory() as tmp:
