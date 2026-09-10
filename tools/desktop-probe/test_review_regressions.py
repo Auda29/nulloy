@@ -21,6 +21,14 @@ class ReviewRegressions(unittest.TestCase):
             with self.assertRaises(probe.ContractError):
                 runtime._read_playlist_rows([Path('one.wav'), Path('two.wav')])
 
+    def test_explorer_hidden_extensions_map_exactly(self):
+        expected = ['desktop-probe-01.wav', 'desktop-probe-02.wav']
+        self.assertEqual(probe.explorer_row_names(['desktop-probe-01', 'desktop-probe-02'], expected), expected)
+        self.assertEqual(probe.explorer_row_names(expected, expected), expected)
+        for names in [['desktop-probe-01'], ['desktop-probe-01', 'unrelated'], ['desktop-probe-01', 'desktop-probe-01.wav']]:
+            with self.subTest(names=names), self.assertRaises(probe.ContractError):
+                probe.explorer_row_names(names, expected)
+
     def test_windows_path_aliases_rejected(self):
         for name in ['C:/escape.exe', 'file.exe:stream', 'CON', 'name.', 'name ', './ok.exe', 'a//b.exe']:
             with self.subTest(name=name), self.assertRaises(probe.ContractError):

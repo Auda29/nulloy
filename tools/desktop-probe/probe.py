@@ -278,6 +278,18 @@ def exact_playlist_rows(actual: Sequence[str], expected: Sequence[str]) -> bool:
     return True
 
 
+def explorer_row_names(display_names: Sequence[str], expected: Sequence[str]) -> list[str]:
+    """Map exact fixture names or hidden-extension labels, never substrings."""
+    mapped = []
+    for name in display_names:
+        matches = [base for base in expected if name in (base, Path(base).stem)]
+        if len(matches) != 1:
+            raise ContractError(f"ambiguous or unknown Explorer row: {name!r}")
+        mapped.append(matches[0])
+    exact_playlist_rows(mapped, expected)
+    return mapped
+
+
 def verdict(assertions: Sequence[bool], cleanup_verified: bool) -> str:
     return "PASS" if bool(assertions) and all(assertions) and cleanup_verified else "FAIL"
 
@@ -487,15 +499,11 @@ class WindowsDesktopRun:
             return None
 
     def _select_all_fixture_files(self) -> None:
-        expected_names = {path.name for path in self.fixture_directory.iterdir() if path.is_file()}
-        items = {
-            item.window_text(): item
-            for item in self.explorer_window.descendants(control_type="ListItem")
-            if item.window_text() in expected_names
-        }
-        if set(items) != expected_names:
-            raise RuntimeError(f"Explorer did not expose exactly the fixture rows: {sorted(items)}")
-        ordered = [items[path.name] for path in sorted(self.fixture_directory.iterdir())]
+        expected_names = sorted(path.name for path in self.fixture_directory.iterdir() if path.is_file())
+        controls = self.explorer_window.descendants(control_type="ListItem")
+        mapped = explorer_row_names([item.window_text() for item in controls], expected_names)
+        items = dict(zip(mapped, controls))
+        ordered = [items[name] for name in expected_names]
         ordered[0].click_input()
         for item in ordered[1:]:
             item.click_input(pressed="CTRL")
