@@ -1,6 +1,6 @@
 # Weiterarbeiten: Nulloy-Upstream-Stabilisierung
 
-Stand: 10. September 2026. PR #20 und #25 sind inzwischen in
+Stand: 10. September 2026. PR #20, #25 und #26 sind inzwischen in
 `integration/upstream-issues` integriert. Die alte Übergabe auf
 `docs/upstream-issue-register` ist ein historischer Snapshot, nicht mehr die
 empfohlene Entwicklungsbasis.
@@ -18,7 +18,7 @@ git pull --ff-only
 ```
 
 Zum Zeitpunkt der Bestandsaufnahme ist der Integrationscommit
-`01c48f3faa8e5cb00753b96bb087a37d4aa02726`. Unterstützende Folge-PRs können diesen
+`264b05ddbd732dcb6970d42bc5ab82adde5c5e1f`. Unterstützende Folge-PRs können diesen
 Stand später erweitern. Keine ungeprüften Resets, Force-Pushes oder automatischen
 Merges von offenen Drafts.
 
@@ -37,12 +37,15 @@ Die ursprünglichen 19 Swarm-PRs enthalten jetzt 16 Merges und 3 offene funktion
 Drafts. Neue Unterstützungs-PRs gehören nicht zu dieser ursprünglichen Zählung.
 `master` und Release-Tags wurden nicht freigegeben.
 
+PR #26 (separate Python-Pfadkorrektur) ist mit dem oben genannten Commit gemergt,
+ohne funktionale Draft-Änderungen. Die unveränderten berichteten Windows-Paket-IDs
+bleiben davon getrennt; siehe ACCEPTANCE_BASELINE.md.
+
 ## Offene Arbeit
 
 | PR | Thema | Nächster Schritt |
 | --- | --- | --- |
-| [#26](https://github.com/Auda29/nulloy/pull/26) | Separate Python-Pfadkorrektur | Review/CI; nicht nur im kombinierten Windows-Testbranch belassen |
-| [#15](https://github.com/Auda29/nulloy/pull/15) | Neuer Qt-Papierkorbadapter | Eigenständiger Review plus finale Mehrfach-/Duplikat-/Play/Pause/Stop-Abnahme; macOS bleibt offen |
+| [#15](https://github.com/Auda29/nulloy/pull/15) | Neuer Qt-Papierkorbadapter | Review-Test-/Dokufixes auf `774894c4eba7b646beafb38313fe0dc73cfb4671`; separater Linux-Vertrag berichtet 26 QtTest / 1 CTest. Finale Mehrfach-/Duplikat-/Play/Pause/Stop-Abnahme und macOS bleiben offen |
 | [#24](https://github.com/Auda29/nulloy/pull/24) | Explorer/IPC | Echte Explorer-Matrix und gezieltes Aufräumen des temporären Testmenüs |
 | [#16](https://github.com/Auda29/nulloy/pull/16) | Fenster | DPI, maximiert, weitere Skins; vorhandene ältere Slim-Abnahmen getrennt bewahren |
 
@@ -52,7 +55,7 @@ grüner CI. Vor jedem späteren Merge PR-Head und passende Review-/Testbelege pr
 
 ```sh
 gh pr list --repo Auda29/nulloy --base integration/upstream-issues --state all
-gh pr checks 26 --repo Auda29/nulloy
+gh pr view 26 --repo Auda29/nulloy --json state,headRefOid,mergeCommit
 # Einzelnen Draft ohne Integration auschecken:
 gh pr checkout 15
 ```

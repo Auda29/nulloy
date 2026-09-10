@@ -6,7 +6,7 @@ enthält Commit-IDs, gemeldete Prüfsummen und den abgefragten PR-Stand.
 
 ## Arbeitsbasis und getrennte Testbasis
 
-- Integration beim Snapshot: `01c48f3faa8e5cb00753b96bb087a37d4aa02726`.
+- Integration beim Snapshot: `264b05ddbd732dcb6970d42bc5ab82adde5c5e1f`.
 - PR #20 (Register/Übergabe) und #25 (Metadaten-/Shortcut-Tests) sind integriert.
 - Ursprünglicher Swarm #7–#25: 19 PRs, davon 16 gemergt und 3 funktionale Drafts.
   Neue unterstützende Folge-PRs werden nicht in diese historische Gruppe gezählt.
@@ -15,8 +15,9 @@ enthält Commit-IDs, gemeldete Prüfsummen und den abgefragten PR-Stand.
   Berichtsstand `81160a130ae0641fc8d9f220ec52fdec8fb9b863`.
   Er enthält zusätzlich die drei Drafts; **kein freigegebener Integrationsstand**.
 - Die kleine Python-Pfadkorrektur aus `f604c64ded4d9b44a39913b00f9a38317f7683cd`
-  wird unabhängig davon in [PR #26](https://github.com/Auda29/nulloy/pull/26)
-  übernommen. Keine funktionalen Draft-Änderungen in diesem PR.
+  wurde separat mit [PR #26](https://github.com/Auda29/nulloy/pull/26) integriert
+  (Merge `264b05ddbd732dcb6970d42bc5ab82adde5c5e1f`). Keine funktionalen
+  Draft-Änderungen in diesem PR.
 
 ## Paketidentität
 
@@ -64,9 +65,16 @@ freigegeben; native Abnahmen bleiben offen. Die Desktop-Verbindung dieser Sessio
 zeigt Linux, nicht den Windows-Testrechner. Kein Windows-Rechner wurde umkonfiguriert.
 
 - [PR #15](https://github.com/Auda29/nulloy/pull/15), Head
-  `212ba22b8df9d9ee3d8e8a8c7f0b8cdce00f3fc0`: Neuer Qt-Adapter benötigt eigenen
-  Review. Historische Linux-Mocks des alten Shell-Aufrufs belegen keine Sicherheit
-  dieses Adapters. Finale Playlistmatrix und Original-macOS-Fall bleiben offen.
+  `774894c4eba7b646beafb38313fe0dc73cfb4671`: Review-Nachbesserungen nur an Tests/
+  Dokumentation; Produktion unverändert gegenüber `212ba22b8df9d9ee3d8e8a8c7f0b8cdce00f3fc0`.
+  Der [separate Linux-Shared-Contract-Nachweis](https://github.com/Auda29/nulloy/pull/15#issuecomment-5616048127)
+  berichtet 26 QtTest-Ergebnisse und 1/1 CTest ohne Fehler/Skips, einschließlich
+  acht Cancellation-Boundary-Fällen. Hier nicht erneut ausgeführt; kein Windows-/
+  macOS-Nativnachweis und kein neues Paket. Die ursprünglichen Harness-Ergebnisse
+  und ihre damaligen Einschränkungen bleiben im Register unter `prior_test_evidence`;
+  der neue Nachweis steht separat unter `shared_contract_review_evidence`.
+  Historische Linux-Mocks des alten Shell-Aufrufs belegen keine Sicherheit des
+  neuen Qt-Adapters. Finale Playlistmatrix und Original-macOS-Fall bleiben offen.
 - [PR #24](https://github.com/Auda29/nulloy/pull/24): Explorer-Matrix offen;
   250-ms-Leerlauf/1000-ms-Grenze bleiben eine Heuristik. Keine spekulative
   Änderung ohne reproduziertes Fehlverhalten.

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "captured_at_utc": "2026-09-10T08:53:25.460309+00:00",
-  "integration_at_capture": "01c48f3faa8e5cb00753b96bb087a37d4aa02726",
+  "captured_at_utc": "2026-09-10T09:09:02Z",
+  "integration_at_capture": "264b05ddbd732dcb6970d42bc5ab82adde5c5e1f",
   "source_report": "https://github.com/Auda29/nulloy/blob/81160a130ae0641fc8d9f220ec52fdec8fb9b863/docs/upstream/WINDOWS_ACCEPTANCE.md",
   "evidence_policy": "Windows-Ergebnisse aus dem versionierten Bericht übernommen, hier nicht erneut ausgeführt. Hashwerte sind gemeldet, nicht an einem hier verfügbaren ZIP/EXE nachgerechnet. Kein Release.",
   "native_acceptance_deferred_by_user": true,
@@ -100,7 +100,7 @@
   "prs": {
     "15": {
       "headRefName": "fix/upstream-255",
-      "headRefOid": "212ba22b8df9d9ee3d8e8a8c7f0b8cdce00f3fc0",
+      "headRefOid": "774894c4eba7b646beafb38313fe0dc73cfb4671",
       "isDraft": true,
       "mergeCommit": null,
       "number": 15,
@@ -146,6 +146,17 @@
       "number": 25,
       "state": "MERGED",
       "url": "https://github.com/Auda29/nulloy/pull/25"
+    },
+    "26": {
+      "headRefName": "test/native-runner-path-portability",
+      "headRefOid": "17a21c0b001ad2a5ec3a24f5fd0e7c13bd1de5e3",
+      "isDraft": false,
+      "mergeCommit": {
+        "oid": "264b05ddbd732dcb6970d42bc5ab82adde5c5e1f"
+      },
+      "number": 26,
+      "state": "MERGED",
+      "url": "https://github.com/Auda29/nulloy/pull/26"
     }
   },
   "merge_policy": "Native funktionale Drafts #15/#16/#24 bleiben offen; keine Weitergabe ihrer Änderungen in integration ohne Abnahme. master/Release nicht freigegeben."
