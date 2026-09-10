@@ -1,4 +1,5 @@
 {
+  "automation_followup": "NATIVE_AUTOMATION_STATUS.md",
   "source_commit": "027d81a583b07457a4fa5f18b3e7dcca50b05b58",
   "source_document": "../UPSTREAM_ISSUES_ANALYSIS.md",
   "snapshot_sha256": "68a0e1e823be33199baa139b970f7aab51710c2fc648108077ee6a357be8648f",

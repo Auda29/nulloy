@@ -4,7 +4,7 @@
 
 Snapshot: 2026-09-10T08:53:25.460309+00:00. Ursprüngliche Swarm-PRs #7–#25: 16 gemergt, 3 offen. PR #20 (Register) und #25 (Metadaten) sind integriert. Weitere unterstützende Folge-PRs zählen nicht zu diesen 19 ursprünglichen PRs.
 
-Der [aktuelle Teststand](ACCEPTANCE_BASELINE.md) trennt das korrigierte Windows-ZIP, ältere interaktive EXE/Formatprüfung und offene Abnahmen. Native Abnahmen werden auf Nutzerwunsch vorerst nicht ausgeführt. Historische Audit- und Review-Dateien bleiben unverändert.
+Die [Paketbaseline](ACCEPTANCE_BASELINE.md) trennt das korrigierte Windows-ZIP, ältere interaktive EXE/Formatprüfung und offene Abnahmen. Die damalige Zurückstellung nativer Tests ist historisch: inzwischen sind automatisierte echte Windows-Tests auf entbehrlichen GitHub-Runnern freigegeben. Der [Folgestand der nativen Automation](NATIVE_AUTOMATION_STATUS.md) dokumentiert die offenen PRs #28/#29 und fehlgeschlagene Läufe; daraus folgt keine neue Paketabnahme. Historische Audit- und Review-Dateien bleiben unverändert.
 
 Quelle: [ursprüngliche Analyse](../UPSTREAM_ISSUES_ANALYSIS.md). Der Swarm hat die 80 aufgeführten Issues mit ihren 126 Kommentaren erneut abgerufen und bewertet. Issue-IDs, Kommentar-IDs und alle Einzelzählungen wurden programmatisch gegen den Rohsnapshot geprüft.
 

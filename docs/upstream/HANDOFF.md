@@ -1,6 +1,6 @@
 # Weiterarbeiten: Nulloy-Upstream-Stabilisierung
 
-Stand: 10. September 2026. PR #20, #25 und #26 sind inzwischen in
+Stand: 10. September 2026. PR #20, #25, #26 und #27 sind inzwischen in
 `integration/upstream-issues` integriert. Die alte Übergabe auf
 `docs/upstream-issue-register` ist ein historischer Snapshot, nicht mehr die
 empfohlene Entwicklungsbasis.
@@ -18,7 +18,7 @@ git pull --ff-only
 ```
 
 Zum Zeitpunkt der Bestandsaufnahme ist der Integrationscommit
-`264b05ddbd732dcb6970d42bc5ab82adde5c5e1f`. Unterstützende Folge-PRs können diesen
+`919468efc32f4d038c96d7276a799794dab2e86e`. Unterstützende Folge-PRs können diesen
 Stand später erweitern. Keine ungeprüften Resets, Force-Pushes oder automatischen
 Merges von offenen Drafts.
 
@@ -37,7 +37,7 @@ Die ursprünglichen 19 Swarm-PRs enthalten jetzt 16 Merges und 3 offene funktion
 Drafts. Neue Unterstützungs-PRs gehören nicht zu dieser ursprünglichen Zählung.
 `master` und Release-Tags wurden nicht freigegeben.
 
-PR #26 (separate Python-Pfadkorrektur) ist mit dem oben genannten Commit gemergt,
+PR #26 (separate Python-Pfadkorrektur) ist mit `264b05ddbd732dcb6970d42bc5ab82adde5c5e1f` gemergt,
 ohne funktionale Draft-Änderungen. Die unveränderten berichteten Windows-Paket-IDs
 bleiben davon getrennt; siehe ACCEPTANCE_BASELINE.md.
 
@@ -49,9 +49,12 @@ bleiben davon getrennt; siehe ACCEPTANCE_BASELINE.md.
 | [#24](https://github.com/Auda29/nulloy/pull/24) | Explorer/IPC | Echte Explorer-Matrix und gezieltes Aufräumen des temporären Testmenüs |
 | [#16](https://github.com/Auda29/nulloy/pull/16) | Fenster | DPI, maximiert, weitere Skins; vorhandene ältere Slim-Abnahmen getrennt bewahren |
 
-Der Nutzer hat native Abnahmen aktuell zurückgestellt. Nur automatisierbare
-Arbeit läuft weiter. Die drei funktionalen Drafts bleiben daher offen, auch bei
-grüner CI. Vor jedem späteren Merge PR-Head und passende Review-/Testbelege prüfen.
+Der Nutzer kann nicht manuell testen; automatisierte echte native Tests auf
+entbehrlichen GitHub-Windows-Runnern sind inzwischen freigegeben. Sie laufen in
+Draft PR #28, während Draft PR #29 einen dabei gefundenen Start-/IPC-Fehler
+separat bearbeitet. Siehe [Folgestand und Paketidentität](NATIVE_AUTOMATION_STATUS.md).
+Die drei funktionalen Drafts bleiben ohne ihre vollständige Abnahme offen, auch
+bei grüner CI. Vor jedem späteren Merge PR-Head und passende Review-/Testbelege prüfen.
 
 ```sh
 gh pr list --repo Auda29/nulloy --base integration/upstream-issues --state all
