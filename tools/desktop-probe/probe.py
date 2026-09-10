@@ -620,7 +620,14 @@ class WindowsDesktopRun:
                 title = window.window_text()
                 if info.class_name not in ("CabinetWClass", "ExploreWClass") or name not in title:
                     continue
-                if self._explorer_address_path(window) != expected_path:
+                actual_path = self._explorer_address_path(window)
+                if getattr(self, "evidence", None) is not None:
+                    _write_json(self.evidence / "explorer-discovery.json", {
+                        "expected_path": expected_path, "actual_path": actual_path,
+                        "title": title, "handle": getattr(window, "handle", None),
+                    })
+                    _dump_uia(window, self.evidence / "explorer-discovery-uia.jsonl")
+                if actual_path != expected_path:
                     continue
                 handle = getattr(window, "handle", None)
                 if self.explorer_identity is not None and (
