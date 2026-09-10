@@ -151,6 +151,50 @@ class ReviewRegressions(unittest.TestCase):
             with self.assertRaises(probe.ContractError):
                 probe.fixture_playlist_names(wrong, expected)
 
+    def test_player_discovery_records_branch_without_weakening_selection(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = object.__new__(probe.WindowsDesktopRun)
+            runtime.evidence = Path(tmp)
+            main = Control(class_name="NMainWindow")
+            for candidates, branch in [([], "no-main"), ([main], "selected-main"),
+                                       ([main, Control(class_name="NMainWindow")], "multiple-main")]:
+                with patch.object(runtime, "_owned_player_windows", return_value=candidates):
+                    result = runtime._find_player()
+                self.assertIs(result, main if branch == "selected-main" else None)
+            with patch.object(runtime, "_owned_player_windows", side_effect=RuntimeError("UIA unavailable")):
+                self.assertIsNone(runtime._find_player())
+            records = [json.loads(line) for line in (Path(tmp) / "player-discovery.jsonl").read_text().splitlines()]
+            self.assertEqual([r["branch"] for r in records],
+                             ["no-main", "selected-main", "multiple-main", "exception"])
+            self.assertEqual([r.get("main_count") for r in records[:3]], [0, 1, 2])
+            self.assertIn("UIA unavailable", records[-1]["exception"])
+
+    def test_discovery_logs_invisible_and_broken_owned_windows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = object.__new__(probe.WindowsDesktopRun)
+            runtime.evidence = Path(tmp)
+            runtime.owned_player_processes = [probe.ProcessIdentity(17, 123.5, "player.exe")]
+            process = SimpleNamespace(pid=17, create_time=lambda: 123.5, exe=lambda: "player.exe")
+            runtime.psutil = SimpleNamespace(Process=lambda pid: process, NoSuchProcess=ProcessLookupError)
+            runtime.player_window = None
+            invisible = Control(class_name="NMainWindow")
+            invisible.element_info.process_id = 17
+            invisible.handle = 55
+            invisible.is_visible = lambda: False
+            broken = Control(class_name="NMainWindow")
+            broken.element_info.process_id = 17
+            broken.handle = 56
+            def broken_visibility():
+                raise OSError("UIA visibility failed")
+            broken.is_visible = broken_visibility
+            runtime.desktop = SimpleNamespace(windows=lambda: [invisible, broken])
+            self.assertIsNone(runtime._find_player())
+            record = json.loads((Path(tmp) / "player-discovery.jsonl").read_text())
+            self.assertEqual(record["branch"], "no-main")
+            self.assertTrue(record["processes"][0]["matches"])
+            self.assertFalse(record["candidates"][0]["visible"])
+            self.assertIn("UIA visibility failed", record["candidates"][1]["exception"])
+
     def test_player_cleanup_closes_owned_main_window_and_dialog(self):
         class Window(Control):
             def __init__(self, name):

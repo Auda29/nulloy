@@ -672,12 +672,23 @@ class WindowsDesktopRun:
         return None
 
     def _find_player(self) -> Any:
+        poll: dict[str, Any] = {"monotonic": time.monotonic(), "processes": [], "candidates": []}
+        self._player_discovery_poll = poll
         try:
             mains = [window for window in self._owned_player_windows()
                      if window.element_info.class_name == "NMainWindow"]
+            poll["main_count"] = len(mains)
+            poll["branch"] = ("selected-main" if len(mains) == 1
+                              else "multiple-main" if mains else "no-main")
             return mains[0] if len(mains) == 1 else None
-        except Exception:
+        except Exception as exc:
+            poll.update(branch="exception", exception=repr(exc), traceback=traceback.format_exc())
             return None
+        finally:
+            self._player_discovery_poll = None
+            if getattr(self, "evidence", None) is not None:
+                with (self.evidence / "player-discovery.jsonl").open("a", encoding="utf-8") as stream:
+                    stream.write(json.dumps(poll) + "\n")
 
     def _find_explorer_items_view(self) -> Any:
         matches = []
@@ -796,12 +807,19 @@ class WindowsDesktopRun:
         if not self.owned_player_processes or self.psutil is None:
             return []
         owned_pids: set[int] = set()
+        poll = getattr(self, "_player_discovery_poll", None)
         for identity in self.owned_player_processes:
+            observed = dataclasses.asdict(identity)
+            if poll is not None:
+                poll["processes"].append(observed)
             try:
                 process = self.psutil.Process(identity.pid)
-                if process_identity_matches(process, identity):
+                matches = process_identity_matches(process, identity)
+                observed["matches"] = matches
+                if matches:
                     owned_pids.add(identity.pid)
-            except (self.psutil.NoSuchProcess, OSError, ValueError):
+            except (self.psutil.NoSuchProcess, OSError, ValueError) as exc:
+                observed["exception"] = repr(exc)
                 continue
         if not owned_pids:
             return []
@@ -815,17 +833,32 @@ class WindowsDesktopRun:
         windows: list[Any] = []
         seen: set[int] = set()
         for window in candidates:
+            observed_window: dict[str, Any] = {}
+            if poll is not None:
+                poll["candidates"].append(observed_window)
             try:
                 process_id = int(getattr(window.element_info, "process_id", 0))
+                observed_window["pid"] = process_id
+                observed_window["owned"] = process_id in owned_pids
                 if process_id not in owned_pids:
                     continue
-                if hasattr(window, "is_visible") and not window.is_visible():
+                visible = window.is_visible() if hasattr(window, "is_visible") else True
+                observed_window["visible"] = visible
+                if poll is not None:
+                    for key, value in (("hwnd", window), ("class_name", window.element_info),
+                                       ("control_type", window.element_info), ("automation_id", window.element_info)):
+                        try:
+                            observed_window[key] = getattr(value, "handle" if key == "hwnd" else key, None)
+                        except Exception as exc:
+                            observed_window[key + "_error"] = repr(exc)
+                if not visible:
                     continue
                 marker = getattr(window, "handle", None) or id(window)
                 if marker not in seen:
                     seen.add(marker)
                     windows.append(window)
-            except (AttributeError, TypeError, ValueError, OSError):
+            except (AttributeError, TypeError, ValueError, OSError) as exc:
+                observed_window["exception"] = repr(exc)
                 continue
         if self.player_window in windows:
             windows.remove(self.player_window)
