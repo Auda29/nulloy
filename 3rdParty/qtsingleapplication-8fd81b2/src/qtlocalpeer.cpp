@@ -181,8 +181,13 @@ void QtLocalPeer::receiveConnection()
     if (!socket)
         return;
 
-    while (socket->bytesAvailable() < (int)sizeof(quint32))
-        socket->waitForReadyRead();
+    while (socket->bytesAvailable() < (int)sizeof(quint32)) {
+        if (!socket->waitForReadyRead(2000)) {
+            qWarning("QtLocalPeer: Incomplete message header: %s", qPrintable(socket->errorString()));
+            delete socket;
+            return;
+        }
+    }
     QDataStream ds(socket);
     QByteArray uMsg;
     quint32 remaining;

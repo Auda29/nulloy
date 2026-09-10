@@ -3,6 +3,8 @@
 #include <QApplication>
 #include <QElapsedTimer>
 #include <QProcess>
+#include <QLocalServer>
+#include <QLocalSocket>
 #include <QThread>
 #include <QTimer>
 #include <QUuid>
@@ -86,6 +88,33 @@ private:
     }
 
 private slots:
+    void disconnectedClientWithoutHeaderDoesNotBlockPrimary()
+    {
+        const QString id = uniqueId();
+        QProcess primary;
+        QByteArray output;
+        launchPrimary(primary, id, 0, 1000);
+        QVERIFY(primary.waitForStarted(3000));
+        QVERIFY(waitForOutput(primary, "LOOP_START", 3000, output));
+        const QByteArray prefix("SOCKET=");
+        const int start = output.indexOf(prefix);
+        QVERIFY(start >= 0);
+        const int valueStart = start + prefix.size();
+        const QByteArray address = output.mid(valueStart).split('\n').first().trimmed();
+        QLocalSocket client;
+        client.connectToServer(QString::fromUtf8(address));
+        QVERIFY(client.waitForConnected(1000));
+        client.disconnectFromServer();
+        if (client.state() != QLocalSocket::UnconnectedState)
+            QVERIFY(client.waitForDisconnected(1000));
+        QByteArray remainder;
+        QVERIFY2(finish(primary, remainder, 4000), "empty disconnected client blocked primary event loop");
+        output += remainder;
+        QCOMPARE(primary.exitStatus(), QProcess::NormalExit);
+        QCOMPARE(primary.exitCode(), 0);
+        QCOMPARE(receivedCount(output), 0);
+    }
+
     void fastPrimaryForwardsOnceWithoutStartingPlayer()
     {
         const QString id = uniqueId();
@@ -193,6 +222,8 @@ int runPrimary(int argc, char **argv)
     QtSingleApplication app(id, argc, argv);
     if (app.isRunning())
         return 2;
+
+    QTextStream(stdout) << "SOCKET=" << app.findChild<QLocalServer *>()->serverName() << Qt::endl;
 
     QStringList received;
     QObject::connect(&app, &QtSingleApplication::messageReceived,

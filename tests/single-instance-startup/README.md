@@ -7,6 +7,7 @@ secondary subprocesses.
 
 It covers:
 
+- a client that disconnects without sending a frame header: the primary must return to its event loop and exit normally without emitting a message;
 - a fast primary that acknowledges one forwarded message;
 - a primary that starts processing late, making the secondary's bounded
   acknowledgement wait ambiguous: the secondary exits nonzero, does not start
