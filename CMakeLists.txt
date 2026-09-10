@@ -224,4 +224,5 @@ if(BUILD_TESTING)
         set_tests_properties(${test} PROPERTIES WORKING_DIRECTORY "${NULLOY_TEST_DIR}" TIMEOUT 120 RUN_SERIAL TRUE
             ENVIRONMENT "QT_QPA_PLATFORM=windows")
     endforeach()
+    add_subdirectory(tests/single-instance-startup)
 endif()

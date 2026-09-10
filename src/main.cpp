@@ -18,6 +18,7 @@
 #include "common.h"
 #include "player.h"
 #include "settings.h"
+#include "singleInstanceStartup.h"
 
 #if !defined(_N_NO_SKINS_) && QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 #include "skinFileSystem.h"
@@ -168,9 +169,13 @@ int main(int argc, char *argv[])
     // construct message
     QString msg = (options + files).join(MSG_SPLITTER);
     if (NSettings::instance()->value("SingleInstance").toBool()) {
-        // try to send it to an already running instrance
-        if (instance.sendMessage(msg)) {
-            return 0; // return if delivered
+        const auto startup = singleInstanceStartup(instance, msg);
+        if (startup == SingleInstanceStartupResult::MessageDelivered) {
+            return 0;
+        }
+        if (startup == SingleInstanceStartupResult::MessageDeliveryFailed) {
+            print_err("A running Nulloy instance did not acknowledge the startup message; no second player was started");
+            return 1;
         }
     }
 
