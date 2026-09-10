@@ -130,7 +130,7 @@ jobs:
           python-version: '3.12'
       - name: Install desktop automation tools
         shell: pwsh
-        run: python -m pip install pywinauto==0.6.9 Pillow==11.3.0
+        run: python -m pip install pywinauto==0.6.9 Pillow==11.3.0 psutil==7.0.0
       - name: Test probe contracts
         shell: pwsh
         run: python -m unittest discover -s tools/desktop-probe -p 'test_*.py' -v

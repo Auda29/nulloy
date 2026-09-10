@@ -36,7 +36,7 @@ The probe writes evidence even when blocked or failed. Typical files are:
 - `result.json`, `status.txt`
 - `archive.sha256`, `executable.sha256`
 - `desktop-preflight.png`
-- `explorer-before.png`, `explorer-failure.png`, `explorer-uia.jsonl`
+- `explorer-before.png`, `explorer-selection.png`, `explorer-selection-uia.jsonl`, `explorer-failure.png`, `explorer-uia.jsonl`
 - `player.png`, `player-failure.png`, `player-uia.jsonl`, `player-uia-failure.jsonl`
 - `explorer-selection.txt`, `playlist-rows.txt`, `playlist-row-observations.jsonl`
 

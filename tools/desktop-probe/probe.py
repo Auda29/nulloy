@@ -758,35 +758,45 @@ class WindowsDesktopRun:
         return True
 
     def _owned_player_windows(self) -> list[Any]:
-        windows = []
-        seen: set[int] = set()
-        owned_pids = {identity.pid for identity in self.owned_player_processes}
-        if self.desktop is not None and owned_pids:
+        """Return visible windows for a currently revalidated owned player PID."""
+        if not self.owned_player_processes or self.psutil is None:
+            return []
+        owned_pids: set[int] = set()
+        for identity in self.owned_player_processes:
             try:
-                windows.extend(
-                    window for window in self.desktop.windows()
-                    if getattr(window.element_info, "process_id", None) in owned_pids
-                )
-            except Exception:
-                pass
+                process = self.psutil.Process(identity.pid)
+                if process_identity_matches(process, identity):
+                    owned_pids.add(identity.pid)
+            except (self.psutil.NoSuchProcess, OSError, ValueError):
+                continue
+        if not owned_pids:
+            return []
+
+        candidates: list[Any] = []
         if self.player_window is not None:
-            windows.append(self.player_window)
-        unique = []
-        for window in windows:
+            candidates.append(self.player_window)
+        if self.desktop is None:
+            raise RuntimeError("UIA desktop is unavailable while closing owned player windows")
+        candidates.extend(self.desktop.windows())
+        windows: list[Any] = []
+        seen: set[int] = set()
+        for window in candidates:
             try:
-                if not window.is_visible():
+                process_id = int(getattr(window.element_info, "process_id", 0))
+                if process_id not in owned_pids:
                     continue
-            except Exception:
-                pass
-            handle = getattr(window, "handle", None)
-            marker = handle if handle is not None else id(window)
-            if marker not in seen:
-                seen.add(marker)
-                unique.append(window)
-        if self.player_window in unique:
-            unique.remove(self.player_window)
-            unique.append(self.player_window)
-        return unique
+                if hasattr(window, "is_visible") and not window.is_visible():
+                    continue
+                marker = getattr(window, "handle", None) or id(window)
+                if marker not in seen:
+                    seen.add(marker)
+                    windows.append(window)
+            except (AttributeError, TypeError, ValueError, OSError):
+                continue
+        if self.player_window in windows:
+            windows.remove(self.player_window)
+            windows.append(self.player_window)
+        return windows
 
     def _cleanup_player(self) -> bool:
         cleanup_ok = True
@@ -847,6 +857,10 @@ class WindowsDesktopRun:
                 self.explorer_window.capture_as_image(), self.evidence / "explorer-before.png"
             )
             self._select_all_fixture_files()
+            _capture_image(
+                self.explorer_window.capture_as_image(), self.evidence / "explorer-selection.png"
+            )
+            _dump_uia(self.explorer_window, self.evidence / "explorer-selection-uia.jsonl")
             self.explorer_window.type_keys("+{F10}")
             menu_item = _wait_for(
                 lambda: next(

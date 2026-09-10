@@ -152,6 +152,71 @@ class ReviewRegressions(unittest.TestCase):
         self.assertTrue(main.closed)
         self.assertTrue(dialog.closed)
 
+    def test_execute_captures_selected_explorer_evidence_before_invoking_verb(self):
+        events = []
+
+        class Image:
+            pass
+
+        class Explorer(Control):
+            def set_focus(self):
+                pass
+
+            def capture_as_image(self):
+                return Image()
+
+            def type_keys(self, keys):
+                events.append("invoke")
+
+        class MenuItem:
+            def click_input(self):
+                pass
+
+        class Player(Control):
+            def capture_as_image(self):
+                return Image()
+
+        runtime = object.__new__(probe.WindowsDesktopRun)
+        runtime.run_id = "run"
+        runtime.evidence = Path(tempfile.mkdtemp())
+        runtime.package = SimpleNamespace(executable=Path("Nulloy.exe"))
+        runtime.profile = probe.shell_verb_profile("run", Path("Nulloy.exe"))
+        runtime.headless_audio = False
+        runtime.explorer_window = None
+        runtime.player_window = None
+        runtime.desktop = SimpleNamespace(windows=lambda: [])
+        runtime.cleanup_verified = False
+        runtime.cleanup_errors = []
+        runtime.owned_player_processes = []
+        runtime.process_cleanup_verified = True
+        runtime.registry_key_created = False
+        runtime.explorer_launch_started = False
+        runtime.explorer_identity = None
+        runtime.playlist_control_identity = None
+        runtime.preflight = lambda: None
+
+        def capture(image, path):
+            events.append(path.name)
+
+        with patch.object(probe, "_app_environment", return_value={"PATH": "C:\\\\Windows\\\\System32"}), \
+                patch.object(probe, "_make_fixtures", return_value=[Path("one.wav")]), \
+                patch.object(probe.subprocess, "Popen"), \
+                patch.object(probe, "_wait_for", side_effect=[Explorer("fixtures"), MenuItem(), True, Player()]), \
+                patch.object(probe, "_capture_image", side_effect=capture), \
+                patch.object(probe, "_dump_uia", side_effect=lambda window, path: events.append(path.name)), \
+                patch.object(runtime, "preflight"), \
+                patch.object(runtime, "_registry_install"), \
+                patch.object(runtime, "_select_all_fixture_files", side_effect=lambda: events.append("select")), \
+                patch.object(runtime, "_read_playlist_rows", return_value=["one.wav"]), \
+                patch.object(runtime, "_cleanup_player", return_value=True), \
+                patch.object(runtime, "_cleanup_explorer", return_value=True), \
+                patch.object(runtime, "_registry_cleanup", return_value=True), \
+                patch.object(probe.shutil, "rmtree"):
+            runtime.execute()
+
+        self.assertLess(events.index("explorer-selection.png"), events.index("invoke"))
+        self.assertLess(events.index("explorer-selection-uia.jsonl"), events.index("invoke"))
+
     def test_extra_playlist_row_must_not_be_filtered_out(self):
         with tempfile.TemporaryDirectory() as tmp:
             runtime = object.__new__(probe.WindowsDesktopRun)
