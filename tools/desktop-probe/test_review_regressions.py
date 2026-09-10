@@ -330,6 +330,28 @@ class ReviewRegressions(unittest.TestCase):
             self.assertIs(runtime._find_explorer(), right)
             self.assertEqual(runtime.explorer_identity, (2, str(fixture_directory).casefold()))
 
+    def test_explorer_accepts_short_path_only_with_same_filesystem_identity(self):
+        short = r"C:\Users\RUNNER~1\Temp\fixtures-run"
+        long = r"C:\Users\runneradmin\Temp\fixtures-run"
+        runtime = object.__new__(probe.WindowsDesktopRun)
+        runtime.fixture_directory = Path(short)
+        runtime.explorer_identity = None
+        window = Control(name=str(runtime.fixture_directory.name),
+                         children=[Control(f"Address: {long}")],
+                         class_name="CabinetWClass")
+        window.handle = 9
+        runtime.desktop = SimpleNamespace(windows=lambda: [window])
+        with patch.object(probe.os.path, "samefile", return_value=True) as samefile:
+            self.assertIs(runtime._find_explorer(), window)
+            samefile.assert_called_once_with(long.casefold(), short.casefold())
+        with patch.object(probe.os.path, "samefile", return_value=False):
+            self.assertIsNone(runtime._find_explorer())
+        with patch.object(probe.os.path, "samefile", side_effect=OSError("unavailable")):
+            self.assertIsNone(runtime._find_explorer())
+        window.handle = 10
+        with patch.object(probe.os.path, "samefile", return_value=True):
+            self.assertIsNone(runtime._find_explorer())
+
     def test_selection_api_failure_blocks_instead_of_continuing(self):
         class BrokenItem(Control):
             def click_input(self, **kwargs):

@@ -627,7 +627,10 @@ class WindowsDesktopRun:
                         "title": title, "handle": getattr(window, "handle", None),
                     })
                     _dump_uia(window, self.evidence / "explorer-discovery-uia.jsonl")
-                if actual_path != expected_path:
+                if actual_path is None or (
+                    actual_path != expected_path
+                    and not os.path.samefile(actual_path, expected_path)
+                ):
                     continue
                 handle = getattr(window, "handle", None)
                 if self.explorer_identity is not None and (
