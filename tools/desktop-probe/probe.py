@@ -87,7 +87,12 @@ def _relative_manifest_path(value: str, field: str) -> str:
     if not isinstance(value, str) or not value:
         raise ContractError(f"{field} must be a non-empty relative path")
     path = PurePosixPath(value)
-    if path.is_absolute() or ".." in path.parts or "\\" in value:
+    reserved = re.compile(r"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)", re.I)
+    if (path.is_absolute() or ".." in path.parts or "\\" in value
+            or path.as_posix() != value or value == "."
+            or any(re.search(r'[<>:"|?*\x00-\x1f]', part)
+                   or part.endswith((".", " ")) or reserved.match(part)
+                   for part in path.parts)):
         raise ContractError(f"unsafe {field}: {value!r}")
     return path.as_posix()
 
@@ -145,19 +150,20 @@ def validate_archive_members(members: Iterable[str], root: str) -> None:
     for member in members:
         if not isinstance(member, str) or not member or member.startswith(("/", "\\")):
             raise ContractError(f"unsafe archive member: {member!r}")
+        _relative_manifest_path(member.rstrip("/"), "archive member")
         path = PurePosixPath(member)
         if ".." in path.parts or "\\" in member:
             raise ContractError(f"unsafe archive member: {member!r}")
         normalized = path.as_posix()
         if normalized.endswith("/"):
             normalized = normalized.rstrip("/")
-        if normalized in seen:
+        if normalized.casefold() in seen:
             raise ContractError(f"duplicate archive member: {member!r}")
-        seen.add(normalized)
+        seen.add(normalized.casefold())
         if not (normalized == root or normalized.startswith(root + "/")):
             raise ContractError(f"archive member outside package root: {member!r}")
     manifest_name = root + "/package-manifest.json"
-    if manifest_name not in seen:
+    if manifest_name.casefold() not in seen:
         raise ContractError("archive does not contain package-manifest.json")
 
 
@@ -514,7 +520,7 @@ class WindowsDesktopRun:
             names = [item.window_text() for item in control.descendants(control_type="ListItem")]
             matches = [name for name in names if any(base in name for base in expected_names)]
             if matches:
-                candidates = matches
+                candidates = names
                 break
         if not candidates:
             # Keep a useful artifact even when UIA exposes an unexpected control type.
@@ -536,7 +542,7 @@ class WindowsDesktopRun:
         self.preflight()
         environment = _app_environment()
         temp_root = Path(tempfile.mkdtemp(prefix=f"nulloy-desktop-probe-{self.run_id}-"))
-        self.fixture_directory = temp_root / "fixtures"
+        self.fixture_directory = temp_root / f"fixtures-{self.run_id}"
         fixtures: list[Path] = []
         try:
             fixtures = _make_fixtures(self.fixture_directory)
@@ -656,7 +662,7 @@ def run_probe(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
             )
             runtime = WindowsDesktopRun(package, output, run_id)
             runtime_result = runtime.execute()
-            evidence["assertions"] = runtime_result["assertions"]
+            evidence.update(runtime_result)
             evidence["cleanup_verified"] = bool(runtime.cleanup_verified)
             assertions = list(runtime_result["assertions"].values())
             evidence["status"] = verdict(assertions, runtime.cleanup_verified)
