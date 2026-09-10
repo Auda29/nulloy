@@ -9,15 +9,29 @@ It covers:
 
 - a client that disconnects without sending a frame header: the primary must return to its event loop and exit normally without emitting a message;
 - a fast primary that acknowledges one forwarded message;
-- a primary that starts processing late, making the secondary's bounded
-  acknowledgement wait ambiguous: the secondary exits nonzero, does not start
-a player, and the primary receives the message exactly once;
+- a deterministic delayed-acknowledgement failure: a primary is held outside
+  its event loop behind a unique `QTemporaryDir` release file until the
+  secondary has exited, so the secondary must report `IPC_FAILED` and must not
+  start a player; after release, the primary must exit normally and may have
+  received zero or one copy of the message;
+- a separate deterministic delayed-but-within-budget forward: releasing the
+  primary before the secondary's bounded wait expires must produce exactly one
+  received message, a successful forward, and no second player;
 - first launch becoming primary; and
 - `SingleInstance` disabled, where a second process still starts.
 
-The test proves the startup policy and QtLocalPeer interaction only. It does
-not identify the Windows cause of the original startup symptom and is not an
-Explorer or Windows acceptance harness.
+The zero-or-one assertion in the failure case is intentional. A secondary
+that timed out waiting for an acknowledgement cannot establish lossless file
+open delivery, even if the primary later receives the already-written frame.
+Only the separate successful delayed case asserts an exact-once delivery
+contract. The test does not identify the Windows cause of the original startup
+symptom, does not exercise native application wiring, and is not an Explorer
+or Windows acceptance harness; those remain open.
+
+The subprocesses use RAII cleanup and bounded waits so a failed assertion does
+not leave a running `QProcess` behind. The release files are unique per test,
+are passed as arguments, and are removed by `QTemporaryDir` cleanup; no global
+environment or shared control state is used.
 
 ## Run
 
@@ -28,5 +42,9 @@ flock /home/hermes/workspace/nulloy-swarm/build.lock \
 flock /home/hermes/workspace/nulloy-swarm/build.lock \
   cmake --build tests/single-instance-startup/build -j1
 QT_QPA_PLATFORM=offscreen \
-  tests/single-instance-startup/build/testSingleInstanceStartup
+  tests/single-instance-startup/build/testSingleInstanceStartup \
+  -o tests/single-instance-startup/build/testSingleInstanceStartup-results.txt,txt
 ```
+
+CTest uses the same `-o` report path and the test target retains the Windows
+`UNICODE`/`_UNICODE` definitions used by the production build.

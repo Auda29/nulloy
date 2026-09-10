@@ -2,9 +2,11 @@
 #include <QtTest>
 #include <QApplication>
 #include <QElapsedTimer>
+#include <QFile>
 #include <QProcess>
 #include <QLocalServer>
 #include <QLocalSocket>
+#include <QTemporaryDir>
 #include <QThread>
 #include <QTimer>
 #include <QUuid>
@@ -35,7 +37,47 @@ bool waitForOutput(QProcess &process, const QByteArray &marker, int timeout,
         process.waitForReadyRead(qMin(remaining, 50));
     }
     output += process.readAllStandardOutput();
-    return output.contains(marker);
+    if (output.contains(marker))
+        return true;
+    qWarning().noquote() << "child output marker timed out:" << marker
+                         << "program=" << process.program()
+                         << "error=" << process.errorString()
+                         << "stderr=" << process.readAllStandardError();
+    return false;
+}
+
+class ChildProcessCleanup
+{
+public:
+    explicit ChildProcessCleanup(QProcess &process)
+        : m_process(process)
+    {
+    }
+
+    ~ChildProcessCleanup()
+    {
+        if (m_process.state() == QProcess::NotRunning)
+            return;
+        qWarning().noquote() << "terminating child during test cleanup:"
+                             << m_process.program() << m_process.arguments()
+                             << "error=" << m_process.errorString()
+                             << "stderr=" << m_process.readAllStandardError();
+        m_process.kill();
+        if (!m_process.waitForFinished(3000))
+            qWarning().noquote() << "child did not terminate during test cleanup:"
+                                 << m_process.program() << m_process.arguments();
+    }
+
+private:
+    QProcess &m_process;
+};
+
+bool releaseBarrier(const QString &path)
+{
+    QFile release(path);
+    if (!release.open(QIODevice::WriteOnly))
+        return false;
+    return release.write("release\n") == 8;
 }
 
 class SingleInstanceStartupTest : public QObject
@@ -52,10 +94,13 @@ private:
         process.setProcessEnvironment(environment);
     }
 
-    void launchPrimary(QProcess &process, const QString &id, int delayMs, int runMs)
+    void launchPrimary(QProcess &process, const QString &id, int runMs,
+                       const QString &releasePath = QString())
     {
-        setupProcess(process, {QStringLiteral("--primary"), id,
-                               QString::number(delayMs), QString::number(runMs)});
+        QStringList arguments {QStringLiteral("--primary"), id, QString::number(runMs)};
+        if (!releasePath.isEmpty())
+            arguments << releasePath;
+        setupProcess(process, arguments);
         process.start();
     }
 
@@ -69,8 +114,13 @@ private:
 
     static bool finish(QProcess &process, QByteArray &output, int timeout = 5000)
     {
-        if (!process.waitForFinished(timeout))
+        if (!process.waitForFinished(timeout)) {
+            qWarning().noquote() << "child did not finish:" << process.program()
+                                 << process.arguments() << "state=" << process.state()
+                                 << "error=" << process.errorString()
+                                 << "stderr=" << process.readAllStandardError();
             return false;
+        }
         output = process.readAllStandardOutput();
         return true;
     }
@@ -92,9 +142,10 @@ private slots:
     {
         const QString id = uniqueId();
         QProcess primary;
+        ChildProcessCleanup primaryCleanup(primary);
         QByteArray output;
-        launchPrimary(primary, id, 0, 1000);
-        QVERIFY(primary.waitForStarted(3000));
+        launchPrimary(primary, id, 1000);
+        QVERIFY2(primary.waitForStarted(3000), qPrintable(primary.errorString()));
         QVERIFY(waitForOutput(primary, "LOOP_START", 3000, output));
         const QByteArray prefix("SOCKET=");
         const int start = output.indexOf(prefix);
@@ -103,7 +154,7 @@ private slots:
         const QByteArray address = output.mid(valueStart).split('\n').first().trimmed();
         QLocalSocket client;
         client.connectToServer(QString::fromUtf8(address));
-        QVERIFY(client.waitForConnected(1000));
+        QVERIFY2(client.waitForConnected(1000), qPrintable(client.errorString()));
         client.disconnectFromServer();
         if (client.state() != QLocalSocket::UnconnectedState)
             QVERIFY(client.waitForDisconnected(1000));
@@ -120,11 +171,13 @@ private slots:
         const QString id = uniqueId();
         QByteArray primaryOutput;
         QProcess primary;
-        launchPrimary(primary, id, 0, 1000);
+        ChildProcessCleanup primaryCleanup(primary);
+        launchPrimary(primary, id, 1000);
         QVERIFY2(primary.waitForStarted(3000), qPrintable(primary.errorString()));
         QVERIFY(waitForOutput(primary, "LOOP_START", 3000, primaryOutput));
 
         QProcess secondary;
+        ChildProcessCleanup secondaryCleanup(secondary);
         launchProbe(secondary, id, true, 500);
         QVERIFY2(secondary.waitForStarted(3000), qPrintable(secondary.errorString()));
         QByteArray secondaryOutput;
@@ -142,36 +195,90 @@ private slots:
         QVERIFY(primaryOutput.contains("RECEIVED=probe"));
     }
 
-    void lateAcknowledgementFailsWithoutSecondLaunchOrResend()
+    void delayedAcknowledgementFailureIsBoundedAndNotLossless()
     {
         const QString id = uniqueId();
+        QTemporaryDir barrier;
+        QVERIFY(barrier.isValid());
+        const QString releasePath = barrier.filePath(QStringLiteral("release"));
         QByteArray primaryOutput;
         QProcess primary;
-        launchPrimary(primary, id, 450, 1000);
+        ChildProcessCleanup primaryCleanup(primary);
+        launchPrimary(primary, id, 1000, releasePath);
         QVERIFY2(primary.waitForStarted(3000), qPrintable(primary.errorString()));
-        QVERIFY(waitForOutput(primary, "CLAIMED", 3000, primaryOutput));
+        QVERIFY(waitForOutput(primary, "READY_TO_RECEIVE", 3000, primaryOutput));
 
         QProcess secondary;
-        launchProbe(secondary, id, true, 100);
+        ChildProcessCleanup secondaryCleanup(secondary);
+        launchProbe(secondary, id, true, 500);
         QVERIFY2(secondary.waitForStarted(3000), qPrintable(secondary.errorString()));
+        QByteArray secondaryProgress;
+        QVERIFY(waitForOutput(secondary, "SENDING", 3000, secondaryProgress));
         QByteArray secondaryOutput;
-        QVERIFY(finish(secondary, secondaryOutput));
+        QVERIFY2(finish(secondary, secondaryOutput, 5000),
+                 "secondary did not report bounded IPC failure");
+        secondaryProgress += secondaryOutput;
 
         QCOMPARE(secondary.exitStatus(), QProcess::NormalExit);
         QCOMPARE(secondary.exitCode(), 3);
-        QVERIFY(secondaryOutput.contains("IPC_FAILED"));
-        QVERIFY(!secondaryOutput.contains("PLAYER_STARTED"));
+        QVERIFY2(secondaryProgress.contains("IPC_FAILED"), qPrintable(secondaryProgress));
+        QVERIFY2(!secondaryProgress.contains("PLAYER_STARTED"), qPrintable(secondaryProgress));
+
+        QVERIFY2(releaseBarrier(releasePath), qPrintable(releasePath));
 
         QByteArray primaryRemainder;
-        QVERIFY(finish(primary, primaryRemainder, 5000));
+        QVERIFY2(finish(primary, primaryRemainder, 5000), "primary did not exit after release");
         primaryOutput += primaryRemainder;
+        QCOMPARE(primary.exitStatus(), QProcess::NormalExit);
+        QCOMPARE(primary.exitCode(), 0);
+        const int count = receivedCount(primaryOutput);
+        QVERIFY2(count == 0 || count == 1, qPrintable(primaryOutput));
+        QCOMPARE(primaryOutput.count("RECEIVED=probe"), count);
+    }
+
+    void delayedAcknowledgementWithinBudgetDeliversExactlyOnce()
+    {
+        const QString id = uniqueId();
+        QTemporaryDir barrier;
+        QVERIFY(barrier.isValid());
+        const QString releasePath = barrier.filePath(QStringLiteral("release"));
+        QByteArray primaryOutput;
+        QProcess primary;
+        ChildProcessCleanup primaryCleanup(primary);
+        launchPrimary(primary, id, 1000, releasePath);
+        QVERIFY2(primary.waitForStarted(3000), qPrintable(primary.errorString()));
+        QVERIFY(waitForOutput(primary, "READY_TO_RECEIVE", 3000, primaryOutput));
+
+        QProcess secondary;
+        ChildProcessCleanup secondaryCleanup(secondary);
+        launchProbe(secondary, id, true, 3000);
+        QVERIFY2(secondary.waitForStarted(3000), qPrintable(secondary.errorString()));
+        QByteArray secondaryOutput;
+        QVERIFY(waitForOutput(secondary, "SENDING", 3000, secondaryOutput));
+        QVERIFY2(releaseBarrier(releasePath), qPrintable(releasePath));
+        QVERIFY2(finish(secondary, secondaryOutput, 5000),
+                 "delayed forward did not finish");
+
+        QCOMPARE(secondary.exitStatus(), QProcess::NormalExit);
+        QCOMPARE(secondary.exitCode(), 0);
+        QVERIFY2(secondaryOutput.contains("FORWARDED"), qPrintable(secondaryOutput));
+        QVERIFY2(!secondaryOutput.contains("PLAYER_STARTED"), qPrintable(secondaryOutput));
+        QVERIFY2(!secondaryOutput.contains("IPC_FAILED"), qPrintable(secondaryOutput));
+
+        QByteArray primaryRemainder;
+        QVERIFY2(finish(primary, primaryRemainder, 5000),
+                 "primary did not exit after delayed delivery");
+        primaryOutput += primaryRemainder;
+        QCOMPARE(primary.exitStatus(), QProcess::NormalExit);
+        QCOMPARE(primary.exitCode(), 0);
         QCOMPARE(receivedCount(primaryOutput), 1);
-        QVERIFY(primaryOutput.contains("RECEIVED=probe"));
+        QCOMPARE(primaryOutput.count("RECEIVED=probe"), 1);
     }
 
     void firstLaunchStartsPrimary()
     {
         QProcess primary;
+        ChildProcessCleanup primaryCleanup(primary);
         launchProbe(primary, uniqueId(), true, 500);
         QVERIFY2(primary.waitForStarted(3000), qPrintable(primary.errorString()));
         QByteArray output;
@@ -189,11 +296,13 @@ private slots:
         const QString id = uniqueId();
         QByteArray primaryOutput;
         QProcess primary;
-        launchPrimary(primary, id, 0, 1000);
+        ChildProcessCleanup primaryCleanup(primary);
+        launchPrimary(primary, id, 1000);
         QVERIFY2(primary.waitForStarted(3000), qPrintable(primary.errorString()));
         QVERIFY(waitForOutput(primary, "LOOP_START", 3000, primaryOutput));
 
         QProcess secondary;
+        ChildProcessCleanup secondaryCleanup(secondary);
         launchProbe(secondary, id, false, 500);
         QVERIFY2(secondary.waitForStarted(3000), qPrintable(secondary.errorString()));
         QByteArray secondaryOutput;
@@ -217,8 +326,8 @@ private slots:
 int runPrimary(int argc, char **argv)
 {
     const QString id = QString::fromLocal8Bit(argv[2]);
-    const int delayMs = QByteArray(argv[3]).toInt();
-    const int runMs = QByteArray(argv[4]).toInt();
+    const int runMs = QByteArray(argv[3]).toInt();
+    const QString releasePath = argc > 4 ? QString::fromLocal8Bit(argv[4]) : QString();
     QtSingleApplication app(id, argc, argv);
     if (app.isRunning())
         return 2;
@@ -232,7 +341,18 @@ int runPrimary(int argc, char **argv)
                          QTextStream(stdout) << "RECEIVED=" << message << Qt::endl;
                      });
     QTextStream(stdout) << "CLAIMED" << Qt::endl;
-    QThread::msleep(static_cast<unsigned long>(delayMs));
+    if (!releasePath.isEmpty()) {
+        QTextStream(stdout) << "READY_TO_RECEIVE" << Qt::endl;
+        QElapsedTimer barrierTimer;
+        barrierTimer.start();
+        while (!QFile::exists(releasePath) && barrierTimer.elapsed() < 5000)
+            QThread::msleep(10);
+        if (!QFile::exists(releasePath)) {
+            qWarning().noquote() << "primary release barrier timed out:" << releasePath;
+            return 4;
+        }
+        QTextStream(stdout) << "RELEASED" << Qt::endl;
+    }
     QTextStream(stdout) << "LOOP_START" << Qt::endl;
     QTimer::singleShot(runMs, &app, &QCoreApplication::quit);
     const int result = app.exec();
@@ -248,6 +368,7 @@ int runProbe(int argc, char **argv)
     QtSingleApplication app(id, argc, argv);
 
     if (enabled) {
+        QTextStream(stdout) << "SENDING" << Qt::endl;
         const auto result = singleInstanceStartup(app, QStringLiteral("probe"), timeoutMs);
         if (result == SingleInstanceStartupResult::MessageDelivered) {
             QTextStream(stdout) << "FORWARDED" << Qt::endl;
