@@ -684,7 +684,7 @@ class WindowsDesktopRun:
         ordered = [items[name] for name in expected_names]
         ordered[0].click_input()
         for item in ordered[1:]:
-            item.click_input(pressed="CTRL")
+            item.click_input(pressed="control")
 
         def selected_names() -> list[str]:
             try:

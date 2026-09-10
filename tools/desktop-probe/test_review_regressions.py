@@ -352,6 +352,41 @@ class ReviewRegressions(unittest.TestCase):
         with patch.object(probe.os.path, "samefile", return_value=True):
             self.assertIsNone(runtime._find_explorer())
 
+    def test_multi_selection_uses_pywinauto_control_modifier(self):
+        selected = set()
+
+        class SelectableItem(Control):
+            def click_input(self, pressed=""):
+                # pywinauto 0.6.9 mouse._perform_click_input recognizes
+                # 'control', not 'ctrl'; unmodified clicks replace selection.
+                if "control" not in pressed.lower().split():
+                    selected.clear()
+                selected.add(self.window_text())
+
+            def is_selected(self):
+                return self.window_text() in selected
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fixture_directory = root / "fixtures"
+            fixture_directory.mkdir()
+            names = [f"desktop-probe-{n:02}.wav" for n in range(1, 4)]
+            for name in names:
+                (fixture_directory / name).touch()
+            items = [SelectableItem(name) for name in names]
+            view = Control(children=items, class_name="UIItemsView",
+                           control_type="List", name="Items View")
+            runtime = object.__new__(probe.WindowsDesktopRun)
+            runtime.fixture_directory = fixture_directory
+            runtime.evidence = root
+            runtime.explorer_window = Control(children=[view])
+            # A keyboard fallback must not hide broken modifier-clicks.
+            runtime.explorer_window.set_focus = lambda: None
+            runtime.explorer_window.type_keys = lambda keys: None
+            runtime._select_all_fixture_files()
+            self.assertEqual(selected, set(names))
+            self.assertEqual((root / "explorer-selection.txt").read_text().splitlines(), names)
+
     def test_selection_api_failure_blocks_instead_of_continuing(self):
         class BrokenItem(Control):
             def click_input(self, **kwargs):
