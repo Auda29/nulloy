@@ -3,6 +3,25 @@
 Snapshot: 2026-09-10T13:38:33Z. Integrationsbasis:
 `919468efc32f4d038c96d7276a799794dab2e86e` (PR #27).
 
+## Nachtrag: IPC-Komponententest inzwischen grün
+
+Der unten erhaltene Snapshot beschreibt die früheren Fehlläufe. PR #29 steht
+inzwischen auf `9d7de5108f842269ffa2a99048d69577a123d1ac` und bleibt Draft/offen.
+[Windows-Lauf 34497432559](https://github.com/Auda29/nulloy/actions/runs/34497432559)
+besteht unter Qt5 und Qt6: jeweils sechs Verhaltensfälle plus Init/Cleanup,
+keine Fehler oder Skips. Die erfolgreiche Zustellung erfolgt nach tatsächlich
+beobachtetem vollständigem Nachrichtenrahmen und zurückgehaltener Bestätigung
+(159 ms unter Qt5, 154 ms unter Qt6). Unabhängiger Nachreview und Negativkontrolle
+sind [in PR #29 dokumentiert](https://github.com/Auda29/nulloy/pull/29#issuecomment-5621566637).
+
+Der tatsächliche Paket-Buildcommit ist
+`5e502fc65aafc9cdfb2db3df615afc19956990b9`; seine Git-Tree-Identität mit dem
+genannten PR-Head wurde separat verifiziert. Das ist kein neuer
+Explorer-Nachweis und nicht das gemeinsame PR-#15/#16/#24-Abnahmepaket.
+Die ursprünglichen negativen Explorer-Belege und ihre Paketzuordnung bleiben
+unverändert. Der weiter unten genannte nächste IPC-Testschritt ist historisch;
+die echte Explorer-Matrix sowie Papierkorb- und Fensterabnahmen bleiben offen.
+
 ## Geltungsbereich
 
 Manuelle Nutzertests stehen nicht zur Verfügung. Automatisierte echte native
@@ -29,7 +48,9 @@ Zählung nicht und schließen kein ursprüngliches Issue.
 belegte nach echter Explorer-Mehrfachauswahl drei Playerhauptfenster. Siehe auch
 [Auswertung in PR #28](https://github.com/Auda29/nulloy/pull/28#issuecomment-5618825616).
 Die folgenden Werte stammen aus dem heruntergeladenen Probe-Artefakt `result.json`;
-sie bezeichnen **diesen fehlgeschlagenen Lauf**, nicht den aktuellen Branchhead:
+sie bezeichnen **diesen fehlgeschlagenen Lauf**, nicht den aktuellen Branchhead.
+Die Hashwerte sind hier aus dem Probebericht übernommen; dieser
+Dokumentationsnachtrag enthält keine neue lokale ZIP-/EXE-Hashberechnung:
 
 | Identität | Wert |
 | --- | --- |
