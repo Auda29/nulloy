@@ -30,9 +30,14 @@ target_link_libraries(testSingleInstanceStartup PRIVATE
     ${NULLOY_TEST_QT}::Widgets
     ${NULLOY_TEST_QT}::Network
     ${NULLOY_TEST_QT}::Test)
+if(WIN32)
+    # Match the production Windows build: QtLockedFile calls wide Win32 APIs.
+    target_compile_definitions(testSingleInstanceStartup PRIVATE UNICODE _UNICODE)
+endif()
 
 enable_testing()
-add_test(NAME testSingleInstanceStartup COMMAND testSingleInstanceStartup)
+add_test(NAME testSingleInstanceStartup COMMAND testSingleInstanceStartup
+    -o "${CMAKE_BINARY_DIR}/testSingleInstanceStartup-results.txt,txt")
 set_tests_properties(testSingleInstanceStartup PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     TIMEOUT 30)
