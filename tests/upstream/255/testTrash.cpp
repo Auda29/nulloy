@@ -20,6 +20,8 @@ namespace
     QStringList attempted;
     QSet<QString> refused;
     int refusedError;
+    QSet<QString> cancelled;
+    int cancellationError;
 } // namespace
 
 // Keep production NSettings, but isolate its storage from user preferences.
@@ -33,6 +35,9 @@ QString NCore::settingsPath()
 NTrash::NativeResult _trash(const QString &file, QString *error)
 {
     attempted << file;
+    if (cancelled.contains(file)) {
+        return {cancellationError, true};
+    }
     if (!refused.contains(file) &&
         QFile::rename(file, trashDirectory + "/" + QFileInfo(file).fileName())) {
         return {0, false};
@@ -100,6 +105,8 @@ private slots:
         attempted.clear();
         refused.clear();
         refusedError = 1;
+        cancelled.clear();
+        cancellationError = 0;
         m_answers.clear();
         m_defaults.clear();
         m_dialogTitles.clear();
@@ -160,6 +167,63 @@ private slots:
             QCOMPARE(button, QMessageBox::Cancel);
         }
         QCOMPARE(moved, files.mid(0, successes));
+    }
+
+    void nativeCancellationNeverOffersPermanentDeletion_data()
+    {
+        QTest::addColumn<int>("successes");
+        QTest::addColumn<int>("errorCode");
+        QTest::addColumn<bool>("confirm");
+        for (int successes : {0, 1}) {
+            for (int errorCode : {0, 5}) {
+                for (bool confirm : {false, true}) {
+                    const QByteArray name = QString("successes-%1-code-%2-confirm-%3")
+                                                .arg(successes)
+                                                .arg(errorCode)
+                                                .arg(confirm)
+                                                .toLatin1();
+                    QTest::newRow(name.constData()) << successes << errorCode << confirm;
+                }
+            }
+        }
+    }
+
+    void nativeCancellationNeverOffersPermanentDeletion()
+    {
+        QFETCH(int, successes);
+        QFETCH(int, errorCode);
+        QFETCH(bool, confirm);
+        const QString prefix =
+            QString("native-cancel-%1-%2-%3-").arg(successes).arg(errorCode).arg(confirm);
+        const QStringList files{makeFile(prefix + "first"), makeFile(prefix + "second"),
+                                makeFile(prefix + "last")};
+        cancelled.insert(files.at(successes));
+        cancellationError = errorCode;
+        NSettings::instance()->setValue("DisplayMoveToTrashConfirmDialog", confirm);
+        QStringList expectedDialogs;
+        if (confirm) {
+            for (int i = 0; i <= successes; ++i) {
+                m_answers << QMessageBox::Yes;
+                expectedDialogs << "Confirmation";
+            }
+        }
+
+        const QStringList moved = NTrash::moveToTrash(files);
+        // Only ordinary confirmations are allowed, never a permanent-delete fallback.
+        QCOMPARE(m_dialogTitles, expectedDialogs);
+        QCOMPARE(moved, files.mid(0, successes));
+        QCOMPARE(attempted, files.mid(0, successes + 1));
+        for (int i = 0; i < files.size(); ++i) {
+            const QString destination = trashDirectory + "/" + QFileInfo(files.at(i)).fileName();
+            QCOMPARE(QFile::exists(files.at(i)), i >= successes);
+            QCOMPARE(QFile::exists(destination), i < successes);
+            QFile preserved(i < successes ? destination : files.at(i));
+            QVERIFY(preserved.open(QIODevice::ReadOnly));
+            QCOMPARE(preserved.readAll(), QByteArray("generated fixture"));
+        }
+        for (auto button : m_defaults) {
+            QCOMPARE(button, QMessageBox::Cancel);
+        }
     }
 
     void duplicatesAreMovedOnceWithoutStoppingLaterFiles()
