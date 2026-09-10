@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include <QtTest>
 #include <QApplication>
+#include <QDataStream>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QProcess>
+#include <QRegularExpression>
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QTemporaryDir>
@@ -245,19 +247,29 @@ private slots:
         QByteArray primaryOutput;
         QProcess primary;
         ChildProcessCleanup primaryCleanup(primary);
-        launchPrimary(primary, id, 1000, releasePath);
+        setupProcess(primary, {QStringLiteral("--primary-frame"), id,
+                               QStringLiteral("1000"), releasePath});
+        primary.start();
         QVERIFY2(primary.waitForStarted(3000), qPrintable(primary.errorString()));
-        QVERIFY(waitForOutput(primary, "READY_TO_RECEIVE", 3000, primaryOutput));
+        QVERIFY(waitForOutput(primary, "LOOP_START", 3000, primaryOutput));
 
         QProcess secondary;
         ChildProcessCleanup secondaryCleanup(secondary);
         launchProbe(secondary, id, true, 3000);
         QVERIFY2(secondary.waitForStarted(3000), qPrintable(secondary.errorString()));
         QByteArray secondaryOutput;
-        QVERIFY(waitForOutput(secondary, "SENDING", 3000, secondaryOutput));
+        QVERIFY(waitForOutput(primary, "FRAME_QUEUED", 3000, primaryOutput));
+        // The full frame is queued but not acknowledged by the receiver yet.
+        QVERIFY2(!secondary.waitForFinished(150), "sender finished before ACK release");
+        QCOMPARE(secondary.state(), QProcess::Running);
+        secondaryOutput += secondary.readAllStandardOutput();
+        QVERIFY2(!secondaryOutput.contains("FORWARDED"), qPrintable(secondaryOutput));
+        QVERIFY2(!secondaryOutput.contains("IPC_FAILED"), qPrintable(secondaryOutput));
         QVERIFY2(releaseBarrier(releasePath), qPrintable(releasePath));
-        QVERIFY2(finish(secondary, secondaryOutput, 5000),
+        QByteArray secondaryRemainder;
+        QVERIFY2(finish(secondary, secondaryRemainder, 5000),
                  "delayed forward did not finish");
+        secondaryOutput += secondaryRemainder;
 
         QCOMPARE(secondary.exitStatus(), QProcess::NormalExit);
         QCOMPARE(secondary.exitCode(), 0);
@@ -271,6 +283,11 @@ private slots:
         primaryOutput += primaryRemainder;
         QCOMPARE(primary.exitStatus(), QProcess::NormalExit);
         QCOMPARE(primary.exitCode(), 0);
+        const QRegularExpression heldPattern(QStringLiteral("ACK_HELD_MS=(\\d+)"));
+        const auto held = heldPattern.match(QString::fromUtf8(primaryOutput));
+        QVERIFY2(held.hasMatch(), qPrintable(primaryOutput));
+        QVERIFY2(held.captured(1).toLongLong() >= 150, qPrintable(primaryOutput));
+        qInfo() << "Observed frame-to-release delay (ms):" << held.captured(1).toLongLong();
         QCOMPARE(receivedCount(primaryOutput), 1);
         QCOMPARE(primaryOutput.count("RECEIVED=probe"), 1);
     }
@@ -329,6 +346,41 @@ int runPrimary(int argc, char **argv)
     const int runMs = QByteArray(argv[3]).toInt();
     const QString releasePath = argc > 4 ? QString::fromLocal8Bit(argv[4]) : QString();
     QtSingleApplication app(id, argc, argv);
+    if (QByteArray(argv[1]) == "--primary-frame") {
+        auto *server = app.findChild<QLocalServer *>();
+        if (!server || releasePath.isEmpty())
+            qFatal("Frame barrier requires a server and a unique release path");
+        // Connect before isRunning() installs the production receiver. Qt runs
+        // direct slots in connection order. Peek only: the unchanged receiver
+        // must still consume and acknowledge the original, complete frame.
+        QObject::connect(server, &QLocalServer::newConnection, &app, [server, releasePath] {
+            const auto sockets = server->findChildren<QLocalSocket *>(
+                QString(), Qt::FindDirectChildrenOnly);
+            if (sockets.size() != 1)
+                qFatal("Frame barrier requires exactly one connected socket");
+            auto *socket = sockets.first();
+            QByteArray frame;
+            QDataStream stream(&frame, QIODevice::WriteOnly);
+            stream.writeBytes("probe", 5);
+            QElapsedTimer frameTimer;
+            frameTimer.start();
+            while (socket->bytesAvailable() < frame.size()) {
+                const int remaining = 3000 - static_cast<int>(frameTimer.elapsed());
+                if (remaining <= 0 || !socket->waitForReadyRead(remaining))
+                    qFatal("Frame barrier did not observe the complete message");
+            }
+            if (socket->peek(frame.size()) != frame)
+                qFatal("Frame barrier observed an unexpected message");
+            QElapsedTimer heldTimer;
+            heldTimer.start();
+            QTextStream(stdout) << "FRAME_QUEUED" << Qt::endl;
+            while (!QFile::exists(releasePath) && heldTimer.elapsed() < 5000)
+                QThread::msleep(5);
+            if (!QFile::exists(releasePath))
+                qFatal("Frame barrier release timed out");
+            QTextStream(stdout) << "ACK_HELD_MS=" << heldTimer.elapsed() << Qt::endl;
+        });
+    }
     if (app.isRunning())
         return 2;
 
@@ -341,7 +393,7 @@ int runPrimary(int argc, char **argv)
                          QTextStream(stdout) << "RECEIVED=" << message << Qt::endl;
                      });
     QTextStream(stdout) << "CLAIMED" << Qt::endl;
-    if (!releasePath.isEmpty()) {
+    if (!releasePath.isEmpty() && QByteArray(argv[1]) != "--primary-frame") {
         QTextStream(stdout) << "READY_TO_RECEIVE" << Qt::endl;
         QElapsedTimer barrierTimer;
         barrierTimer.start();
@@ -387,7 +439,8 @@ int runProbe(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
-    if (argc > 1 && QByteArray(argv[1]) == "--primary")
+    if (argc > 1 && (QByteArray(argv[1]) == "--primary"
+                    || QByteArray(argv[1]) == "--primary-frame"))
         return runPrimary(argc, argv);
     if (argc > 1 && QByteArray(argv[1]) == "--probe")
         return runProbe(argc, argv);

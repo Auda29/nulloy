@@ -14,9 +14,15 @@ It covers:
   secondary has exited, so the secondary must report `IPC_FAILED` and must not
   start a player; after release, the primary must exit normally and may have
   received zero or one copy of the message;
-- a separate deterministic delayed-but-within-budget forward: releasing the
-  primary before the secondary's bounded wait expires must produce exactly one
-  received message, a successful forward, and no second player;
+- a separate delayed-but-within-budget forward: a test-only `newConnection`
+  observer is registered before the production receiver. It peeks at the full
+  expected frame without consuming it, then holds the production receiver until
+  the parent releases a unique file barrier. The parent checks that the sender
+  stays running for at least 150 ms after the frame is observed; the receiver
+  also reports the measured hold. Only then may the unchanged receiver consume
+  the frame and acknowledge it. Exactly one message, successful forwarding and
+  no second player are required. This observes a queued frame, not merely the
+  earlier `SENDING` log marker;
 - first launch becoming primary; and
 - `SingleInstance` disabled, where a second process still starts.
 
