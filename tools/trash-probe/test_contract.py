@@ -9,6 +9,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest import mock
 import zipfile
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -37,6 +38,300 @@ def valid_manifest(**updates: object) -> dict[str, object]:
 
 
 class ContractTests(unittest.TestCase):
+    def test_live_process_without_identity_preserves_temp_files(self) -> None:
+        class LiveProcess:
+            returncode = None
+
+            def poll(self):
+                return None
+
+        with tempfile.TemporaryDirectory() as temporary:
+            evidence = Path(temporary) / "evidence"
+            scenario = probe.WindowsScenario(Path("package.zip"), SOURCE_SHA, evidence, "test")
+            scenario.temp_root = Path(temporary) / "generated"
+            scenario.temp_root.mkdir()
+            scenario.process = LiveProcess()
+
+            result = scenario.cleanup()
+
+            self.assertFalse(result["cleanup_verified"])
+            self.assertFalse(result["process_cleanup_verified"])
+            self.assertTrue(scenario.temp_root.exists())
+
+    def test_exited_owned_popen_without_identity_can_be_removed(self) -> None:
+        class ExitedProcess:
+            returncode = 0
+
+            def poll(self):
+                return self.returncode
+
+        with tempfile.TemporaryDirectory() as temporary:
+            evidence = Path(temporary) / "evidence"
+            scenario = probe.WindowsScenario(Path("package.zip"), SOURCE_SHA, evidence, "test")
+            scenario.temp_root = Path(temporary) / "generated"
+            scenario.temp_root.mkdir()
+            scenario.process = ExitedProcess()
+
+            result = scenario.cleanup()
+
+            self.assertTrue(result["cleanup_verified"])
+            self.assertFalse(scenario.temp_root.exists())
+
+    def test_focused_non_default_button_is_not_treated_as_default(self) -> None:
+        class FocusedButton:
+            def get_properties(self):
+                return {}
+
+            def has_focus(self):
+                return True
+
+        self.assertFalse(probe.WindowsScenario._button_is_default(FocusedButton()))
+
+    def test_legacy_default_state_proves_default_without_focus(self) -> None:
+        class Legacy:
+            CurrentState = 0x100
+
+        class Button:
+            iface_legacy = Legacy()
+
+            def get_properties(self):
+                return {}
+
+            def has_focus(self):
+                return False
+
+        self.assertTrue(probe.WindowsScenario._button_is_default(Button()))
+
+    def test_confirmation_transition_accepts_replacement_dialog(self) -> None:
+        class Control:
+            def __init__(self, text: str):
+                self.text = text
+
+            def window_text(self):
+                return self.text
+
+        class Button(Control):
+            def __init__(self, text: str, on_click=None):
+                super().__init__(text)
+                self.on_click = on_click
+
+            def get_properties(self):
+                return {"is_default": self.text == "Cancel"}
+
+            def has_focus(self):
+                return False
+
+            def click_input(self):
+                if self.on_click:
+                    self.on_click()
+
+            def wrapper_object(self):
+                return self
+
+        class Dialog:
+            def __init__(self, fixture: str, on_answer):
+                self.fixture = fixture
+                self.answer = Button("Yes", on_answer)
+                self.cancel = Button("Cancel")
+
+            def window_text(self):
+                return "Confirmation"
+
+            def is_visible(self):
+                return True
+
+            def descendants(self, control_type=None):
+                buttons = [self.answer, self.cancel]
+                if control_type == "Button":
+                    return buttons
+                return [Control("Confirmation"), Control(self.fixture), *buttons]
+
+            def child_window(self, title, control_type):
+                return next(button for button in self.descendants("Button") if button.text == title)
+
+            def wrapper_object(self):
+                return self
+
+        class Scenario(probe.WindowsScenario):
+            def __init__(self):
+                super().__init__(Path("package.zip"), SOURCE_SHA, Path("evidence"), "test")
+                self.dialog = None
+                self.next_dialog = Dialog("second.wav", lambda: None)
+                self.dialog = Dialog("first.wav", self._replace)
+
+            def _replace(self):
+                self.dialog = self.next_dialog
+
+            def _verify_process(self):
+                return None
+
+            def _dialog_candidates(self):
+                return [] if self.dialog is None else [self.dialog]
+
+        scenario = Scenario()
+        scenario.fixtures = [
+            probe.Fixture(Path("first.wav"), "a", 1),
+            probe.Fixture(Path("second.wav"), "b", 1),
+        ]
+        scenario._drive_confirmation("first.wav", "Yes")
+        self.assertIs(scenario.dialog, scenario.next_dialog)
+
+    def test_confirmation_trash_error_is_cancelled_and_blocked(self) -> None:
+        class Button:
+            def __init__(self, text, on_click=None):
+                self.text = text
+                self.on_click = on_click
+
+            def window_text(self):
+                return self.text
+
+            def get_properties(self):
+                return {"is_default": self.text == "Cancel"}
+
+            def has_focus(self):
+                return False
+
+            def click_input(self):
+                if self.on_click:
+                    self.on_click()
+
+            def wrapper_object(self):
+                return self
+
+        class Dialog:
+            def __init__(self, on_cancel):
+                self.cancel = Button("Cancel", on_cancel)
+                self.yes = Button("Yes", on_cancel)
+
+            def window_text(self):
+                return "Confirmation"
+
+            def descendants(self, control_type=None):
+                if control_type == "Button":
+                    return [self.yes, self.cancel]
+                return [Button("Confirmation"), Button("first.wav"), *self.descendants("Button")]
+
+            def child_window(self, title, control_type):
+                return self.cancel if title == "Cancel" else self.yes
+
+            def wrapper_object(self):
+                return self
+
+        class ErrorDialog(Dialog):
+            def window_text(self):
+                return "Trash Error"
+
+            def descendants(self, control_type=None):
+                if control_type == "Button":
+                    return [self.cancel]
+                return [Button("Trash Error"), *self.descendants("Button")]
+
+        class Scenario(probe.WindowsScenario):
+            def __init__(self):
+                super().__init__(Path("package.zip"), SOURCE_SHA, Path("evidence"), "test")
+                self.dialog = None
+                self.dialog = Dialog(self._show_error)
+
+            def _show_error(self):
+                self.dialog = ErrorDialog(self._close)
+
+            def _close(self):
+                self.dialog = None
+
+            def _verify_process(self):
+                return None
+
+            def _dialog_candidates(self):
+                return [] if self.dialog is None else [self.dialog]
+
+        scenario = Scenario()
+        scenario.fixtures = [probe.Fixture(Path("first.wav"), "a", 1)]
+        with self.assertRaises(probe.BlockedError):
+            scenario._drive_confirmation("first.wav", "Yes")
+        self.assertIsNone(scenario.dialog)
+
+    def test_stop_requires_evidence_of_active_loaded_playback(self) -> None:
+        class StopButton:
+            element_info = type("Info", (), {"automation_id": "stopButton"})()
+
+        class ZeroSlider:
+            element_info = type(
+                "Info", (), {"class_name": "NWaveformSlider", "automation_id": "waveformSlider"}
+            )()
+
+            def get_value(self):
+                return 0.0
+
+        class Window:
+            def descendants(self, control_type=None):
+                if control_type == "Button":
+                    return [StopButton()]
+                return [StopButton(), ZeroSlider()]
+
+            def set_focus(self):
+                return None
+
+        scenario = probe.WindowsScenario(Path("package.zip"), SOURCE_SHA, Path("evidence"), "test")
+        scenario.main_window = Window()
+        scenario._verify_process = lambda: None
+        keyboard = type("Keyboard", (), {"send_keys": staticmethod(lambda keys: None)})
+        with mock.patch.dict(sys.modules, {"pywinauto.keyboard": keyboard}):
+            with self.assertRaises(probe.BlockedError):
+                scenario._stop_and_verify()
+
+    def test_cleanup_error_preserves_primary_and_blocks_remaining_scenarios(self) -> None:
+        contract = probe.validate_manifest(valid_manifest(), SOURCE_SHA)
+        package = probe.ExtractedPackage(
+            archive_sha256="archive",
+            executable_sha256="executable",
+            file_hashes_verified=2,
+            root=Path("NulloyFork"),
+            executable=Path("NulloyFork/NulloyFork.exe"),
+            contract=contract,
+        )
+
+        class FakeScenario:
+            created = []
+
+            def __init__(self, *args, **kwargs):
+                self.created.append(kwargs.get("name", args[-1]))
+                self.process = object()
+
+            def run(self, selected, answers):
+                raise RuntimeError("primary native failure")
+
+            def _capture_failure_evidence(self):
+                return None
+
+            def cleanup(self):
+                raise OSError("cleanup failure")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            args = probe.parse_args([
+                "--package", str(Path(temporary) / "package.zip"),
+                "--source-sha", SOURCE_SHA,
+                "--output", str(Path(temporary) / "evidence"),
+            ])
+            patches = [
+                mock.patch.object(probe, "is_windows_native", return_value=True),
+                mock.patch.object(probe, "_manifest_from_archive", return_value=("archive", valid_manifest())),
+                mock.patch.object(probe, "extract_and_validate", return_value=package),
+                mock.patch.object(probe, "WindowsScenario", FakeScenario),
+            ]
+            with patches[0], patches[1], patches[2], patches[3]:
+                code, result = probe.run_probe(args)
+
+        self.assertEqual(code, 1)
+        self.assertEqual(result["status"], "FAIL")
+        self.assertEqual(FakeScenario.created, ["ordinary-cancellation"])
+        first = result["scenarios"]["ordinary-cancellation"]
+        self.assertIn("primary native failure", first["error"])
+        self.assertIn("cleanup failure", first["cleanup_errors"][0])
+        self.assertFalse(first["cleanup_verified"])
+        self.assertEqual(
+            result["scenarios"]["successful-recycling"]["status"], "BLOCKED"
+        )
+
     def test_source_sha_is_exactly_forty_hex_characters(self) -> None:
         self.assertEqual(probe.parse_source_sha(SOURCE_SHA), SOURCE_SHA)
         for value in ("", "f" * 39, "f" * 41, "g" * 40):

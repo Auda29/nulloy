@@ -85,6 +85,10 @@ def status_exit_code(status: str) -> int:
     return {"PASS": 0, "FAIL": 1, "BLOCKED": 2}.get(status, 1)
 
 
+def is_windows_native() -> bool:
+    return os.name == "nt"
+
+
 
 def parse_source_sha(value: str) -> str:
     if not isinstance(value, str) or not SOURCE_SHA_RE.fullmatch(value):
@@ -616,16 +620,39 @@ class WindowsScenario:
                 continue
         return candidates
 
+    def _dialog_text(self, dialog: Any) -> tuple[str, str]:
+        title = _window_text(dialog)
+        texts = [title] + [_window_text(control) for control in dialog.descendants()]
+        return title, "\n".join(texts)
+
+    def _confirmation_transition_complete(self, expected_name: str) -> bool:
+        """Wait for this modal to close or be replaced by another modal."""
+        dialogs = self._dialog_candidates()
+        if not dialogs:
+            return True
+        if len(dialogs) != 1:
+            raise RuntimeError(f"owned dialog count is {len(dialogs)}, expected one")
+        dialog = dialogs[0]
+        title, joined = self._dialog_text(dialog)
+        if title == "Trash Error":
+            self._cancel_owned_dialog(dialog)
+            raise BlockedError("player offered permanent-delete fallback after recycle failure")
+        if title != "Confirmation":
+            raise RuntimeError(f"unexpected owned dialog after answer: {title!r}")
+        if expected_name in joined and not any(
+            fixture.path.name in joined
+            for fixture in self.fixtures
+            if fixture.path.name != expected_name
+        ):
+            return False
+        return True
+
     def _verify_confirmation(self, expected_name: str) -> Any:
         dialogs = self._dialog_candidates()
         if len(dialogs) != 1:
             raise RuntimeError(f"owned confirmation dialog count is {len(dialogs)}, expected one")
         dialog = dialogs[0]
-        title = _window_text(dialog)
-        texts = [_window_text(dialog)] + [
-            _window_text(control) for control in dialog.descendants()
-        ]
-        joined = "\n".join(texts)
+        title, joined = self._dialog_text(dialog)
         if title != "Confirmation":
             if title == "Trash Error":
                 self._cancel_owned_dialog(dialog)
@@ -649,6 +676,7 @@ class WindowsScenario:
 
     @staticmethod
     def _button_is_default(button: Any) -> bool:
+        """Accept only an explicit accessibility or native default-state proof."""
         try:
             properties = button.get_properties()
             for key in ("is_default", "default", "is_default_button"):
@@ -657,17 +685,26 @@ class WindowsScenario:
         except Exception:
             pass
         try:
-            if button.has_focus():
+            # UIA's LegacyIAccessible pattern exposes MSAA STATE_SYSTEM_DEFAULT.
+            legacy = getattr(button, "iface_legacy")
+            state = int(getattr(legacy, "CurrentState"))
+            if state & 0x100:  # STATE_SYSTEM_DEFAULT
                 return True
-        except Exception:
+        except (AttributeError, TypeError, ValueError, OSError):
             pass
         try:
             import ctypes
             handle = int(getattr(button, "handle", 0))
-            if handle:
-                style = ctypes.windll.user32.GetWindowLongW(handle, -16)
+            if handle and _window_class(button).casefold() == "button":
+                user32 = ctypes.windll.user32
+                class_name = ctypes.create_unicode_buffer(32)
+                if user32.GetClassNameW(handle, class_name, len(class_name)) <= 0:
+                    return False
+                if class_name.value.casefold() != "button":
+                    return False
+                style = user32.GetWindowLongW(handle, -16)
                 return bool(style & 0x1)  # BS_DEFPUSHBUTTON
-        except Exception:
+        except (AttributeError, TypeError, ValueError, OSError):
             pass
         return False
 
@@ -687,11 +724,15 @@ class WindowsScenario:
         # Re-find and revalidate the exact modal immediately before clicking.
         dialog = self._verify_confirmation(expected_name)
         dialog.child_window(title=answer, control_type="Button").wrapper_object().click_input()
-        _wait_for(lambda: not self._dialog_candidates(), 15, "owned confirmation dialog close")
+        _wait_for(
+            lambda: self._confirmation_transition_complete(expected_name),
+            15,
+            "owned confirmation dialog close or replacement",
+        )
         _write_step(self.steps, "confirmation_answered", fixture=expected_name, answer=answer)
 
     def _stop_and_verify(self) -> None:
-        """Use the real V shortcut and verify the exposed position is reset."""
+        """Send V only after proving the loaded fixture is actively playing."""
         self._verify_process()
         stop_buttons = [
             control
@@ -709,8 +750,6 @@ class WindowsScenario:
         if len(sliders) != 1:
             raise ContractError(f"owned waveformSlider count is {len(sliders)}, expected one")
         self.main_window.set_focus()
-        from pywinauto.keyboard import send_keys
-        send_keys("v")
 
         def position() -> float | None:
             slider = sliders[0]
@@ -723,25 +762,48 @@ class WindowsScenario:
                 except (AttributeError, TypeError, ValueError):
                     return None
 
-        samples: list[float] = []
+        before_samples: list[float] = []
         deadline = time.monotonic() + 3
         while time.monotonic() < deadline:
             self._verify_process()
             value = position()
             if value is not None:
-                samples.append(value)
-                if abs(value) <= 1e-6 and len(samples) >= 2:
+                before_samples.append(value)
+                if value > 1e-6:
+                    break
+            time.sleep(0.2)
+        if not before_samples or before_samples[-1] <= 1e-6:
+            raise BlockedError(
+                "could not establish active playback of the loaded fixtures before V; "
+                "zero position is ambiguous between stopped and paused"
+            )
+
+        from pywinauto.keyboard import send_keys
+        send_keys("v")
+        after_samples: list[float] = []
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            self._verify_process()
+            value = position()
+            if value is not None:
+                after_samples.append(value)
+                if abs(value) <= 1e-6 and len(after_samples) >= 2:
                     _write_json(self.evidence / "player-stopped.json", {
                         "shortcut": "V",
                         "stop_button_automation_id": "stopButton",
                         "waveform_slider_automation_id": "waveformSlider",
-                        "position_samples": samples,
+                        "pre_stop_position_samples": before_samples,
+                        "position_samples": after_samples,
                         "verified": True,
+                        "verification_basis": "active fixture playback reset to stable zero after V",
                     })
                     _write_step(self.steps, "player_stopped", shortcut="V", position=value)
                     return
             time.sleep(0.2)
-        raise ContractError(f"V did not expose a stopped zero position: {samples!r}")
+        raise BlockedError(
+            f"V did not establish a stable stopped zero position after active playback: "
+            f"before={before_samples!r}, after={after_samples!r}"
+        )
 
     def _send_move_to_trash(self) -> None:
         self._verify_process()
@@ -937,20 +999,27 @@ class WindowsScenario:
         }
 
     def _cleanup_player(self) -> bool:
-        if self.process is None or self.identity is None:
+        if self.process is None:
             self.process_cleanup_verified = True
             return True
         try:
-            if self.process.poll() is None:
+            # A Popen handle is sufficient proof for an already exited child.  A
+            # live child must retain the independently acquired identity before
+            # any close/terminate action or generated-file removal is allowed.
+            if self.process.poll() is not None:
+                self.process_cleanup_verified = True
+                return True
+            if self.identity is None or self.psutil is None:
+                raise RuntimeError("live player process ownership is not established")
+            self._verify_process()
+            if self.main_window is not None:
+                self.main_window.close()
+            try:
+                self.process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
                 self._verify_process()
-                if self.main_window is not None:
-                    self.main_window.close()
-                try:
-                    self.process.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    self._verify_process()
-                    self.process.terminate()
-                    self.process.wait(timeout=10)
+                self.process.terminate()
+                self.process.wait(timeout=10)
             if self.process.poll() is not None:
                 self.process_cleanup_verified = True
                 return True
@@ -1015,7 +1084,7 @@ def run_probe(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
         "audio_mode": "headless-no-device-fallback" if args.headless_audio else "normal",
         "scenarios": {},
     }
-    if os.name != "nt":
+    if not is_windows_native():
         result["error"] = "Windows native acceptance requires Windows; execution was not started"
         _write_json(output / "result.json", result)
         (output / "status.txt").write_text("BLOCKED\n", encoding="utf-8")
@@ -1049,39 +1118,71 @@ def run_probe(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
         scenario_data: dict[str, Any] = {}
         blocked = False
         failed = False
+        stop_remaining = False
         for scenario_name, selected, answers in SCENARIOS:
+            if stop_remaining:
+                blocked = True
+                scenario_data[scenario_name] = {
+                    "status": "BLOCKED",
+                    "error": "scenario not executed because the previous scenario did not complete safely",
+                    "executed": False,
+                    "cleanup_verified": True,
+                    "process_cleanup_verified": True,
+                    "cleanup_errors": [],
+                    "preserved_temp_root": None,
+                }
+                continue
             scenario = WindowsScenario(
                 args.package.resolve(), source_sha, output / scenario_name, scenario_name
             )
             scenario.headless_audio = bool(args.headless_audio)
             primary_error: str | None = None
+            scenario_data[scenario_name] = {"executed": True}
             try:
                 data = scenario.run(selected, answers)
-                scenario_data[scenario_name] = data
+                scenario_data[scenario_name].update(data)
             except BlockedError as exc:
                 blocked = True
                 primary_error = str(exc)
-                scenario_data[scenario_name] = {"status": "BLOCKED", "error": primary_error}
+                scenario_data[scenario_name].update({"status": "BLOCKED", "error": primary_error})
             except Exception as exc:
                 failed = True
                 primary_error = f"{type(exc).__name__}: {exc}"
-                scenario._capture_failure_evidence()
-                scenario_data[scenario_name] = {
+                try:
+                    scenario._capture_failure_evidence()
+                except Exception:
+                    pass
+                scenario_data[scenario_name].update({
                     "status": "FAIL",
                     "error": primary_error,
                     "traceback": traceback.format_exc(),
-                }
-            finally:
+                })
+
+            try:
                 cleanup = scenario.cleanup()
-                scenario_data[scenario_name].update(cleanup)
-                result["execution_started"] = bool(
-                    result["execution_started"] or scenario.process is not None
-                )
-                if not cleanup["cleanup_verified"]:
-                    failed = True
+            except Exception as exc:
+                cleanup = {
+                    "cleanup_verified": False,
+                    "process_cleanup_verified": False,
+                    "cleanup_errors": [f"cleanup raised {type(exc).__name__}: {exc}"],
+                    "preserved_temp_root": str(getattr(scenario, "temp_root", None)),
+                }
+            scenario_data[scenario_name].update(cleanup)
+            result["execution_started"] = bool(
+                result["execution_started"] or scenario.process is not None
+            )
+            if not cleanup.get("cleanup_verified", False):
+                failed = True
+                stop_remaining = True
+            if primary_error is not None:
+                # An unexpected native result is not a safe basis for another
+                # scenario, even when this scenario's cleanup happened to pass.
+                stop_remaining = True
         result["scenarios"] = scenario_data
         result["cleanup_verified"] = all(
-            bool(data.get("cleanup_verified")) for data in scenario_data.values()
+            bool(data.get("cleanup_verified"))
+            for data in scenario_data.values()
+            if data.get("executed", True)
         )
         if failed:
             result["status"] = "FAIL"
