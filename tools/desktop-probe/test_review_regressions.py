@@ -195,6 +195,21 @@ class ReviewRegressions(unittest.TestCase):
             self.assertFalse(record["candidates"][0]["visible"])
             self.assertIn("UIA visibility failed", record["candidates"][1]["exception"])
 
+    def test_explorer_cleanup_revalidates_instead_of_closing_cached_wrapper(self):
+        runtime = object.__new__(probe.WindowsDesktopRun)
+        runtime.explorer_launch_started = True
+        closed = []
+        cached = SimpleNamespace(close=lambda: closed.append("cached"))
+        fresh = SimpleNamespace(close=lambda: closed.append("fresh"))
+        runtime.explorer_window = cached
+        with patch.object(runtime, "_find_explorer", return_value=None):
+            with self.assertRaisesRegex(RuntimeError, "not found"):
+                runtime._cleanup_explorer()
+        self.assertEqual(closed, [])
+        with patch.object(runtime, "_find_explorer", side_effect=[fresh, None]):
+            self.assertTrue(runtime._cleanup_explorer())
+        self.assertEqual(closed, ["fresh"])
+
     def test_player_cleanup_closes_owned_main_window_and_dialog(self):
         class Window(Control):
             def __init__(self, name):

@@ -795,7 +795,9 @@ class WindowsDesktopRun:
     def _cleanup_explorer(self) -> bool:
         if not self.explorer_launch_started:
             return True
-        window = self.explorer_window or self._find_explorer()
+        # Revalidate HWND and directory immediately before the close side effect.
+        # A cached UIA wrapper may now refer to a navigated or reused window.
+        window = self._find_explorer()
         if window is None:
             raise RuntimeError("owned fixture Explorer window was not found for cleanup")
         window.close()

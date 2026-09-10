@@ -2,6 +2,14 @@
 
 `tools/desktop-probe/probe.py` is a bounded feasibility probe for the Qt 6 Windows package. It is not the complete upstream `#211` acceptance matrix and does not cover `#255` or `#236`.
 
+## Current acceptance limits
+
+This probe is **not accepted for integration**. Native run [34477210965](https://github.com/Auda29/nulloy/actions/runs/34477210965) recorded three visible `NMainWindow` instances in three distinct processes, rather than one. Its package source is `e3371b2cf8b5c364bdba3aa0c142b9bd2d936e5f` (branch head `e2ea841bdfaa5e6c7e81eecb2f0a2cc3a917fa88`); this is a failure observation, not a passed Explorer acceptance.
+
+The code now re-discovers the stored Explorer HWND/directory before closing instead of trusting a cached wrapper. That change has local regression coverage; native verification is still pending. Other independent-review findings remain open: process ownership is inferred from a best-effort snapshot, registry creation/deletion lacks a verified ownership marker, and menu lookup is not bound to the owned Explorer HWND. A reported `cleanup_verified=true` describes the checks implemented for that run, not proof that these remaining safety gaps are resolved.
+
+`player-discovery.jsonl` records each discovery poll and distinguishes no main window, multiple main windows, one selected main window, and exceptions. The exact-one-main requirement must not be relaxed to bypass the observed multi-instance startup.
+
 ## Invocation
 
 ```text
@@ -29,7 +37,7 @@ Exit codes are:
 6. A unique HKCU `SystemFileAssociations\\.wav\\shell\\NulloyDesktopProbe-<run>` verb is installed with `MultiSelectModel=Document`. Its command contains one `%1` file placeholder, never `%*`, and starts the packaged app with `PATH=%SystemRoot%\\System32` so development/toolchain DLL paths are not used. With the explicit `--headless-audio` opt-in, the same Explorer-launched command also sets `GST_PLUGIN_FEATURE_RANK=directsoundsink:0,waveformsink:0,wasapisink:0,wasapi2sink:0`; this reports `audio_mode=no-device-fallback` and excludes `audio_output_not_tested` from acceptance. It is not audio acceptance and does not alter the normal device-backed mode.
 7. Explorer is opened on that private directory. The three files are selected in Explorer and the verb is invoked through the actual Explorer context menu; no multi-file CLI substitute is used. Only the exact `UIItemsView` file container and its direct `ListItem` rows are considered, and selection is re-read after any fallback before continuing.
 8. UIA reads the cold-launched packaged player's playlist after a bounded stabilization wait. The control must match the observed Qt identity `class_name=NPlaylistWidget`, `automation_id=QtSingleApplication.mainWindow.borderWidget.splitter.playlistWidget`; every intermediate row snapshot is retained, and each generated basename must occur exactly once with exactly three rows.
-9. Only the probe's player process (matched by exact package path, PID, and creation time), player window, exact Explorer window/path, registry key, and temporary fixture directory are owned. The probe never kills Explorer or arbitrary player processes and never removes user files.
+9. The intended ownership scope is the private packaged player processes, exact Explorer window/path, unique registry verb and generated fixture directory. PID/creation-time/executable revalidation narrows process cleanup, but does not resolve all ownership gaps listed above. Explorer itself is never terminated as a process.
 
 The probe writes evidence even when blocked or failed. Typical files are:
 
