@@ -109,3 +109,49 @@ jobs:
             ${{ matrix.build }}/package-info.json
             ${{ matrix.build }}/Testing/Temporary/LastTest.log
             .phase3/skin-probe/*-results.txt
+
+  desktop-probe:
+    name: Real Explorer desktop feasibility (Qt6)
+    needs: windows
+    # Opt-in spike only; never execute untrusted fork code on this desktop.
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'test/windows-desktop-probe'
+    runs-on: windows-2022
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install desktop automation tools
+        shell: pwsh
+        run: python -m pip install pywinauto==0.6.9 Pillow==11.3.0
+      - name: Test probe contracts
+        shell: pwsh
+        run: python -m unittest discover -s tools/desktop-probe -p 'test_*.py' -v
+      - uses: actions/download-artifact@v4
+        with:
+          name: Nulloy-Qt6-windows-x64
+          path: .desktop-probe/package
+      - name: Probe real desktop and cold Explorer multi-open
+        shell: pwsh
+        env:
+          PROBE_SOURCE_SHA: ${{ github.sha }}
+        run: |
+          $packages = @(Get-ChildItem .desktop-probe/package -Filter '*.zip' -Recurse)
+          if ($packages.Count -ne 1) { throw "Expected exactly one package, got $($packages.Count)" }
+          python tools/desktop-probe/probe.py --package $packages[0].FullName --output .desktop-probe/evidence --source-sha $env:PROBE_SOURCE_SHA
+          exit $LASTEXITCODE
+      - name: Upload desktop evidence even when blocked
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-desktop-probe-evidence
+          path: .desktop-probe/evidence/
+          if-no-files-found: error
+          retention-days: 14
