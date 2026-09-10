@@ -661,11 +661,9 @@ class WindowsDesktopRun:
 
     def _find_player(self) -> Any:
         try:
-            application = self.application(backend="uia").connect(
-                path=str(self.package.executable), timeout=1
-            )
-            visible = [window for window in application.windows() if window.is_visible()]
-            return visible[0] if visible else None
+            mains = [window for window in self._owned_player_windows()
+                     if window.element_info.class_name == "NMainWindow"]
+            return mains[0] if len(mains) == 1 else None
         except Exception:
             return None
 

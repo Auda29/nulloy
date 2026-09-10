@@ -130,6 +130,17 @@ class ReviewRegressions(unittest.TestCase):
             alias.unlink()
             self.assertFalse(probe.process_identity_matches(process, identity))
 
+    def test_player_discovery_uses_owned_main_window_not_path_or_dialog(self):
+        main = Control("Nulloy", class_name="NMainWindow", control_type="Pane")
+        dialog = Control("Log", class_name="NLogDialog")
+        runtime = object.__new__(probe.WindowsDesktopRun)
+        with patch.object(runtime, "_owned_player_windows", return_value=[dialog, main]):
+            self.assertIs(runtime._find_player(), main)
+        with patch.object(runtime, "_owned_player_windows", return_value=[dialog]):
+            self.assertIsNone(runtime._find_player())
+        with patch.object(runtime, "_owned_player_windows", return_value=[main, Control(class_name="NMainWindow")]):
+            self.assertIsNone(runtime._find_player())
+
     def test_player_cleanup_closes_owned_main_window_and_dialog(self):
         class Window(Control):
             def __init__(self, name):
