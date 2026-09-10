@@ -50,6 +50,37 @@ class IssueRegister(unittest.TestCase):
                 self.assertRegex(url, r'^https://github.com/Auda29/nulloy/pull/[1-9][0-9]*$')
                 self.assertIn(url, text)
 
+    def test_acceptance_baseline_keeps_artifacts_and_open_gates_separate(self):
+        baseline = json.loads((ROOT / 'docs/upstream/acceptance-baseline.json').read_text(encoding='utf-8'))
+        self.assertTrue(baseline['native_acceptance_deferred_by_user'])
+        self.assertEqual(baseline['prs']['20']['state'], 'MERGED')
+        self.assertEqual(baseline['prs']['25']['state'], 'MERGED')
+        self.assertEqual(self.data['delivery_snapshot']['swarm_merged'], 16)
+        self.assertEqual(self.data['delivery_snapshot']['swarm_open'], 3)
+        for n in ['15', '16', '24']:
+            self.assertEqual(baseline['prs'][n]['state'], 'OPEN')
+            self.assertTrue(baseline['prs'][n]['isDraft'])
+        for artifact in baseline['artifacts'].values():
+            if artifact.get('commit'):
+                self.assertRegex(artifact['commit'], r'^[0-9a-f]{40}$')
+            if artifact.get('sha256'):
+                self.assertRegex(artifact['sha256'], r'^[0-9a-f]{64}$')
+                self.assertFalse(artifact['hash_verified_here'])
+        checks = {check['id']: check for check in baseline['checks']}
+        self.assertEqual(len(checks), len(baseline['checks']))
+        self.assertEqual(checks['qt6-package']['artifact'], 'corrected_zip')
+        self.assertEqual(checks['formats']['status'], 'reported_older_only')
+        self.assertEqual(checks['interactive-slim']['artifact'], 'earlier_interactive_exe')
+        for name in ['final-trash-matrix', 'explorer', 'display', 'final-formats', 'macos-original', 'explorer-cleanup']:
+            self.assertEqual(checks[name]['status'], 'open')
+        for check in checks.values():
+            if check['artifact'] is not None:
+                self.assertIn(check['artifact'], baseline['artifacts'])
+        by_number = {row['number']: row for row in self.rows}
+        for n, pr in [(146, '25'), (255, '15'), (236, '16'), (211, '24')]:
+            self.assertEqual(by_number[n]['delivery']['head_sha'], baseline['prs'][pr]['headRefOid'])
+            self.assertEqual(by_number[n]['delivery']['pr_state'], baseline['prs'][pr]['state'])
+
     def test_archived_snapshot_matches_audit_and_register(self):
         archive = ROOT / 'docs/upstream/handoff-evidence'
         raw = (archive / 'audit/snapshot.jsonl').read_bytes()
