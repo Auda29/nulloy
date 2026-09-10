@@ -198,7 +198,8 @@
           "Parent independent review pending",
           "Early tmpfs exhaustion/OOM builds recovered under parent global lock; final actual builds/tests verified"
         ],
-        "original_issue_closed": false
+        "original_issue_closed": false,
+        "merge_commit": "a10b5fff3676586b049c34a976dedba36b2d0b13"
       }
     },
     {
@@ -402,46 +403,70 @@
       "duplicate_search_evidence": "duplicate-search.json",
       "implementation_policy": "Kein GitHub-Write durch Audit. Nur bei freigegebenem reproduzierbarem Stabilisierungsscope ein separater PR pro Implementierungsissue; covered/defer/platform bleiben Dokumentation.",
       "delivery": {
-        "state": "Korrektur als Draft; native Abnahme bzw. IPC-/Policy-Nachweis offen",
+        "state": "Draft: Qt-Papierkorbkorrektur; Windows-Nachweise paketgebunden, finale Playlistmatrix/macOS offen",
         "prs": [
           "https://github.com/Auda29/nulloy/pull/15"
         ],
-        "head_sha": "eed97c21876de703a707a7e0080e01bed033373e",
+        "head_sha": "774894c4eba7b646beafb38313fe0dc73cfb4671",
         "pr_state": "OPEN",
-        "tests": {
-          "ctest": "2/2 suites passed, exit 0",
-          "shared_contract": "18 passed, 0 failed (including init/cleanup)",
-          "windows_boundary": "15 passed, 0 failed (including init/cleanup); real Windows adapter linked with real shared loop and settings",
-          "tdd": "Success, cancel, duplicates, native zero+abort, and irreversible-delete flag each observed RED before its fix and GREEN after",
-          "baseline_sabotage": "Same tests against archived 027d81a production sources: 11 shared failures and 2 Windows-boundary failures; 2/2 CTest suites failed (historical initial-worker tests, before NativeResult signature change)",
-          "security_scan": "No matches in added lines",
-          "git_diff_check": "passed",
-          "evidence": "/home/hermes/workspace/nulloy-swarm/evidence/255/",
-          "review_correction_tdd": "Before production edits, 8 native-cancellation rows failed at unwanted Trash Error dialog against 5d0ea14292986a054c8aad94a68cb152b937a477; all 8 passed after fix. Covers first/later cancel, shell 0/5, ordinary confirmation on/off.",
-          "negative_error_characterization": "4 added rows passed: -1/-43 remain real errors, not cancellation sentinels",
-          "linux_adapter_syntax": "C++17/Qt6 syntax-only compilation passed",
-          "review_evidence": [
-            "review-red.txt",
-            "review-shared-green.txt",
-            "review-windows-green.txt",
-            "review-ctest.xml"
+        "limitations": [
+          "Finale Mehrfach-/Duplikat-Playlistmatrix sowie aktueller/nächster Titel bei Play/Pause/Stop am korrigierten Player bleiben offen.",
+          "Originaler macOS-15.5-Absturz bleibt ohne native Reproduktion offen; keine Schließungsbehauptung.",
+          "Historische Windows-/Qt5-Nachweise sind paket-/quellstandgebundene Berichte; der neue Linux-Shared-Contract ersetzt keine native Windows-/macOS-Abnahme."
+        ],
+        "original_issue_closed": false,
+        "acceptance_baseline": "acceptance-baseline.json",
+        "prior_test_evidence": {
+          "tests": {
+            "ctest": "2/2 suites passed, exit 0",
+            "shared_contract": "18 passed, 0 failed (including init/cleanup)",
+            "windows_boundary": "15 passed, 0 failed (including init/cleanup); real Windows adapter linked with real shared loop and settings",
+            "tdd": "Success, cancel, duplicates, native zero+abort, and irreversible-delete flag each observed RED before its fix and GREEN after",
+            "baseline_sabotage": "Same tests against archived 027d81a production sources: 11 shared failures and 2 Windows-boundary failures; 2/2 CTest suites failed (historical initial-worker tests, before NativeResult signature change)",
+            "security_scan": "No matches in added lines",
+            "git_diff_check": "passed",
+            "evidence": "/home/hermes/workspace/nulloy-swarm/evidence/255/",
+            "review_correction_tdd": "Before production edits, 8 native-cancellation rows failed at unwanted Trash Error dialog against 5d0ea14292986a054c8aad94a68cb152b937a477; all 8 passed after fix. Covers first/later cancel, shell 0/5, ordinary confirmation on/off.",
+            "negative_error_characterization": "4 added rows passed: -1/-43 remain real errors, not cancellation sentinels",
+            "linux_adapter_syntax": "C++17/Qt6 syntax-only compilation passed",
+            "review_evidence": [
+              "review-red.txt",
+              "review-shared-green.txt",
+              "review-windows-green.txt",
+              "review-ctest.xml"
+            ]
+          },
+          "test_commands": [
+            "cmake -S tests/upstream/255 -B /home/hermes/workspace/nulloy-swarm/evidence/255/review-build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS_DEBUG='-O0 -g0'",
+            "flock -w 600 /home/hermes/workspace/nulloy-swarm/build.lock sh -c 'cmake --build /home/hermes/workspace/nulloy-swarm/evidence/255/review-build -j1 && ctest --test-dir /home/hermes/workspace/nulloy-swarm/evidence/255/review-build --output-on-failure --output-junit /home/hermes/workspace/nulloy-swarm/evidence/255/review-ctest.xml && QT_QPA_PLATFORM=xcb xvfb-run -a /home/hermes/workspace/nulloy-swarm/evidence/255/review-build/testTrash && QT_QPA_PLATFORM=xcb xvfb-run -a /home/hermes/workspace/nulloy-swarm/evidence/255/review-build/testWindowsTrash'",
+            "flock -w 600 /home/hermes/workspace/nulloy-swarm/build.lock sh -c 'c++ -std=c++17 -fPIC -fsyntax-only -fmax-errors=3 $(pkg-config --cflags Qt6Widgets) -Isrc src/platform/trash_x11.cpp'"
+          ],
+          "note": "Historische ursprüngliche Harness-Ergebnisse; keine Neuausführung oder Freigabe des aktuellen Windows-Pakets.",
+          "limitations": [
+            "Linux Qt6.8.2 component tests, not a native Windows SDK/ABI or real Recycle Bin test",
+            "Original macOS15.5 crash remains unverified; no crash-closure claim",
+            "Qt5 not installed; compatibility retained but not runtime-verified",
+            "ActionManager/playlistWidget not instantiated by this harness; returned contract validated and existing sole caller inspected",
+            "Native permanent-delete warning UI and player play/pause/stop integration remain manual/parent acceptance",
+            "Independent review and publishing remain with parent; no push or PR performed",
+            "macOS adapter signature updated but not compiled on this Linux host; native status values preserved without new cancellation-code interpretation"
           ]
         },
-        "test_commands": [
-          "cmake -S tests/upstream/255 -B /home/hermes/workspace/nulloy-swarm/evidence/255/review-build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS_DEBUG='-O0 -g0'",
-          "flock -w 600 /home/hermes/workspace/nulloy-swarm/build.lock sh -c 'cmake --build /home/hermes/workspace/nulloy-swarm/evidence/255/review-build -j1 && ctest --test-dir /home/hermes/workspace/nulloy-swarm/evidence/255/review-build --output-on-failure --output-junit /home/hermes/workspace/nulloy-swarm/evidence/255/review-ctest.xml && QT_QPA_PLATFORM=xcb xvfb-run -a /home/hermes/workspace/nulloy-swarm/evidence/255/review-build/testTrash && QT_QPA_PLATFORM=xcb xvfb-run -a /home/hermes/workspace/nulloy-swarm/evidence/255/review-build/testWindowsTrash'",
-          "flock -w 600 /home/hermes/workspace/nulloy-swarm/build.lock sh -c 'c++ -std=c++17 -fPIC -fsyntax-only -fmax-errors=3 $(pkg-config --cflags Qt6Widgets) -Isrc src/platform/trash_x11.cpp'"
-        ],
-        "limitations": [
-          "Linux Qt6.8.2 component tests, not a native Windows SDK/ABI or real Recycle Bin test",
-          "Original macOS15.5 crash remains unverified; no crash-closure claim",
-          "Qt5 not installed; compatibility retained but not runtime-verified",
-          "ActionManager/playlistWidget not instantiated by this harness; returned contract validated and existing sole caller inspected",
-          "Native permanent-delete warning UI and player play/pause/stop integration remain manual/parent acceptance",
-          "Independent review and publishing remain with parent; no push or PR performed",
-          "macOS adapter signature updated but not compiled on this Linux host; native status values preserved without new cancellation-code interpretation"
-        ],
-        "original_issue_closed": false
+        "tests": "Aktuelle Trennung der berichteten finalen, älteren und offenen Abnahmen: acceptance-baseline.json",
+        "test_commands": [],
+        "shared_contract_review_evidence": {
+          "head_sha": "774894c4eba7b646beafb38313fe0dc73cfb4671",
+          "source": "https://github.com/Auda29/nulloy/pull/15#issuecomment-5616048127",
+          "kind": "reported_linux_shared_contract",
+          "tests": {
+            "qttest_passed": 26,
+            "ctest_passed": 1,
+            "failed": 0,
+            "skipped": 0
+          },
+          "production_unchanged_since": "212ba22b8df9d9ee3d8e8a8c7f0b8cdce00f3fc0",
+          "note": "Separater Review-Nachweis: acht Cancellation-Boundary-Fälle; hier nicht erneut ausgeführt. Kein nativer Windows-/macOS-Test, kein neues Paket und kein Ersatz für die ursprünglichen Harness-Ergebnisse."
+        }
       }
     },
     {
@@ -796,7 +821,8 @@
           "Metadata backend only, not skin rendering",
           "One unbounded-ffmpeg fixture timed out in shared environment; thread caps added and rerun passed"
         ],
-        "original_issue_closed": false
+        "original_issue_closed": false,
+        "merge_commit": "cb5ace06a6b81b6988bb5d9304addc29315fdc23"
       }
     },
     {
@@ -1042,7 +1068,8 @@
           "Local Linux Qt6.8.2 TagLib2.0.2 only; Windows Qt5/6 pending",
           "Existing TagLib length deprecation and tagToKey return warnings"
         ],
-        "original_issue_closed": false
+        "original_issue_closed": false,
+        "merge_commit": "a048dee228463f2c9db0c5f41d8e01acb0da9301"
       }
     },
     {
@@ -1124,7 +1151,8 @@
           "WAV only; mid-handoff rate changes and extremely short clips untested",
           "parent independent review and release checks pending"
         ],
-        "original_issue_closed": false
+        "original_issue_closed": false,
+        "merge_commit": "4cad737e3d101b16017864b88502cbc88f24c589"
       }
     },
     {
@@ -1205,7 +1233,8 @@
           "appsink PCM is not hardware audio/listening verification",
           "parent independent review and Windows package checks pending"
         ],
-        "original_issue_closed": false
+        "original_issue_closed": false,
+        "merge_commit": "4f683017816a547874686f92cc9e8ff6051c8089"
       }
     },
     {
@@ -1290,40 +1319,50 @@
       "duplicate_search_evidence": "duplicate-search.json",
       "implementation_policy": "Kein GitHub-Write durch Audit. Nur bei freigegebenem reproduzierbarem Stabilisierungsscope ein separater PR pro Implementierungsissue; covered/defer/platform bleiben Dokumentation.",
       "delivery": {
-        "state": "Korrektur als Draft; native Abnahme bzw. IPC-/Policy-Nachweis offen",
+        "state": "Draft: frühere Slim-Monitorabnahme dokumentiert; finales Paket, DPI/maximiert/weitere Skins offen",
         "prs": [
           "https://github.com/Auda29/nulloy/pull/16"
         ],
         "head_sha": "791ea82705898652d15866be7b77e3ad5f720976",
         "pr_state": "OPEN",
-        "tests": {
-          "qt": "6.8.2",
-          "build": "Release, GCC 14.2, production mainWindow.cpp/settings.cpp and geometry helper",
-          "ctest": "1/1 passed, final rerun after original-code sensitivity test passed",
-          "offscreen": "45 passed, 0 failed, 0 skipped (includes init/cleanup)",
-          "xvfb_scale_1_5": "45 passed, 0 failed, 0 skipped",
-          "xvfb_scale_2": "45 passed, 0 failed, 0 skipped",
-          "baseline_sensitivity": "Final tests compiled against external original mainWindow.cpp/.h: all 12 selected restoration cases failed",
-          "strict_tdd": "Sequential RED/GREEN logs 01-18 in evidence/236; startup first failed against unchanged production code",
-          "evidence": "/home/hermes/workspace/nulloy-swarm/evidence/236",
-          "documentation": "docs/upstream/236.md"
-        },
-        "test_commands": [
-          "cmake -S tests/upstream/236 -B /home/hermes/workspace/nulloy-swarm/evidence/236/build-qt6 -DCMAKE_BUILD_TYPE=Release",
-          "flock /home/hermes/workspace/nulloy-swarm/build.lock sh -c 'cmake --build /home/hermes/workspace/nulloy-swarm/evidence/236/build-qt6 -j1 && ctest --test-dir /home/hermes/workspace/nulloy-swarm/evidence/236/build-qt6 --output-on-failure --timeout 180'",
-          "QT_QPA_PLATFORM=offscreen /home/hermes/workspace/nulloy-swarm/evidence/236/build-qt6/testWindowRestoration",
-          "QT_SCALE_FACTOR=1.5 xvfb-run -a -s '-screen 0 1600x1200x24' /home/hermes/workspace/nulloy-swarm/evidence/236/build-qt6/testWindowRestoration",
-          "QT_SCALE_FACTOR=2 xvfb-run -a -s '-screen 0 1600x1200x24' /home/hermes/workspace/nulloy-swarm/evidence/236/build-qt6/testWindowRestoration"
-        ],
         "limitations": [
-          "Parent independent review and publication pending; no push, PR, merge, or upstream writes made.",
-          "Qt5 configure attempted but Qt5 dev package absent; Qt5 platform paths require CI.",
-          "Windows build/native taskbar/mixed-DPI/physical-hotplug/original-skin acceptance not executed in Linux; detailed matrix in docs/upstream/236.md.",
-          "Xvfb had no window manager; notifications and multi-screen rectangles are synthetic inputs, not physical monitor tests.",
-          "Initial shared-resource OOM and a terminated Release build were recovered; final serialized build succeeded. Existing Qt mouse/hover deprecation warnings remain.",
-          "This fixes the demonstrated offscreen-coordinate class, not a proven diagnosis of every invisible-window report."
+          "Finaler Windows-Fenstersmoke mit unterschiedlicher DPI, maximiertem Zustand und weiteren Skins bleibt offen; ältere bestätigte Slim-Monitorfälle sind kein Nachweis für die identische finale EXE.",
+          "Die behobene Offscreen-Koordinatenklasse ist keine gesicherte Diagnose jedes ursprünglichen Unsichtbarkeitsberichts."
         ],
-        "original_issue_closed": false
+        "original_issue_closed": false,
+        "acceptance_baseline": "acceptance-baseline.json",
+        "prior_test_evidence": {
+          "tests": {
+            "qt": "6.8.2",
+            "build": "Release, GCC 14.2, production mainWindow.cpp/settings.cpp and geometry helper",
+            "ctest": "1/1 passed, final rerun after original-code sensitivity test passed",
+            "offscreen": "45 passed, 0 failed, 0 skipped (includes init/cleanup)",
+            "xvfb_scale_1_5": "45 passed, 0 failed, 0 skipped",
+            "xvfb_scale_2": "45 passed, 0 failed, 0 skipped",
+            "baseline_sensitivity": "Final tests compiled against external original mainWindow.cpp/.h: all 12 selected restoration cases failed",
+            "strict_tdd": "Sequential RED/GREEN logs 01-18 in evidence/236; startup first failed against unchanged production code",
+            "evidence": "/home/hermes/workspace/nulloy-swarm/evidence/236",
+            "documentation": "docs/upstream/236.md"
+          },
+          "test_commands": [
+            "cmake -S tests/upstream/236 -B /home/hermes/workspace/nulloy-swarm/evidence/236/build-qt6 -DCMAKE_BUILD_TYPE=Release",
+            "flock /home/hermes/workspace/nulloy-swarm/build.lock sh -c 'cmake --build /home/hermes/workspace/nulloy-swarm/evidence/236/build-qt6 -j1 && ctest --test-dir /home/hermes/workspace/nulloy-swarm/evidence/236/build-qt6 --output-on-failure --timeout 180'",
+            "QT_QPA_PLATFORM=offscreen /home/hermes/workspace/nulloy-swarm/evidence/236/build-qt6/testWindowRestoration",
+            "QT_SCALE_FACTOR=1.5 xvfb-run -a -s '-screen 0 1600x1200x24' /home/hermes/workspace/nulloy-swarm/evidence/236/build-qt6/testWindowRestoration",
+            "QT_SCALE_FACTOR=2 xvfb-run -a -s '-screen 0 1600x1200x24' /home/hermes/workspace/nulloy-swarm/evidence/236/build-qt6/testWindowRestoration"
+          ],
+          "note": "Historische ursprüngliche Harness-Ergebnisse; keine Neuausführung oder Freigabe des aktuellen Windows-Pakets.",
+          "limitations": [
+            "Parent independent review and publication pending; no push, PR, merge, or upstream writes made.",
+            "Qt5 configure attempted but Qt5 dev package absent; Qt5 platform paths require CI.",
+            "Windows build/native taskbar/mixed-DPI/physical-hotplug/original-skin acceptance not executed in Linux; detailed matrix in docs/upstream/236.md.",
+            "Xvfb had no window manager; notifications and multi-screen rectangles are synthetic inputs, not physical monitor tests.",
+            "Initial shared-resource OOM and a terminated Release build were recovered; final serialized build succeeded. Existing Qt mouse/hover deprecation warnings remain.",
+            "This fixes the demonstrated offscreen-coordinate class, not a proven diagnosis of every invisible-window report."
+          ]
+        },
+        "tests": "Aktuelle Trennung der berichteten finalen, älteren und offenen Abnahmen: acceptance-baseline.json",
+        "test_commands": []
       }
     },
     {
@@ -1736,7 +1775,8 @@
           "Scope limited to production local-action/Qt-event routing with equivalent fixture wiring, not full NActionManager/player; originalMacBook not proven",
           "Frozen for parent review/publication; no push/PR/upstream write"
         ],
-        "original_issue_closed": false
+        "original_issue_closed": false,
+        "merge_commit": "9f7b3d08de78ba79b113d19c14d9aababade5396"
       }
     },
     {
@@ -1840,53 +1880,65 @@
       "duplicate_search_evidence": "duplicate-search.json",
       "implementation_policy": "Kein GitHub-Write durch Audit. Nur bei freigegebenem reproduzierbarem Stabilisierungsscope ein separater PR pro Implementierungsissue; covered/defer/platform bleiben Dokumentation.",
       "delivery": {
-        "state": "Korrektur als Draft; native Abnahme bzw. IPC-/Policy-Nachweis offen",
+        "state": "Draft: echte Explorer-Matrix und Aufräumen des Testmenüs offen",
         "prs": [
           "https://github.com/Auda29/nulloy/pull/24"
         ],
         "head_sha": "21848c11d6ca4dc1e1c8552285ffc1b84946a029",
         "pr_state": "OPEN",
-        "tests": {
-          "final_qttest_passed": 33,
-          "failed": 0,
-          "skipped": 0,
-          "ctest_consecutive_passes": 3,
-          "baseline_red": "red-01.txt: real unmodified NPlayer, expected 3 rows, actual 1",
-          "tdd_cycles": [
-            "multi-message retention",
-            "continuing idle window",
-            "all four CLI command boundaries",
-            "preference transitions"
-          ],
-          "sabotage_failures": 19,
-          "coverage": [
-            "12 enqueue/play/state combinations",
-            "8 restored-startup combinations",
-            "row and media selection",
-            "position preservation",
-            "actual percent-i display values",
-            "250ms idle and 1000ms absolute bounds",
-            "empty and missing paths",
-            "command priority and no late playback"
-          ],
-          "evidence": "/home/hermes/workspace/nulloy-swarm/evidence/211",
-          "fixtures": "C++ test generates real disposable PCM WAV files; CTest setup is automatic"
-        },
-        "test_commands": [
-          "cmake -S /home/hermes/workspace/nulloy-swarm/issue-211/tests/upstream/211 -B /home/hermes/workspace/nulloy-swarm/evidence/211/build -G Ninja -DCMAKE_CXX_FLAGS='--param ggc-min-expand=10 --param ggc-min-heapsize=16384'",
-          "flock /home/hermes/workspace/nulloy-swarm/build.lock sh -c 'cmake --build /home/hermes/workspace/nulloy-swarm/evidence/211/build -j1 && QT_QPA_PLATFORM=offscreen /home/hermes/workspace/nulloy-swarm/evidence/211/build/test211 -o /home/hermes/workspace/nulloy-swarm/evidence/211/green-final.txt,txt && ctest --test-dir /home/hermes/workspace/nulloy-swarm/evidence/211/build --output-on-failure --no-tests=error --repeat until-fail:3'",
-          "git -C /home/hermes/workspace/nulloy-swarm/issue-211 diff --cached --check"
-        ],
         "limitations": [
           "Bounded heuristic, not arbitrary shell selection detection: independent rapid opens can group, delayed/large selections can split and replace earlier groups.",
-          "Verified real Linux NPlayer/playlist/GStreamer/TagLib code with separate timed readMessage calls; actual process launch, IPC transport and Windows Explorer not exercised.",
-          "Linux-only standalone harness has explicit stock-font-query and desktop-global-hotkey boundary substitutes; GStreamer uses existing test fakesink, not audible validation.",
-          "Qt5 runtime and native Windows UI/package validation remain pending; main.cpp, loadDefaultPlaylist and all UI/drop code unchanged.",
-          "Existing --pause-to-play dispatch intentionally preserved; #98/#23 not implemented.",
-          "Independent review and publishing delegated to parent; no push, merge, PR or upstream write performed.",
-          "Early OOM/tool-session issues resolved through 2GiB-aware serialized builds; baseline warnings remain documented."
+          "Echte Explorer-Matrix am finalen Paket bleibt offen: geschlossen/laufend, Enqueue/Play-enqueued, Pause/Stop, getrennte schnelle Aufrufe und große Auswahl.",
+          "Temporären Explorer-Testschlüssel nach Prüfung gezielt entfernen; hier weder Existenz noch Entfernung verifiziert.",
+          "Existing --pause-to-play dispatch intentionally preserved; #98/#23 not implemented."
         ],
-        "original_issue_closed": false
+        "original_issue_closed": false,
+        "acceptance_baseline": "acceptance-baseline.json",
+        "prior_test_evidence": {
+          "tests": {
+            "final_qttest_passed": 33,
+            "failed": 0,
+            "skipped": 0,
+            "ctest_consecutive_passes": 3,
+            "baseline_red": "red-01.txt: real unmodified NPlayer, expected 3 rows, actual 1",
+            "tdd_cycles": [
+              "multi-message retention",
+              "continuing idle window",
+              "all four CLI command boundaries",
+              "preference transitions"
+            ],
+            "sabotage_failures": 19,
+            "coverage": [
+              "12 enqueue/play/state combinations",
+              "8 restored-startup combinations",
+              "row and media selection",
+              "position preservation",
+              "actual percent-i display values",
+              "250ms idle and 1000ms absolute bounds",
+              "empty and missing paths",
+              "command priority and no late playback"
+            ],
+            "evidence": "/home/hermes/workspace/nulloy-swarm/evidence/211",
+            "fixtures": "C++ test generates real disposable PCM WAV files; CTest setup is automatic"
+          },
+          "test_commands": [
+            "cmake -S /home/hermes/workspace/nulloy-swarm/issue-211/tests/upstream/211 -B /home/hermes/workspace/nulloy-swarm/evidence/211/build -G Ninja -DCMAKE_CXX_FLAGS='--param ggc-min-expand=10 --param ggc-min-heapsize=16384'",
+            "flock /home/hermes/workspace/nulloy-swarm/build.lock sh -c 'cmake --build /home/hermes/workspace/nulloy-swarm/evidence/211/build -j1 && QT_QPA_PLATFORM=offscreen /home/hermes/workspace/nulloy-swarm/evidence/211/build/test211 -o /home/hermes/workspace/nulloy-swarm/evidence/211/green-final.txt,txt && ctest --test-dir /home/hermes/workspace/nulloy-swarm/evidence/211/build --output-on-failure --no-tests=error --repeat until-fail:3'",
+            "git -C /home/hermes/workspace/nulloy-swarm/issue-211 diff --cached --check"
+          ],
+          "note": "Historische ursprüngliche Harness-Ergebnisse; keine Neuausführung oder Freigabe des aktuellen Windows-Pakets.",
+          "limitations": [
+            "Bounded heuristic, not arbitrary shell selection detection: independent rapid opens can group, delayed/large selections can split and replace earlier groups.",
+            "Verified real Linux NPlayer/playlist/GStreamer/TagLib code with separate timed readMessage calls; actual process launch, IPC transport and Windows Explorer not exercised.",
+            "Linux-only standalone harness has explicit stock-font-query and desktop-global-hotkey boundary substitutes; GStreamer uses existing test fakesink, not audible validation.",
+            "Qt5 runtime and native Windows UI/package validation remain pending; main.cpp, loadDefaultPlaylist and all UI/drop code unchanged.",
+            "Existing --pause-to-play dispatch intentionally preserved; #98/#23 not implemented.",
+            "Independent review and publishing delegated to parent; no push, merge, PR or upstream write performed.",
+            "Early OOM/tool-session issues resolved through 2GiB-aware serialized builds; baseline warnings remain documented."
+          ]
+        },
+        "tests": "Aktuelle Trennung der berichteten finalen, älteren und offenen Abnahmen: acceptance-baseline.json",
+        "test_commands": []
       }
     },
     {
@@ -2328,7 +2380,8 @@
           "CLI args shim and synchronized fake audio sinks; real production engine otherwise unchanged",
           "First ctest rerun timed out generating fixtures under shared cgroup OOM pressure; serialized rerun passed"
         ],
-        "original_issue_closed": false
+        "original_issue_closed": false,
+        "merge_commit": "2c18ab0a8e53e7ddab29edf8a8b44008ab1d96e5"
       }
     },
     {
@@ -2692,18 +2745,19 @@
       "duplicate_search_evidence": "duplicate-search.json",
       "implementation_policy": "Kein GitHub-Write durch Audit. Nur bei freigegebenem reproduzierbarem Stabilisierungsscope ein separater PR pro Implementierungsissue; covered/defer/platform bleiben Dokumentation.",
       "delivery": {
-        "state": "Test-PR offen, Draft; ursprüngliches Issue nicht pauschal geschlossen",
+        "state": "Test-PR integriert; ursprüngliches Issue nicht pauschal geschlossen",
         "prs": [
           "https://github.com/Auda29/nulloy/pull/25"
         ],
         "head_sha": "7bcc139562a7a207c5030ca1f629ebeb3f2542d7",
-        "pr_state": "OPEN",
+        "pr_state": "MERGED",
         "tests": "Siehe Issue-Bericht und verknüpfte CI-Prüfungen",
         "test_commands": [],
         "limitations": [
           "Originalplattform und vollständiger Player bleiben gesonderte Abnahmen; siehe Issue-Bericht"
         ],
-        "original_issue_closed": false
+        "original_issue_closed": false,
+        "merge_commit": "01c48f3faa8e5cb00753b96bb087a37d4aa02726"
       }
     },
     {
@@ -2842,7 +2896,8 @@
           "50ms intermediate visibleprogress not claimed",
           "parent independent review and package compatibility pending"
         ],
-        "original_issue_closed": false
+        "original_issue_closed": false,
+        "merge_commit": "2d54d7d4ebd132add13cbdf1a64159357df5b42a"
       }
     },
     {
@@ -2906,7 +2961,8 @@
         "limitations": [
           "Originalplattform und vollständiger Player bleiben gesonderte Abnahmen; siehe Issue-Bericht"
         ],
-        "original_issue_closed": false
+        "original_issue_closed": false,
+        "merge_commit": "46a35da1280bcf9debb85c56aca1e3a10d55f60c"
       }
     },
     {
@@ -3126,7 +3182,8 @@
         "limitations": [
           "Originalplattform und vollständiger Player bleiben gesonderte Abnahmen; siehe Issue-Bericht"
         ],
-        "original_issue_closed": false
+        "original_issue_closed": false,
+        "merge_commit": "67f26cba67e9e20c4a20407d978a64bc782886e4"
       }
     },
     {
@@ -3207,7 +3264,8 @@
           "removeFiles existing missing index/duration recomputation unchanged/excluded; no persistence/waveform/memory-profile/native keyboard claims.",
           "OOM/build timeouts and initial seek fixture race were diagnosed; final build/test lock-protected and green. Independent parent review pending; branch frozen for review/publication. No push/PR/upstream write."
         ],
-        "original_issue_closed": false
+        "original_issue_closed": false,
+        "merge_commit": "4faa863179459b73c5995e56a420bbcf9ea783aa"
       }
     },
     {
@@ -3326,7 +3384,8 @@
           "Qt6 Linux only; Qt5, canonical Windows package, native macOS, actual audio and full player restart outstanding",
           "Independent base027d81a branch, frozen for parent review/publication; no push/PR/upstream write"
         ],
-        "original_issue_closed": false
+        "original_issue_closed": false,
+        "merge_commit": "f10b99e0d83ff60e90167762ed71eea3df0cec18"
       }
     },
     {
@@ -4673,7 +4732,8 @@
           "Only metadata handles, not playback or waveform handles",
           "TagLib2.0.2 upstream FILE_SHARE_READ is static dependency evidence not measurement of released Windows DLL"
         ],
-        "original_issue_closed": false
+        "original_issue_closed": false,
+        "merge_commit": "05c59cbffcaf80e9299a4d7afee9cdd294321301"
       }
     },
     {
@@ -4796,5 +4856,47 @@
         "limitations": "Keine neue Featureimplementierung oder Laufzeitabnahme im Stabilisierungsschritt; verlinkte Gestaltungsmedien nicht umfassend geprüft."
       }
     }
-  ]
+  ],
+  "delivery_snapshot": {
+    "captured_at_utc": "2026-09-10T09:09:02Z",
+    "swarm_pr_count": 19,
+    "swarm_merged": 16,
+    "swarm_open": 3,
+    "supporting_prs": {
+      "7": {
+        "headRefName": "ci/upstream-stabilization",
+        "headRefOid": "378b1f609a6de38dfeb2619d6d19dfed2e1aff91",
+        "isDraft": false,
+        "mergeCommit": {
+          "oid": "8238c9456373e9e8b1837bc426f0b85b08bb4d5e"
+        },
+        "number": 7,
+        "state": "MERGED",
+        "url": "https://github.com/Auda29/nulloy/pull/7"
+      },
+      "20": {
+        "headRefName": "docs/upstream-issue-register",
+        "headRefOid": "0f4c6084971a18da816f4a8612bd1fd1c9393b65",
+        "isDraft": false,
+        "mergeCommit": {
+          "oid": "3323869f388ebf1e81da23259a3d580d3d148975"
+        },
+        "number": 20,
+        "state": "MERGED",
+        "url": "https://github.com/Auda29/nulloy/pull/20"
+      },
+      "26": {
+        "headRefName": "test/native-runner-path-portability",
+        "headRefOid": "17a21c0b001ad2a5ec3a24f5fd0e7c13bd1de5e3",
+        "isDraft": false,
+        "mergeCommit": {
+          "oid": "264b05ddbd732dcb6970d42bc5ab82adde5c5e1f"
+        },
+        "number": 26,
+        "state": "MERGED",
+        "url": "https://github.com/Auda29/nulloy/pull/26"
+      }
+    },
+    "acceptance_baseline": "acceptance-baseline.json"
+  }
 }

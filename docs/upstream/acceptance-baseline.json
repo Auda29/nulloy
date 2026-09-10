@@ -1,0 +1,163 @@
+{
+  "schema_version": 1,
+  "captured_at_utc": "2026-09-10T09:09:02Z",
+  "integration_at_capture": "264b05ddbd732dcb6970d42bc5ab82adde5c5e1f",
+  "source_report": "https://github.com/Auda29/nulloy/blob/81160a130ae0641fc8d9f220ec52fdec8fb9b863/docs/upstream/WINDOWS_ACCEPTANCE.md",
+  "evidence_policy": "Windows-Ergebnisse aus dem versionierten Bericht übernommen, hier nicht erneut ausgeführt. Hashwerte sind gemeldet, nicht an einem hier verfügbaren ZIP/EXE nachgerechnet. Kein Release.",
+  "native_acceptance_deferred_by_user": true,
+  "artifacts": {
+    "corrected_zip": {
+      "commit": "078c734cf8e31fd561a857fa492c530bd4bb6f76",
+      "version": "0.10.0-alpha.3-test",
+      "path": ".phase4/acceptance-build/NulloyFork-0.10.0-alpha.3-test-windows-x64.zip",
+      "sha256": "e9ce76194d4c8a87b429da7adff0b8f6d5468f99349691dc1f4e46f11f1f7b5a",
+      "hash_verified_here": false
+    },
+    "earlier_interactive_exe": {
+      "commit": null,
+      "sha256": "855d74e505c670194a2e85ee34a93d9358949da55ade4b8d4308610e45a152b5",
+      "hash_verified_here": false,
+      "note": "Interaktive Abnahme vor zusätzlicher Prüfung der Quelldatei-Abwesenheit im finalen Paket; kein exakter Commit im Bericht genannt."
+    },
+    "obsolete_package": {
+      "commit": "f604c64ded4d9b44a39913b00f9a38317f7683cd",
+      "sha256": null,
+      "note": "Überholt wegen unsicherem Windows-Papierkorbpfad. Nicht zur Löschabnahme verwenden."
+    }
+  },
+  "checks": [
+    {
+      "id": "qt6-package",
+      "status": "reported_final",
+      "artifact": "corrected_zip",
+      "kind": "automated",
+      "result": "Qt6 5/5 CTests; entpacktes Paket ohne Toolchain-PATH, 520 Dateihashes / 236 x64-Binärdateien; Skin-Paketabläufe und separater Prozesslauf bestanden laut Bericht."
+    },
+    {
+      "id": "qt5-native-trash",
+      "status": "reported_corrected_source",
+      "artifact": null,
+      "kind": "automated",
+      "result": "Qt5 vollständiger Build 5/5 CTests; native Papierkorbtests Qt5/Qt6 mit Recycling an/aus und fehlender Datei laut Bericht. Separate Builds, nicht dieselbe Qt6-ZIP-Datei."
+    },
+    {
+      "id": "formats",
+      "status": "reported_older_only",
+      "artifact": "obsolete_package",
+      "kind": "automated",
+      "result": "WAV/MP3/FLAC/Ogg/Opus/WavPack und Unicode-Tags am alten Paket; am finalen ZIP nicht nachgeholt."
+    },
+    {
+      "id": "interactive-slim",
+      "status": "reported_older_only",
+      "artifact": "earlier_interactive_exe",
+      "kind": "manual",
+      "result": "Slim: Neustart ohne zweiten Monitor, laufend normal/minimiert trennen/verbinden; Bedienung/Audio/Drag-and-drop sowie Cancel nach gescheitertem Recycling laut Bericht. Nicht auf identische finale EXE übertragbar."
+    },
+    {
+      "id": "final-trash-matrix",
+      "status": "open",
+      "artifact": "corrected_zip",
+      "kind": "manual",
+      "result": "Mehrfach-/Teilabbruch und doppelte Playlistzeilen; aktueller/nächster Titel bei Play/Pause/Stop einschließlich weiterer Titelwechsel. Nur erzeugte entbehrliche Dateien."
+    },
+    {
+      "id": "explorer",
+      "status": "open",
+      "artifact": "corrected_zip",
+      "kind": "manual",
+      "result": "Echter Explorer bei geschlossenem/laufendem Player; Enqueue/Play-enqueued-Matrix, Pause/Stop, getrennte schnelle Aufrufe und große Auswahl. Nicht durch Drop/CLI-Einzelprozess ersetzt."
+    },
+    {
+      "id": "display",
+      "status": "open",
+      "artifact": "corrected_zip",
+      "kind": "manual",
+      "result": "Unterschiedliche DPI, maximiert, weitere Skins; gezielte finale Smoke-Abnahme. Frühere bestätigte Slim-Monitorfälle bleiben als historischer Nachweis erhalten."
+    },
+    {
+      "id": "final-formats",
+      "status": "open",
+      "artifact": "corrected_zip",
+      "kind": "automated",
+      "result": "Formatmatrix am finalen ZIP mit passender Windows-Umgebung erneut ausführen."
+    },
+    {
+      "id": "macos-original",
+      "status": "open",
+      "artifact": null,
+      "kind": "manual",
+      "result": "Originaler macOS-Absturz #255 bleibt offen."
+    },
+    {
+      "id": "explorer-cleanup",
+      "status": "open",
+      "artifact": null,
+      "kind": "manual",
+      "result": "Nur den temporären Schlüssel HKCU\\Software\\Classes\\SystemFileAssociations\\.wav\\shell\\NulloyForkAcceptance_20260909 nach Prüfung entfernen; hier weder ausgelesen noch gelöscht."
+    }
+  ],
+  "prs": {
+    "15": {
+      "headRefName": "fix/upstream-255",
+      "headRefOid": "774894c4eba7b646beafb38313fe0dc73cfb4671",
+      "isDraft": true,
+      "mergeCommit": null,
+      "number": 15,
+      "state": "OPEN",
+      "url": "https://github.com/Auda29/nulloy/pull/15"
+    },
+    "16": {
+      "headRefName": "fix/upstream-236",
+      "headRefOid": "791ea82705898652d15866be7b77e3ad5f720976",
+      "isDraft": true,
+      "mergeCommit": null,
+      "number": 16,
+      "state": "OPEN",
+      "url": "https://github.com/Auda29/nulloy/pull/16"
+    },
+    "20": {
+      "headRefName": "docs/upstream-issue-register",
+      "headRefOid": "0f4c6084971a18da816f4a8612bd1fd1c9393b65",
+      "isDraft": false,
+      "mergeCommit": {
+        "oid": "3323869f388ebf1e81da23259a3d580d3d148975"
+      },
+      "number": 20,
+      "state": "MERGED",
+      "url": "https://github.com/Auda29/nulloy/pull/20"
+    },
+    "24": {
+      "headRefName": "fix/upstream-211",
+      "headRefOid": "21848c11d6ca4dc1e1c8552285ffc1b84946a029",
+      "isDraft": true,
+      "mergeCommit": null,
+      "number": 24,
+      "state": "OPEN",
+      "url": "https://github.com/Auda29/nulloy/pull/24"
+    },
+    "25": {
+      "headRefName": "fix/upstream-146",
+      "headRefOid": "7bcc139562a7a207c5030ca1f629ebeb3f2542d7",
+      "isDraft": false,
+      "mergeCommit": {
+        "oid": "01c48f3faa8e5cb00753b96bb087a37d4aa02726"
+      },
+      "number": 25,
+      "state": "MERGED",
+      "url": "https://github.com/Auda29/nulloy/pull/25"
+    },
+    "26": {
+      "headRefName": "test/native-runner-path-portability",
+      "headRefOid": "17a21c0b001ad2a5ec3a24f5fd0e7c13bd1de5e3",
+      "isDraft": false,
+      "mergeCommit": {
+        "oid": "264b05ddbd732dcb6970d42bc5ab82adde5c5e1f"
+      },
+      "number": 26,
+      "state": "MERGED",
+      "url": "https://github.com/Auda29/nulloy/pull/26"
+    }
+  },
+  "merge_policy": "Native funktionale Drafts #15/#16/#24 bleiben offen; keine Weitergabe ihrer Änderungen in integration ohne Abnahme. master/Release nicht freigegeben."
+}

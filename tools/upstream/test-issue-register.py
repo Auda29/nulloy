@@ -50,6 +50,86 @@ class IssueRegister(unittest.TestCase):
                 self.assertRegex(url, r'^https://github.com/Auda29/nulloy/pull/[1-9][0-9]*$')
                 self.assertIn(url, text)
 
+    def test_acceptance_baseline_keeps_artifacts_and_open_gates_separate(self):
+        baseline = json.loads((ROOT / 'docs/upstream/acceptance-baseline.json').read_text(encoding='utf-8'))
+        self.assertTrue(baseline['native_acceptance_deferred_by_user'])
+        self.assertEqual(baseline['prs']['20']['state'], 'MERGED')
+        self.assertEqual(baseline['prs']['25']['state'], 'MERGED')
+        self.assertEqual(self.data['delivery_snapshot']['swarm_merged'], 16)
+        self.assertEqual(self.data['delivery_snapshot']['swarm_open'], 3)
+        for n in ['15', '16', '24']:
+            self.assertEqual(baseline['prs'][n]['state'], 'OPEN')
+            self.assertTrue(baseline['prs'][n]['isDraft'])
+        # Fixed identities copied from the immutable source report, NOT hashes
+        # independently calculated from Windows ZIP/EXE bytes. Unknown stays null.
+        self.assertEqual(baseline['source_report'],
+                         'https://github.com/Auda29/nulloy/blob/'
+                         '81160a130ae0641fc8d9f220ec52fdec8fb9b863/'
+                         'docs/upstream/WINDOWS_ACCEPTANCE.md')
+        self.assertEqual(
+            {name: (artifact['commit'], artifact['sha256'])
+             for name, artifact in baseline['artifacts'].items()},
+            {
+                'corrected_zip': (
+                    '078c734cf8e31fd561a857fa492c530bd4bb6f76',
+                    'e9ce76194d4c8a87b429da7adff0b8f6d5468f99349691dc1f4e46f11f1f7b5a'),
+                'earlier_interactive_exe': (
+                    None,
+                    '855d74e505c670194a2e85ee34a93d9358949da55ade4b8d4308610e45a152b5'),
+                'obsolete_package': (
+                    'f604c64ded4d9b44a39913b00f9a38317f7683cd', None),
+            })
+        for artifact in baseline['artifacts'].values():
+            if artifact.get('commit'):
+                self.assertRegex(artifact['commit'], r'^[0-9a-f]{40}$')
+            if artifact.get('sha256'):
+                self.assertRegex(artifact['sha256'], r'^[0-9a-f]{64}$')
+                self.assertFalse(artifact['hash_verified_here'])
+        checks = {check['id']: check for check in baseline['checks']}
+        self.assertEqual(len(checks), len(baseline['checks']))
+        self.assertEqual(
+            {name: check['artifact'] for name, check in checks.items()},
+            {
+                'qt6-package': 'corrected_zip',
+                'qt5-native-trash': None,
+                'formats': 'obsolete_package',
+                'interactive-slim': 'earlier_interactive_exe',
+                'final-trash-matrix': 'corrected_zip',
+                'explorer': 'corrected_zip',
+                'display': 'corrected_zip',
+                'final-formats': 'corrected_zip',
+                'macos-original': None,
+                'explorer-cleanup': None,
+            })
+        self.assertEqual(checks['formats']['status'], 'reported_older_only')
+        for name in ['final-trash-matrix', 'explorer', 'display', 'final-formats', 'macos-original', 'explorer-cleanup']:
+            self.assertEqual(checks[name]['status'], 'open')
+        for check in checks.values():
+            if check['artifact'] is not None:
+                self.assertIn(check['artifact'], baseline['artifacts'])
+        by_number = {row['number']: row for row in self.rows}
+        for n, pr in [(146, '25'), (255, '15'), (236, '16'), (211, '24')]:
+            self.assertEqual(by_number[n]['delivery']['head_sha'], baseline['prs'][pr]['headRefOid'])
+            self.assertEqual(by_number[n]['delivery']['pr_state'], baseline['prs'][pr]['state'])
+
+    def test_historical_harness_limitations_are_not_current_acceptance_gaps(self):
+        by_number = {row['number']: row for row in self.rows}
+        for n in [255, 236, 211]:
+            with self.subTest(issue=n):
+                delivery = by_number[n]['delivery']
+                prior = delivery['prior_test_evidence']
+                self.assertIn('limitations', prior)
+                self.assertTrue(prior['limitations'])
+                self.assertTrue(prior['tests'])
+                self.assertTrue(prior['test_commands'])
+                self.assertTrue(delivery['limitations'])
+                historical_publication = [text for text in prior['limitations']
+                                          if 'no push' in text]
+                self.assertEqual(len(historical_publication), 1)
+                self.assertNotIn(historical_publication[0], delivery['limitations'])
+                self.assertNotIn('Qt5 not installed', ' '.join(delivery['limitations']))
+                self.assertNotIn('Qt5 runtime', ' '.join(delivery['limitations']))
+
     def test_archived_snapshot_matches_audit_and_register(self):
         archive = ROOT / 'docs/upstream/handoff-evidence'
         raw = (archive / 'audit/snapshot.jsonl').read_bytes()

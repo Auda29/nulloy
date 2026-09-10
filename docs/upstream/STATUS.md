@@ -1,5 +1,11 @@
 # Status aller 80 Upstream-Issues
 
+## Aktueller Lieferstand
+
+Snapshot: 2026-09-10T08:53:25.460309+00:00. Ursprüngliche Swarm-PRs #7–#25: 16 gemergt, 3 offen. PR #20 (Register) und #25 (Metadaten) sind integriert. Weitere unterstützende Folge-PRs zählen nicht zu diesen 19 ursprünglichen PRs.
+
+Der [aktuelle Teststand](ACCEPTANCE_BASELINE.md) trennt das korrigierte Windows-ZIP, ältere interaktive EXE/Formatprüfung und offene Abnahmen. Native Abnahmen werden auf Nutzerwunsch vorerst nicht ausgeführt. Historische Audit- und Review-Dateien bleiben unverändert.
+
 Quelle: [ursprüngliche Analyse](../UPSTREAM_ISSUES_ANALYSIS.md). Der Swarm hat die 80 aufgeführten Issues mit ihren 126 Kommentaren erneut abgerufen und bewertet. Issue-IDs, Kommentar-IDs und alle Einzelzählungen wurden programmatisch gegen den Rohsnapshot geprüft.
 
 Die maschinenlesbare [Statusdatei](issue-register.json) enthält je Issue die Quelllinks, Codebelege, Entscheidung, konkrete nächste Prüfung und den Lieferstatus. Der textuelle Rohsnapshot der öffentlichen Issue-Threads ist unter [handoff-evidence/audit/snapshot.jsonl](handoff-evidence/audit/snapshot.jsonl) mitversioniert; sein SHA-256 steht in der Statusdatei. [Übergabe für ein anderes Gerät](HANDOFF.md).
@@ -24,7 +30,7 @@ Audit-Entscheidungen: covered: 4, defer: 43, needs-repro: 5, platform: 12, stabi
 | [#260](https://github.com/nulloy/nulloy/issues/260) | Qt6 migration | covered | Bestand im Code geprüft  |
 | [#259](https://github.com/nulloy/nulloy/issues/259) | Feature request: make it visible in playlist which songs belong to a single album | defer | zurückgestellt gemäß Umfang  |
 | [#256](https://github.com/nulloy/nulloy/issues/256) | Is there no portable version anymore? | covered | Bestand im Code geprüft  |
-| [#255](https://github.com/nulloy/nulloy/issues/255) | Move to Trash app crash | stabilize | Korrektur als Draft; native Abnahme bzw. IPC-/Policy-Nachweis offen [PR #15](https://github.com/Auda29/nulloy/pull/15) |
+| [#255](https://github.com/nulloy/nulloy/issues/255) | Move to Trash app crash | stabilize | Draft: Qt-Papierkorbkorrektur; Windows-Nachweise paketgebunden, finale Playlistmatrix/macOS offen [PR #15](https://github.com/Auda29/nulloy/pull/15) |
 | [#253](https://github.com/nulloy/nulloy/issues/253) | About dep dev-qt/linguist: are you sure that you need it? | platform | spätere Plattformabnahme  |
 | [#250](https://github.com/nulloy/nulloy/issues/250) | MacOs Code Signing | platform | spätere Plattformabnahme  |
 | [#249](https://github.com/nulloy/nulloy/issues/249) | AUDIO INPUT AND OUTPUT PREFERENCES MISSING | defer | zurückgestellt gemäß Umfang  |
@@ -38,7 +44,7 @@ Audit-Entscheidungen: covered: 4, defer: 43, needs-repro: 5, platform: 12, stabi
 | [#240](https://github.com/nulloy/nulloy/issues/240) | Incorrect loop point on non-default playback rate | stabilize | Test-PR integriert; ursprüngliches Issue nicht pauschal geschlossen [PR #11](https://github.com/Auda29/nulloy/pull/11) |
 | [#238](https://github.com/nulloy/nulloy/issues/238) | Nulloy always starts on MAX-Volume | stabilize | Test-PR integriert; ursprüngliches Issue nicht pauschal geschlossen [PR #8](https://github.com/Auda29/nulloy/pull/8) |
 | [#237](https://github.com/nulloy/nulloy/issues/237) | Fluent Design (Windows 11) skin | defer | zurückgestellt gemäß Umfang  |
-| [#236](https://github.com/nulloy/nulloy/issues/236) | Initially works fine, then App Window is hidden on launch until reinstalled | stabilize | Korrektur als Draft; native Abnahme bzw. IPC-/Policy-Nachweis offen [PR #16](https://github.com/Auda29/nulloy/pull/16) |
+| [#236](https://github.com/nulloy/nulloy/issues/236) | Initially works fine, then App Window is hidden on launch until reinstalled | stabilize | Draft: frühere Slim-Monitorabnahme dokumentiert; finales Paket, DPI/maximiert/weitere Skins offen [PR #16](https://github.com/Auda29/nulloy/pull/16) |
 | [#235](https://github.com/nulloy/nulloy/issues/235) | Feature request: please consider adding of percentage of progress for every track - this is a commons feature for audiobook software | defer | zurückgestellt gemäß Umfang  |
 | [#234](https://github.com/nulloy/nulloy/issues/234) | .config folder location: according to XDG Base Directory Specification it must be in $HOME/.config | platform | spätere Plattformabnahme  |
 | [#230](https://github.com/nulloy/nulloy/issues/230) | Website: about how to install: please add link to Gentoo Guru  | defer | zurückgestellt gemäß Umfang  |
@@ -47,7 +53,7 @@ Audit-Entscheidungen: covered: 4, defer: 43, needs-repro: 5, platform: 12, stabi
 | [#224](https://github.com/nulloy/nulloy/issues/224) | Support for Poly Wave File Format | defer | zurückgestellt gemäß Umfang  |
 | [#218](https://github.com/nulloy/nulloy/issues/218) | Feature request: Enter/Return key to play selected file | stabilize | Test-PR integriert; ursprüngliches Issue nicht pauschal geschlossen [PR #22](https://github.com/Auda29/nulloy/pull/22) |
 | [#217](https://github.com/nulloy/nulloy/issues/217) | Tracker formats not working | platform | spätere Plattformabnahme  |
-| [#211](https://github.com/nulloy/nulloy/issues/211) | When opening multiple songs at once it only plays the last one in the playlist | stabilize | Korrektur als Draft; native Abnahme bzw. IPC-/Policy-Nachweis offen [PR #24](https://github.com/Auda29/nulloy/pull/24) |
+| [#211](https://github.com/nulloy/nulloy/issues/211) | When opening multiple songs at once it only plays the last one in the playlist | stabilize | Draft: echte Explorer-Matrix und Aufräumen des Testmenüs offen [PR #24](https://github.com/Auda29/nulloy/pull/24) |
 | [#205](https://github.com/nulloy/nulloy/issues/205) | Tag editor: no way to add artwork | defer | zurückgestellt gemäß Umfang  |
 | [#204](https://github.com/nulloy/nulloy/issues/204) | Tag Editor: add UNSYNCEDLYRICS | defer | zurückgestellt gemäß Umfang  |
 | [#201](https://github.com/nulloy/nulloy/issues/201) | "Project MESSAGE: This project is using private headers and will therefore be tied to this specific Qt module build version": is it possible to resolve this warning? | covered | Bestand im Code geprüft  |
@@ -61,7 +67,7 @@ Audit-Entscheidungen: covered: 4, defer: 43, needs-repro: 5, platform: 12, stabi
 | [#151](https://github.com/nulloy/nulloy/issues/151) | Zoomable waveform | defer | zurückgestellt gemäß Umfang  |
 | [#148](https://github.com/nulloy/nulloy/issues/148) | New Skin Proposal in Action - Live demo! | defer | zurückgestellt gemäß Umfang  |
 | [#147](https://github.com/nulloy/nulloy/issues/147) | New skin proposal | defer | zurückgestellt gemäß Umfang  |
-| [#146](https://github.com/nulloy/nulloy/issues/146) | Missing track information | stabilize | Test-PR offen, Draft; ursprüngliches Issue nicht pauschal geschlossen [PR #25](https://github.com/Auda29/nulloy/pull/25) |
+| [#146](https://github.com/nulloy/nulloy/issues/146) | Missing track information | stabilize | Test-PR integriert; ursprüngliches Issue nicht pauschal geschlossen [PR #25](https://github.com/Auda29/nulloy/pull/25) |
 | [#145](https://github.com/nulloy/nulloy/issues/145) | projectM | defer | zurückgestellt gemäß Umfang  |
 | [#141](https://github.com/nulloy/nulloy/issues/141) | Waveform playback ends too soon | stabilize | Test-PR integriert; ursprüngliches Issue nicht pauschal geschlossen [PR #23](https://github.com/Auda29/nulloy/pull/23) |
 | [#139](https://github.com/nulloy/nulloy/issues/139) | Moving music directory freezes UI for some time | needs-repro | Korrektur-PR integriert; ursprüngliches Issue nicht pauschal geschlossen [PR #17](https://github.com/Auda29/nulloy/pull/17) |
