@@ -109,3 +109,52 @@ jobs:
             ${{ matrix.build }}/package-info.json
             ${{ matrix.build }}/Testing/Temporary/LastTest.log
             .phase3/skin-probe/*-results.txt
+
+  trash-player-probe:
+    name: Packaged player recycle-bin acceptance (Qt6)
+    needs: windows
+    # Internal opt-in test branch only; no Explorer associations or bin settings.
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'test/windows-trash-player'
+    runs-on: windows-2022
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install desktop automation tools
+        shell: pwsh
+        run: python -m pip install pywinauto==0.6.9 Pillow==11.3.0 psutil==7.0.0
+      - name: Verify probe contracts are present and pass
+        shell: pwsh
+        run: >-
+          python -c "import sys, unittest;
+          suite = unittest.defaultTestLoader.discover('tools/trash-probe', pattern='test_*.py');
+          assert suite.countTestCases() > 0, 'No trash probe tests discovered';
+          sys.exit(0 if unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful() else 1)"
+      - uses: actions/download-artifact@v4
+        with:
+          name: Nulloy-Qt6-windows-x64
+          path: .trash-probe/package
+      - name: Exercise real player with generated disposable files
+        shell: pwsh
+        env:
+          PROBE_SOURCE_SHA: ${{ github.sha }}
+        run: |
+          $packages = @(Get-ChildItem .trash-probe/package -Filter '*.zip' -Recurse)
+          if ($packages.Count -ne 1) { throw "Expected exactly one package, got $($packages.Count)" }
+          python tools/trash-probe/probe.py --package $packages[0].FullName --output .trash-probe/evidence --source-sha $env:PROBE_SOURCE_SHA --headless-audio
+          exit $LASTEXITCODE
+      - name: Upload trash evidence even when blocked
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-trash-player-evidence
+          path: .trash-probe/evidence/
+          if-no-files-found: warn
