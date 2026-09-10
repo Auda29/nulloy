@@ -310,13 +310,22 @@ def _normalized_executable(value: str) -> str:
     return os.path.abspath(value).casefold()
 
 
+def _same_executable(first: str, second: str) -> bool:
+    if _normalized_executable(first) == _normalized_executable(second):
+        return True
+    try:
+        return os.path.samefile(first, second)
+    except (OSError, ValueError):
+        return False
+
+
 def process_identity_matches(process: Any, identity: ProcessIdentity) -> bool:
     """Match a live process without risking PID reuse or a different executable."""
     try:
         return (
             process.pid == identity.pid
             and float(process.create_time()) == identity.create_time
-            and _normalized_executable(process.exe()) == _normalized_executable(identity.executable)
+            and _same_executable(process.exe(), identity.executable)
         )
     except (OSError, AttributeError, TypeError, ValueError):
         return False
@@ -457,6 +466,7 @@ class WindowsDesktopRun:
         self.process_cleanup_verified = False
         self.cleanup_errors: list[str] = []
         self.explorer_launch_started = False
+        self.player_launch_started = False
         self.explorer_identity: tuple[int | None, str] | None = None
         self.cleanup_verified = False
         self.playlist_control_identity: dict[str, str] | None = None
@@ -467,7 +477,7 @@ class WindowsDesktopRun:
             try:
                 info = process.info
                 executable = info.get("exe")
-                if executable and _normalized_executable(executable) == _normalized_executable(str(self.package.executable)):
+                if executable and _same_executable(executable, str(self.package.executable)):
                     records.append((process, ProcessIdentity(
                         int(info["pid"]), float(info["create_time"]), executable
                     )))
@@ -489,6 +499,10 @@ class WindowsDesktopRun:
         if not self.owned_player_processes and self.psutil is not None:
             self._capture_new_player_processes()
         if not self.owned_player_processes:
+            if self.player_launch_started:
+                self.cleanup_errors.append("player launch attempted but no process identity established; cleanup unverified")
+                self.process_cleanup_verified = False
+                return False
             self.process_cleanup_verified = True
             return True
         failures = []
@@ -885,6 +899,7 @@ class WindowsDesktopRun:
                 10,
                 "probe shell verb in Explorer context menu",
             )
+            self.player_launch_started = True
             menu_item.click_input()
             _wait_for(self._capture_new_player_processes, 45, "owned packaged player process")
             self.player_window = _wait_for(self._find_player, 45, "cold packaged player window")

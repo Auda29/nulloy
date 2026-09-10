@@ -89,6 +89,47 @@ class ReviewRegressions(unittest.TestCase):
             observations = (Path(tmp) / "playlist-row-observations.jsonl").read_text().splitlines()
             self.assertEqual([json.loads(line) for line in observations], snapshots)
 
+    def test_launch_without_discovered_process_never_verifies_cleanup(self):
+        runtime = object.__new__(probe.WindowsDesktopRun)
+        runtime.player_launch_started = True
+        runtime.owned_player_processes = []
+        runtime.psutil = SimpleNamespace()
+        runtime.cleanup_errors = []
+        runtime.process_cleanup_verified = False
+        with patch.object(runtime, "_capture_new_player_processes", return_value=False):
+            self.assertFalse(runtime._terminate_owned_player_processes())
+        self.assertFalse(runtime.process_cleanup_verified)
+        self.assertTrue(runtime.cleanup_errors)
+
+    def test_process_discovery_and_revalidation_use_filesystem_identity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            executable = root / "Nulloy.exe"
+            executable.write_bytes(b"disposable identity fixture")
+            alias_dir = root / "alias"
+            alias_dir.mkdir()
+            alias = alias_dir / executable.name
+            probe.os.link(executable, alias)
+            foreign_dir = root / "foreign"
+            foreign_dir.mkdir()
+            foreign = foreign_dir / executable.name
+            foreign.write_bytes(executable.read_bytes())
+            process = SimpleNamespace(
+                pid=17, create_time=lambda: 123.5, exe=lambda: str(alias),
+                info={"pid": 17, "create_time": 123.5, "exe": str(alias)})
+            unrelated = SimpleNamespace(info={"pid": 18, "create_time": 125, "exe": str(foreign)})
+            runtime = object.__new__(probe.WindowsDesktopRun)
+            runtime.package = SimpleNamespace(executable=executable)
+            runtime.psutil = SimpleNamespace(process_iter=lambda attrs: [process, unrelated])
+            records = runtime._process_snapshot()
+            self.assertEqual([identity.pid for _, identity in records], [17])
+            identity = probe.ProcessIdentity(17, 123.5, str(executable))
+            self.assertTrue(probe.process_identity_matches(process, identity))
+            self.assertFalse(probe.process_identity_matches(process, probe.ProcessIdentity(17, 123.5, str(foreign))))
+            self.assertFalse(probe.process_identity_matches(process, probe.ProcessIdentity(17, 999, str(executable))))
+            alias.unlink()
+            self.assertFalse(probe.process_identity_matches(process, identity))
+
     def test_player_cleanup_closes_owned_main_window_and_dialog(self):
         class Window(Control):
             def __init__(self, name):
