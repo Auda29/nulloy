@@ -13,6 +13,7 @@ permissions:
 jobs:
   windows:
     strategy:
+      max-parallel: 1
       fail-fast: false
       matrix:
         include:
@@ -113,11 +114,8 @@ jobs:
   trash-player-probe:
     name: Packaged player recycle-bin acceptance (Qt6)
     needs: windows
-    # Internal opt-in test branch only; no Explorer associations or bin settings.
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.head_ref == 'test/windows-trash-player'
+    # Build-only branch: unsafe/unaccepted native probe must never execute.
+    if: ${{ false }}
     runs-on: windows-2022
     timeout-minutes: 12
     steps:
