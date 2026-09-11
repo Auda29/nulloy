@@ -112,6 +112,45 @@ class _FakeMenuItem:
         return self._name
 
 
+class _FakeSurface:
+    def __init__(
+        self,
+        name,
+        *,
+        pid=4242,
+        control_type="Pane",
+        visible=True,
+        children=(),
+        runtime_id=None,
+    ):
+        self.element_info = _FakeInfo(name, pid=pid, control_type=control_type)
+        if runtime_id is not None:
+            self.element_info.runtime_id = runtime_id
+        self._visible = visible
+        self._children = list(children)
+
+    def descendants(self):
+        result = []
+        for child in self._children:
+            result.append(child)
+            result.extend(child.descendants())
+        return result
+
+    def is_visible(self):
+        return self._visible
+
+    def window_text(self):
+        return self.element_info.name
+
+
+class _FakeDesktop:
+    def __init__(self, windows):
+        self._windows = list(windows)
+
+    def windows(self):
+        return list(self._windows)
+
+
 class _CleanupProcess:
     def __init__(self, wait_results):
         self.wait_results = iter(wait_results)
@@ -380,6 +419,90 @@ class ContractTests(unittest.TestCase):
                     _FakeMenuItem("Remove From Playlist", [3]),
                 ]
             )
+
+    def test_owned_menu_discovery_reaches_menu_below_owned_popup_pane(self):
+        menu = _FakeSurface("context", control_type="Menu")
+        wrapper = _FakeSurface("popup-wrapper", children=[menu])
+        popup = _FakeSurface("popup-surface", children=[wrapper])
+        main = _FakeSurface("main", children=[])
+
+        menus = MODULE._owned_context_menus(_FakeDesktop([main, popup]), main, 4242)
+
+        self.assertEqual(menus, [menu])
+
+    def test_owned_menu_discovery_excludes_foreign_pid_descendants(self):
+        foreign_menu = _FakeSurface("foreign", pid=9999, control_type="Menu")
+        foreign_surface = _FakeSurface("foreign-surface", pid=9999, children=[foreign_menu])
+        main = _FakeSurface("main", children=[foreign_surface])
+
+        self.assertEqual(MODULE._owned_context_menus(_FakeDesktop([main]), main, 4242), [])
+
+    def test_owned_menu_discovery_rejects_hidden_menu(self):
+        hidden_menu = _FakeSurface("hidden", control_type="Menu", visible=False)
+        popup = _FakeSurface("popup", children=[hidden_menu])
+        main = _FakeSurface("main")
+
+        self.assertEqual(MODULE._owned_context_menus(_FakeDesktop([main, popup]), main, 4242), [])
+
+    def test_owned_menu_discovery_deduplicates_duplicate_runtime_id(self):
+        runtime_id = [4242, 77]
+        first = _FakeSurface("first", control_type="Menu", runtime_id=runtime_id)
+        duplicate = _FakeSurface("duplicate", control_type="Menu", runtime_id=runtime_id)
+        popup = _FakeSurface("popup", children=[first, duplicate])
+        main = _FakeSurface("main")
+
+        self.assertEqual(MODULE._owned_context_menus(_FakeDesktop([main, popup]), main, 4242), [first])
+
+    def test_owned_menu_discovery_rejects_unexpected_distinct_menu_roots(self):
+        first = _FakeSurface("first", control_type="Menu")
+        second = _FakeSurface("second", control_type="Menu")
+        popup = _FakeSurface("popup", children=[first, second])
+        main = _FakeSurface("main")
+
+        with self.assertRaises(MODULE.ContractError):
+            MODULE._owned_context_menus(_FakeDesktop([main, popup]), main, 4242)
+
+    def test_owned_surface_diagnostics_include_only_owned_surfaces_and_descendants(self):
+        owned_child = _FakeSurface("owned-child")
+        foreign_child = _FakeSurface("foreign-child", pid=9999)
+        owned_surface = _FakeSurface("owned-surface", children=[owned_child, foreign_child])
+        foreign_surface = _FakeSurface("foreign-surface", pid=9999)
+
+        diagnostics = MODULE._owned_surface_diagnostics(
+            _FakeDesktop([owned_surface, foreign_surface]), 4242
+        )
+
+        self.assertEqual(len(diagnostics["top_level_surfaces"]), 1)
+        surface = diagnostics["top_level_surfaces"][0]
+        self.assertEqual(
+            {surface["surface"][field] for field in ("pid", "class_name", "nativehandle", "control_type")},
+            {4242, "", None, "Pane"},
+        )
+        self.assertEqual([item["name"] for item in surface["descendants"]], ["owned-child"])
+        self.assertNotIn("foreign-child", json.dumps(diagnostics))
+
+    def test_context_menu_timeout_writes_bounded_owned_surface_diagnostics(self):
+        main = _FakeSurface("main")
+        identity = {"pid": 4242}
+        with tempfile.TemporaryDirectory() as temporary:
+            diagnostics_path = Path(temporary) / "discovery.json"
+            with self.assertRaises(RuntimeError):
+                MODULE._wait_for_context_menu(
+                    _FakeDesktop([main]),
+                    main,
+                    process=None,
+                    psutil=None,
+                    identity=identity,
+                    executable=Path("Nulloy.exe"),
+                    baseline_keys=set(),
+                    timeout=0,
+                    diagnostics_path=diagnostics_path,
+                )
+            diagnostics = json.loads(diagnostics_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(diagnostics["process_pid"], 4242)
+        self.assertEqual(len(diagnostics["top_level_surfaces"]), 1)
+        self.assertEqual(diagnostics["top_level_surfaces"][0]["surface"]["name"], "main")
 
     def test_context_menu_flag_is_opt_in_and_default_mode_has_no_action(self):
         args = MODULE.parse_args(

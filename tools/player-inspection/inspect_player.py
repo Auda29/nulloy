@@ -553,8 +553,48 @@ def _is_visible(control: Any) -> bool:
         return True
 
 
+_CONTEXT_DIAGNOSTIC_MAX_SURFACES = 32
+_CONTEXT_DIAGNOSTIC_MAX_DESCENDANTS = 512
+
+
+def _owned_top_level_windows(desktop: Any, process_pid: int) -> list[Any]:
+    """Return only deduplicated top-level UIA surfaces owned by the player."""
+    windows: list[Any] = []
+    seen: set[str] = set()
+    for window in desktop.windows():
+        info = window.element_info
+        if getattr(info, "process_id", None) != process_pid:
+            continue
+        key = _runtime_key(window)
+        if key in seen:
+            continue
+        seen.add(key)
+        windows.append(window)
+    return windows
+
+
+def _owned_context_menu_candidates(desktop: Any, main_window: Any, process_pid: int) -> list[Any]:
+    """Search owned top-level surfaces and their owned descendants only."""
+    surfaces = _owned_top_level_windows(desktop, process_pid)
+    main_info = main_window.element_info
+    if getattr(main_info, "process_id", None) == process_pid:
+        main_key = _runtime_key(main_window)
+        if all(_runtime_key(surface) != main_key for surface in surfaces):
+            surfaces.append(main_window)
+
+    candidates: list[Any] = []
+    for surface in surfaces:
+        candidates.append(surface)
+        candidates.extend(
+            control
+            for control in surface.descendants()
+            if getattr(control.element_info, "process_id", None) == process_pid
+        )
+    return candidates
+
+
 def _owned_context_menus(desktop: Any, main_window: Any, process_pid: int) -> list[Any]:
-    candidates = list(desktop.windows()) + list(main_window.descendants())
+    candidates = _owned_context_menu_candidates(desktop, main_window, process_pid)
     menus: list[Any] = []
     seen: set[str] = set()
     for control in candidates:
@@ -571,6 +611,41 @@ def _owned_context_menus(desktop: Any, main_window: Any, process_pid: int) -> li
     if len(menus) > 1:
         raise ContractError(f"unexpected count of owned visible Menu roots: {len(menus)}")
     return menus
+
+
+def _owned_surface_diagnostics(desktop: Any, process_pid: int) -> dict[str, Any]:
+    """Bounded diagnostics for owned top-level UIA surfaces, never foreign content."""
+    surfaces: list[dict[str, Any]] = []
+    owned_windows = _owned_top_level_windows(desktop, process_pid)
+    for surface in owned_windows[:_CONTEXT_DIAGNOSTIC_MAX_SURFACES]:
+        record: dict[str, Any] = {"surface": _control_record(surface)}
+        try:
+            all_descendants = list(surface.descendants())
+        except Exception as exc:
+            record.update({"descendants": [], "descendants_error": repr(exc)})
+        else:
+            owned_descendants = [
+                control
+                for control in all_descendants
+                if getattr(control.element_info, "process_id", None) == process_pid
+            ]
+            record.update(
+                {
+                    "descendants": [
+                        _control_record(control)
+                        for control in owned_descendants[:_CONTEXT_DIAGNOSTIC_MAX_DESCENDANTS]
+                    ],
+                    "descendant_count": len(owned_descendants),
+                    "descendants_truncated": len(owned_descendants) > _CONTEXT_DIAGNOSTIC_MAX_DESCENDANTS,
+                }
+            )
+        surfaces.append(record)
+    return {
+        "process_pid": process_pid,
+        "top_level_surface_count": len(owned_windows),
+        "top_level_surfaces": surfaces,
+        "top_level_surfaces_truncated": len(owned_windows) > _CONTEXT_DIAGNOSTIC_MAX_SURFACES,
+    }
 
 
 def _owned_visible_popups(desktop: Any, main_window: Any, process_pid: int) -> list[Any]:
@@ -630,6 +705,7 @@ def _wait_for_context_menu(
     executable: Path,
     baseline_keys: set[str],
     timeout: float,
+    diagnostics_path: Path | None = None,
 ) -> Any:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -641,6 +717,11 @@ def _wait_for_context_menu(
                 raise ContractError(f"unexpected newly-visible owned Menu count: {len(fresh)}")
             return fresh[0]
         time.sleep(0.25)
+    if diagnostics_path is not None:
+        try:
+            _write_json(diagnostics_path, _owned_surface_diagnostics(desktop, identity["pid"]))
+        except Exception as exc:
+            _write_json(diagnostics_path, {"error": repr(exc), "process_pid": identity["pid"]})
     raise RuntimeError("timed out waiting for newly-visible owned context Menu")
 
 
@@ -898,6 +979,7 @@ def inspect_context_menu(
         executable,
         baseline_keys,
         timeout=10,
+        diagnostics_path=output / "player-context-menu-discovery-diagnostics.json",
     )
     menu_tree = _tree(menu)
     _write_json(output / "player-context-menu-uia.json", menu_tree)
