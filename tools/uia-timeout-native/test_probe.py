@@ -110,6 +110,28 @@ class ProbeFixtureTests(unittest.TestCase):
             self.assertNotIn("timeout-demonstration", report["acceptance_label"])
             self.assertTrue(report["fixture_cleanup"]["verified"])
 
+    def test_snapshot_accepts_exact_title_in_worker_name_but_rejects_guessed_field(self):
+        import run_probe
+
+        target = {
+            "pid": 77,
+            "hwnd": 88,
+            "label": "Harmless UIA heartbeat native-contract",
+            "window_title": "UIA Timeout Fixture native-contract",
+        }
+        title_in_name = {
+            "pid": 77,
+            "hwnd": 88,
+            "snapshot": [{"process_id": 77, "name": target["window_title"]}],
+        }
+        guessed_title_field = {
+            "pid": 77,
+            "hwnd": 88,
+            "snapshot": [{"process_id": 77, "name": "unrelated", "window_title": target["window_title"]}],
+        }
+        self.assertEqual(run_probe._snapshot_is_owned(title_in_name, target), (True, ""))
+        self.assertFalse(run_probe._snapshot_is_owned(guessed_title_field, target)[0])
+
     def test_responsive_failure_stops_before_block_request(self):
         import run_probe
 
@@ -150,6 +172,75 @@ class ProbeFixtureTests(unittest.TestCase):
             self.assertIn("identity", report["failure_kind"])
             self.assertTrue(report["fixture_cleanup"]["verified"])
 
+    def test_postquery_capture_identity_mutations_fail_and_cleanup(self):
+        import run_probe
+
+        for field in ("hwnd", "create_time", "nonce"):
+            with self.subTest(field=field):
+                mutated = [False]
+                real_read_state = run_probe._read_state
+
+                def query(target, output_dir, stage):
+                    if stage == "blocked":
+                        mutated[0] = True
+                    return self._success(target) if stage == "responsive" else {
+                        "status": "TIMEOUT",
+                        "timed_out": True,
+                        "timeout_phase": "execution",
+                        "cleanup_verified": True,
+                        "returncode": -15,
+                    }
+
+                def read_state(path):
+                    value = real_read_state(path)
+                    if mutated[0] and path.name == "state.json" and value.get("phase") == "blocked":
+                        value = dict(value)
+                        if field == "hwnd":
+                            value["hwnd"] += 1
+                        elif field == "create_time":
+                            value["create_time"] += 1.0
+                        else:
+                            value["nonce"] = "forged-after-query"
+                    return value
+
+                with tempfile.TemporaryDirectory(prefix="uia-native-test-") as raw:
+                    with mock.patch.object(run_probe, "_read_state", side_effect=read_state):
+                        report = run_probe.run_probe(
+                            query_runner=query,
+                            evidence_root=Path(raw) / "evidence",
+                            fixture_lifetime=4,
+                            block_seconds=0.65,
+                            non_native_test=True,
+                        )
+                self.assertEqual(report["outcome"], "FAIL")
+                self.assertIn("identity", report["failure_kind"])
+                self.assertTrue(report["fixture_cleanup"]["verified"])
+
+    def test_native_hwnd_owner_mismatch_is_rejected_by_controller_contract(self):
+        import run_probe
+
+        process = mock.Mock(pid=123)
+        state = {
+            "nonce": "native-contract",
+            "pid": 123,
+            "create_time": 4.5,
+            "executable": "/python",
+            "hwnd": 9001,
+            "qt_version": "6.8.2",
+            "qt_platform": "windows",
+        }
+        with mock.patch.object(run_probe, "_live_identity", return_value=(123, 4.5, "/python")):
+            with mock.patch.object(run_probe, "_native_window_pid", return_value=124):
+                with self.assertRaises(run_probe.ProbeFailure) as caught:
+                    run_probe._validate_target(
+                        state,
+                        process,
+                        non_native=False,
+                        launch_identity=(123, 4.5, "/python"),
+                        expected_nonce="native-contract",
+                    )
+        self.assertIn("HWND owner PID", caught.exception.detail)
+
     def test_worker_error_is_partial_and_report_is_serialized(self):
         import run_probe
 
@@ -177,10 +268,12 @@ class ProbeFixtureTests(unittest.TestCase):
             self.assertEqual(saved["blocked"]["classification"], "worker_error")
             self.assertEqual(saved["blocked"]["query"]["primary_error"], "injected worker error")
 
-    def test_cleanup_uncertainty_is_fail_and_temp_is_retained(self):
+    def test_cleanup_uncertainty_preserves_primary_failure_and_temp_is_retained(self):
         import run_probe
 
         def query(target, output_dir, stage):
+            if stage == "responsive":
+                return {"status": "TIMEOUT", "timeout_phase": "readiness", "cleanup_verified": True}
             return self._success(target)
 
         real_cleanup = run_probe._cleanup_fixture
@@ -201,8 +294,48 @@ class ProbeFixtureTests(unittest.TestCase):
                     non_native_test=True,
                 )
             self.assertEqual(report["outcome"], "FAIL")
-            self.assertEqual(report["failure_kind"], "fixture_cleanup")
+            self.assertEqual(report["failure_kind"], "responsive_query")
+            self.assertTrue(report["cleanup_diagnostics"])
             self.assertTrue(Path(report["owned_temp_parent"]).exists())
+
+    def test_final_report_write_failure_returns_structured_fail(self):
+        import run_probe
+
+        real_write_report = run_probe._write_report
+
+        def write_report(path, report):
+            if path.name == "final-report.json":
+                raise OSError("injected final report write failure")
+            return real_write_report(path, report)
+
+        with tempfile.TemporaryDirectory(prefix="uia-native-test-") as raw:
+            with mock.patch.object(run_probe, "_write_report", side_effect=write_report):
+                report = run_probe.run_probe(
+                    query_runner=lambda target, output_dir, stage: self._success(target),
+                    evidence_root=Path(raw) / "evidence",
+                    fixture_lifetime=3,
+                    non_native_test=True,
+                )
+        self.assertEqual(report["outcome"], "FAIL")
+        self.assertEqual(report["failure_kind"], "report_write")
+        self.assertIn("injected final report write failure", report["report_write_error"])
+        self.assertTrue(report["fixture_cleanup"]["verified"])
+
+    def test_startup_hash_failure_is_structured_before_owned_temp_allocation(self):
+        import run_probe
+
+        with tempfile.TemporaryDirectory(prefix="uia-native-test-") as raw:
+            with mock.patch.object(run_probe, "_runtime_hashes", side_effect=OSError("injected hash failure")):
+                report = run_probe.run_probe(
+                    query_runner=lambda target, output_dir, stage: self._success(target),
+                    evidence_root=Path(raw) / "evidence",
+                    fixture_lifetime=3,
+                    non_native_test=True,
+                )
+            self.assertEqual(report["outcome"], "FAIL")
+            self.assertEqual(report["failure_kind"], "runtime_hash")
+            self.assertNotIn("owned_temp_parent", report)
+            self.assertFalse(list(Path(raw).glob("uia-timeout-native-*")))
 
 
 class ProbeGuardTests(unittest.TestCase):
@@ -214,6 +347,12 @@ class ProbeGuardTests(unittest.TestCase):
                 status = run_probe.main(["--evidence-root", str(Path(raw) / "evidence")])
             self.assertEqual(status, 1)
             self.assertFalse(any(Path(raw).rglob("state.json")))
+
+    def test_injected_query_runner_cannot_be_used_for_native_acceptance(self):
+        import run_probe
+
+        with self.assertRaises(ValueError):
+            run_probe.run_probe(query_runner=lambda target, output_dir, stage: {}, non_native_test=False)
 
 
 if __name__ == "__main__":
