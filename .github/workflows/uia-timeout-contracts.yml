@@ -1,0 +1,95 @@
+name: Harmless Windows UIA timeout contracts
+
+on:
+  push:
+    branches: ['test/windows-uia-timeout-native']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uia-timeout-contracts
+  cancel-in-progress: false
+
+jobs:
+  contracts:
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned harmless fixture dependencies
+        run: python -m pip install PySide6==6.8.2 psutil==7.0.0 pywinauto==0.6.9
+      - name: Run native Windows contracts without player or UI actions
+        shell: python
+        run: |
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import platform
+          import sys
+          import unittest
+          import PySide6
+          import psutil
+          from PySide6.QtCore import qVersion
+
+          output = Path('evidence')
+          output.mkdir(exist_ok=False)
+          assert os.name == 'nt', 'native contracts require Windows'
+          assert not os.environ.get('QT_QPA_PLATFORM'), 'do not substitute offscreen Qt'
+          sources = sorted(Path('tools/uia-timeout-spike').glob('*.py'))
+          sources += sorted(Path('tools/uia-timeout-fixture').glob('*.py'))
+          provenance = {
+              'commit': os.environ['GITHUB_SHA'],
+              'run_id': os.environ['GITHUB_RUN_ID'],
+              'platform': platform.platform(),
+              'python': sys.version,
+              'pyside': PySide6.__version__,
+              'qt': qVersion(),
+              'psutil': psutil.__version__,
+              'native_uia_query_executed': False,
+              'player_started': False,
+              'hashes': {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources},
+          }
+          (output / 'provenance.json').write_text(json.dumps(provenance, indent=2), encoding='utf-8')
+          posix_only = {
+              'test_unexpected_wait_failure_still_reaches_kill_fallback',
+              'test_timeout_remains_primary_when_posix_final_stderr_capture_exceeds_cap',
+          }
+          for name, expected_count, expected_skips in (
+              ('uia-timeout-spike', 18, posix_only),
+              ('uia-timeout-fixture', 4, set()),
+          ):
+              path = str(Path('tools', name).resolve())
+              suite = unittest.TestLoader().discover(path, pattern='test_*.py')
+              log_path = output / (name + '.log')
+              with log_path.open('w', encoding='utf-8') as log:
+                  result = unittest.TextTestRunner(stream=log, verbosity=2).run(suite)
+              print(log_path.read_text(encoding='utf-8'), flush=True)
+              record = {
+                  'tests_run': result.testsRun,
+                  'successful': result.wasSuccessful(),
+                  'failures': [(test.id(), text) for test, text in result.failures],
+                  'errors': [(test.id(), text) for test, text in result.errors],
+                  'skipped': [(test.id(), reason) for test, reason in result.skipped],
+                  'unexpected_successes': [test.id() for test in result.unexpectedSuccesses],
+                  'expected_failures': [(test.id(), text) for test, text in result.expectedFailures],
+              }
+              (output / (name + '.json')).write_text(json.dumps(record, indent=2), encoding='utf-8')
+              observed_skips = {test.id().split('.')[-1] for test, _ in result.skipped}
+              if (not result.wasSuccessful() or result.testsRun != expected_count
+                      or observed_skips != expected_skips or result.expectedFailures):
+                  raise SystemExit(1)
+      - name: Preserve contract evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uia-timeout-contracts-${{ github.sha }}
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 14
