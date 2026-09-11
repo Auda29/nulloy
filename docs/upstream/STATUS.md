@@ -4,7 +4,9 @@
 
 Snapshot: 2026-09-10T08:53:25.460309+00:00. Ursprüngliche Swarm-PRs #7–#25: 16 gemergt, 3 offen. PR #20 (Register) und #25 (Metadaten) sind integriert. Weitere unterstützende Folge-PRs zählen nicht zu diesen 19 ursprünglichen PRs.
 
-Der [aktuelle Teststand](ACCEPTANCE_BASELINE.md) trennt das korrigierte Windows-ZIP, ältere interaktive EXE/Formatprüfung und offene Abnahmen. Native Abnahmen werden auf Nutzerwunsch vorerst nicht ausgeführt. Historische Audit- und Review-Dateien bleiben unverändert.
+Die [Paketbaseline](ACCEPTANCE_BASELINE.md) trennt das korrigierte Windows-ZIP, ältere interaktive EXE/Formatprüfung und offene Abnahmen. Die damalige Zurückstellung nativer Tests ist historisch: inzwischen sind automatisierte echte Windows-Tests auf entbehrlichen GitHub-Runnern freigegeben. Der [Folgestand der nativen Automation](NATIVE_AUTOMATION_STATUS.md) dokumentiert die offenen PRs #28/#29 und fehlgeschlagene Läufe; daraus folgt keine neue Paketabnahme. Historische Audit- und Review-Dateien bleiben unverändert.
+
+Nachtrag 2026-09-11: Das [isolierte PR15-Paket und seine Auswahlprobe](NATIVE_AUTOMATION_STATUS.md#nachtrag-isoliertes-pr15-paket-und-auswahlprobe) sind mit Buildcommit, ZIP-/EXE-Prüfsummen und getrenntem Prüfercommit dokumentiert. Start-/Format-/Playlistbelege bestanden, Zweifachauswahl belegt, Kontextmenüprobe fehlgeschlagen. Kein gemeinsames Endpaket und keine native Papierkorb-Abnahme. Das Register führt diesen Teilstand separat unter `package_inspection_followup`.
 
 Quelle: [ursprüngliche Analyse](../UPSTREAM_ISSUES_ANALYSIS.md). Der Swarm hat die 80 aufgeführten Issues mit ihren 126 Kommentaren erneut abgerufen und bewertet. Issue-IDs, Kommentar-IDs und alle Einzelzählungen wurden programmatisch gegen den Rohsnapshot geprüft.
 
@@ -108,3 +110,50 @@ Audit-Entscheidungen: covered: 4, defer: 43, needs-repro: 5, platform: 12, stabi
 ## Offene Abnahmen
 
 Die ursprünglichen macOS-, Windows-Explorer-, Hardware-Audio-, HID- und Monitor-/DPI-Abläufe benötigen ihre jeweilige reale Umgebung. Linux-Tests können gemeinsame Logik, GStreamer-Ausgabedaten und Qt-Widgets prüfen, aber keine plattformfremde Abnahme ersetzen. Konkrete Schritte und verbleibende Lücken sind pro Issue in der JSON-Datei und für bearbeitete Issues im jeweiligen Bericht unter `docs/upstream/` festgehalten.
+
+## Nachtrag 2026-09-11: isolierte Paket-Kontextmenübeobachtung
+
+Der Registereintrag `package_context_menu_milestone` dokumentiert den verifizierten grünen Lauf [34584964888](https://github.com/Auda29/nulloy/actions/runs/34584964888) mit Prüfercommit `5cf2973242321053cd4c793e6518138828baead1` und 53 bestandenen Vertragsprüfungen. Er bindet die Beobachtung an das Qt6-Paket aus Buildlauf `34572047079` / Commit `9e1b3f060e649a64c698b2a5981dbfca1d741b84` und dessen unveränderte ZIP-/EXE-Prüfsummen. Exakt zwei von drei Zeilen blieben nach einem guarded Right-Click ausgewählt; das eigene Qt-Kontextmenü und `Remove From Playlist` sowie `Move To Trash` wurden mit Labels, Automation-IDs, PID und den distinct Runtime-IDs `[42, 197778, 4, -2147483613]` bzw. `[42, 197778, 4, -2147483612]` erkannt. Kein Menüeintrag wurde aufgerufen; Fixture-Dateien und Bereinigung sind final verifiziert.
+
+Der Befund schließt nur diese isolierte, nichtdestruktive Qt6-Paketbeobachtung. Er ist weder das finale kombinierte PR15/24/29-Paket noch eine Papierkorb-, Explorer-, PR16-DPI/Fenster-, macOS-, kombinierte Qt5/Qt6- oder Release-Abnahme. Die historischen Recognition- und stdout-Serialisierungsfehler bleiben als FAIL erhalten. Die genehmigte Speicherbereinigung (29 Artefakte / 1,674,672,514 Bytes; 31 Caches / 10,632,210,125 Bytes) ist mit 309 verbliebenen Artefakten zum Prüfzeitpunkt und geschützten IDs `10188441880`, `10188259265` vermerkt; der Wert ist nicht als aktueller Gesamtbestand zu lesen. Siehe [Native-Automationsstand](NATIVE_AUTOMATION_STATUS.md#nachtrag-2026-09-11-isoliertes-kontextmenü-milestone-grün) und die externe Verifikationsablage.
+
+## Nachtrag 2026-09-11: PR30 und getrennte native Vertragsmilestones
+
+Der Live-API-Snapshot vom `2026-09-11T11:50:53.817380+00:00` bestätigt PR #30 unter exakt `c2405a0375b23dfdc3561a5bdd7a1eb56a812902` als offenem Draft. Windows-Qt5/Qt6-Lauf `34588893748` und Linux-Lauf `34588893721` sind für genau diesen PR-Head grün. Das bleibt CI-Branch-Nachweis: keine neue PR30-Paketprüfung, keine neue Paket-Hashannahme und keine kombinierte Endabnahme. Die Windows-Matrix bleibt seriell; Workflows wurden hierfür nicht verändert. Integration bleibt `919468efc32f4d038c96d7276a799794dab2e86e`, `master` bleibt `027d81a583b07457a4fa5f18b3e7dcca50b05b58`.
+
+Der geprüfte Windows-Supervisor-/Qt-Fixture-Vertrag [34595596113](https://github.com/Auda29/nulloy/actions/runs/34595596113) ist separat als PASS dokumentiert: 18 Supervisor-Tests, davon 16 PASS und zwei ausdrücklich POSIX-bedingt übersprungen; vier harmlose Qt-Fixture-Tests PASS. Reviewte Quellen sind Supervisor `68cdc90f369d6c5f507c81cf757befb509dbfeb9`, Fixture `b7d228e885841cb796ed9d31fa79526864dba031` und assembled native commit `ca49815db8db16b8704cc82f89336e09f8ed2d70`; alle fünf Laufzeitskript-Hashes sind im Register und Elternnachweis festgehalten. Dies war kein Player-Paket und keine tatsächliche UIA-Abfrage: HWND `0` wurde vor der Query abgewiesen, die synthetische PID-Prüfung ist kein nativer UIA-Nachweis. COM-/Provider-Query bleibt `not_executed`; daraus folgen keine UIA-, Player- oder Release-Behauptungen.
+
+Die Playerbeobachtung [34589940677](https://github.com/Auda29/nulloy/actions/runs/34589940677) bestand mit 60 Vertragsprüfungen am exakt gebundenen Qt6-Paket aus Buildlauf `34572047079` / Commit `9e1b3f060e649a64c698b2a5981dbfca1d741b84` (ZIP `5558a6ed786051224f7dcf3228a230fa45c95959f3e363e5b06b48d446ccb833`, EXE `d7d622c3a0afe88657fa108bebf72f7bfdc69777c9f1f626fe3fe26e589315f9`; Prüfer `4ab11fa4eb11ebd6844fc8290b8d362085da1b6d`). Zwei von drei Zeilen blieben nach einem guarded Right-Click ausgewählt; kein Menüeintrag wurde aufgerufen, die Fixture-Dateien blieben unverändert und die Bereinigung ist bestätigt. Dies erweitert den bestehenden 53-PASS-Nachweis aus Lauf `34584964888`; er wird nicht überschrieben. PR15-Papierkorbmatrix, PR24 Explorer, PR16 DPI/Fenster, macOS, kombinierte Qt5/Qt6-Endabnahme und Release bleiben offen.
+
+Die laufende Beobachtung bleibt ausschließlich nichtdestruktiv; sie ist keine
+Papierkorbaktion.
+
+## Nachtrag 2026-09-11: Konsolidierung vor PR30-Merge
+
+Der append-only-Konsolidierungsstand ist in [CONSOLIDATION.md](CONSOLIDATION.md)
+und im Registerfeld `consolidation_snapshot` festgehalten. Die verifizierte
+Bestandsaufnahme **nach** den Retirements lautet 12 Remote-Branches, 11 lokale
+Branches und 10 Worktrees; der Stand davor war 33/34/33, jeweils sauber. Exakt
+18 bereits gemergte PR-Branches (#7–#14, #17–#23, #25–#27) sowie sechs
+Experimentzustände wurden archiviert bzw. entfernt. Das Archiv bewahrt die
+Original-SHAs, Historien, Fehlschläge sowie ungetrackte/ignorierte Nachweise.
+Die alte Codex-Branch war eine kombinierte Produktionsquelle und ist nicht mit
+der isolierten `9e1b3f0`-Trash-Quelle gleichzusetzen; daraus folgt keine Aussage,
+dass alle Änderungen gemergt seien.
+
+Erhalten bleiben die vier dokumentierten Branch-Anker für Playerinspektion,
+proof-only UIA-Timeout, eingefrorenes Paket und PR28-Desktopprobe. PR15
+(Papierkorb-Review ohne formale native Abnahme), PR16 (Mixed-DPI/maximiert/Skins/
+Minimieren-Wiederherstellen), PR24 (externe Mehrfachöffnung mit PR29-IPC-
+Abhängigkeit sowie getrennte Öffnungs-/Großauswahl-Lücke), PR28 (kein
+Produktfix, PR24/PR29-Abhängigkeit, offen ohne finalen PASS) und PR29 (grüne
+Tests, aber kein Explorer-PASS) bleiben offen. `qml` ist unangetastetes Legacy,
+keine neue aktive Arbeit.
+
+PR30 ist in diesem Snapshot exakt auf `1e44a4477929cbd1bad7b36c204f8466f8711f69`
+offen; Windows-Lauf `34597690721` und Linux-Lauf `34597690744` sind erfolgreich.
+Das ist nur Branch-CI, keine Paket- oder kombinierte Endabnahme. Integration
+`919468efc32f4d038c96d7276a799794dab2e86e` und `master`
+`027d81a583b07457a4fa5f18b3e7dcca50b05b58` bleiben getrennt. Der Eintrag ist
+vor dem möglichen späteren Merge durch den Elternprozess geschrieben und
+behauptet diesen Merge nicht.
