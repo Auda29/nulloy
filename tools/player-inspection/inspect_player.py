@@ -3,11 +3,14 @@
 
 This runner launches one validated portable package with three generated WAV files,
 reads only its owned Qt UIA tree, and cleans up only the Popen-owned process and
-its own temporary files.  It never invokes a UI control or changes the playlist.
+its own temporary files.  Default mode never invokes a UI control or changes the
+playlist; the explicit context-menu mode uses only UIA SelectionItem selection and
+one root-HWND WM_CONTEXTMENU post, and never invokes a menu item.
 """
 from __future__ import annotations
 
 import argparse
+import ctypes
 import hashlib
 import importlib.util
 import json
@@ -21,6 +24,7 @@ import tempfile
 import time
 import uuid
 import wave
+from ctypes import wintypes
 from typing import Any, Sequence
 
 SOURCE_SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
@@ -29,6 +33,12 @@ FIXTURE_COUNT = 3
 FIXTURE_SECONDS = 30
 PLAYLIST_CLASS = "NPlaylistWidget"
 PLAYLIST_AUTOMATION_ID = "QtSingleApplication.mainWindow.borderWidget.splitter.playlistWidget"
+WM_CONTEXTMENU = 0x007B
+_MENU_LABELS = ("Move To Trash", "Remove From Playlist")
+_SHORTCUT_KEY = r"(?:Del|Delete|Backspace|Ins|Insert|Home|End|PageUp|PageDown|Left|Right|Up|Down|F(?:[1-9]|1[0-2])|[A-Za-z0-9])"
+_SHORTCUT_RE = re.compile(
+    rf"(?:(?:Ctrl|Alt|Shift|Meta|Win)\+)*{_SHORTCUT_KEY}$"
+)
 
 
 class ContractError(ValueError):
@@ -168,7 +178,7 @@ def _as_json_value(value: Any) -> Any:
 def _control_record(control: Any) -> dict[str, Any]:
     info = control.element_info
     patterns: dict[str, bool] = {}
-    for name in ("iface_invoke", "iface_expand_collapse", "iface_legacy_iaccessible", "iface_selection_item"):
+    for name in ("iface_invoke", "iface_expand_collapse", "iface_selection_item"):
         try:
             patterns[name.removeprefix("iface_")] = getattr(control, name, None) is not None
         except Exception:
@@ -184,6 +194,148 @@ def _control_record(control: Any) -> dict[str, Any]:
         "text": _window_text(control),
         "patterns_available": patterns,
     }
+
+
+def _row_fullname(row: Any) -> str:
+    """Return the exact UIA row name without consulting legacy MSAA."""
+    info_name = str(getattr(row.element_info, "name", "") or "")
+    return info_name or _window_text(row)
+
+
+def _selection_pattern(row: Any) -> Any:
+    try:
+        pattern = getattr(row, "iface_selection_item", None)
+    except Exception as exc:
+        raise BlockedError(f"UIA SelectionItem pattern is unavailable: {exc!r}") from exc
+    if pattern is None:
+        raise BlockedError(f"row lacks UIA SelectionItem pattern: {_row_fullname(row)!r}")
+    return pattern
+
+
+def _selection_state(row: Any) -> bool:
+    pattern = _selection_pattern(row)
+    try:
+        value = getattr(pattern, "CurrentIsSelected")
+    except Exception as exc:
+        raise BlockedError(f"cannot read UIA SelectionItem state: {exc!r}") from exc
+    if type(value) is not bool:
+        raise ContractError(f"SelectionItem.CurrentIsSelected is not boolean for {_row_fullname(row)!r}")
+    return value
+
+
+def select_exact_rows(rows: Sequence[Any], expected: Sequence[str], process_pid: int) -> list[str]:
+    """Select exactly the first two already-recognized rows through SelectionItem only."""
+    if len(rows) != len(expected) or len(expected) != FIXTURE_COUNT:
+        raise ContractError("selection requires exactly the three recognized playlist rows")
+    observed: list[str] = []
+    for row, expected_name in zip(rows, expected):
+        info = row.element_info
+        if getattr(info, "process_id", None) != process_pid:
+            raise ContractError(f"playlist row PID mismatch for {expected_name!r}")
+        fullname = _row_fullname(row)
+        text = _window_text(row)
+        if fullname != expected_name or text != expected_name:
+            raise ContractError(
+                f"playlist row fullname mismatch: expected={expected_name!r}, fullname={fullname!r}, text={text!r}"
+            )
+        _selection_state(row)
+        observed.append(fullname)
+    if observed != list(expected):
+        raise ContractError(f"playlist row fullnames differ before selection: {observed!r}")
+
+    first_pattern = _selection_pattern(rows[0])
+    second_pattern = _selection_pattern(rows[1])
+    try:
+        first_pattern.Select()
+    except Exception as exc:
+        raise BlockedError(f"UIA SelectionItem.Select failed: {exc!r}") from exc
+    if not _selection_state(rows[0]):
+        raise ContractError("first playlist row was not selected by SelectionItem.Select")
+    try:
+        second_pattern.AddToSelection()
+    except Exception as exc:
+        raise BlockedError(f"UIA SelectionItem.AddToSelection failed: {exc!r}") from exc
+
+    selected: list[str] = []
+    for row, expected_name in zip(rows, expected):
+        if _selection_state(row):
+            selected.append(_row_fullname(row))
+    if selected != list(expected[:2]):
+        raise ContractError(f"selection was not exactly the first two rows: {selected!r}")
+    return selected
+
+
+def _row_center(row: Any) -> tuple[int, int]:
+    try:
+        rectangle = row.rectangle()
+        left, top = int(rectangle.left), int(rectangle.top)
+        right, bottom = int(rectangle.right), int(rectangle.bottom)
+    except Exception as exc:
+        raise BlockedError(f"cannot read selected row rectangle: {exc!r}") from exc
+    if right - left <= 2 or bottom - top <= 2:
+        raise ContractError("selected row rectangle is too small for a strict interior point")
+    return (left + right) // 2, (top + bottom) // 2
+
+
+def context_message_args(
+    main_window: Any,
+    selected_row: Any,
+    process_identity: dict[str, Any],
+    root_identity: dict[str, Any],
+    executable: str | Path,
+    *,
+    point: tuple[int, int] | None = None,
+) -> tuple[int, int, int, int]:
+    """Validate the owned native root and produce one WM_CONTEXTMENU payload."""
+    info = main_window.element_info
+    hwnd = int(getattr(info, "handle", 0) or 0)
+    if not hwnd:
+        raise BlockedError("owned main window has no native HWND")
+    if getattr(info, "process_id", None) != process_identity["pid"]:
+        raise ContractError("owned main window PID does not match Popen identity")
+    if root_identity.get("pid") != process_identity["pid"]:
+        raise ContractError("WM_CONTEXTMENU root HWND PID does not match Popen identity")
+    if float(root_identity.get("create_time")) != float(process_identity["create_time"]):
+        raise ContractError("WM_CONTEXTMENU root HWND create-time does not match Popen identity")
+    if not _same_path(root_identity.get("executable", ""), executable):
+        raise ContractError("WM_CONTEXTMENU root HWND executable does not match package executable")
+    x, y = point if point is not None else _row_center(selected_row)
+    rectangle = selected_row.rectangle()
+    if not (int(rectangle.left) < x < int(rectangle.right) and int(rectangle.top) < y < int(rectangle.bottom)):
+        raise ContractError("WM_CONTEXTMENU point is not strictly inside the selected row rectangle")
+    if not (-32768 <= x <= 32767 and -32768 <= y <= 32767):
+        raise ContractError("WM_CONTEXTMENU screen point cannot be represented by LPARAM coordinates")
+    lparam = ((y & 0xFFFF) << 16) | (x & 0xFFFF)
+    return hwnd, WM_CONTEXTMENU, hwnd, lparam
+
+
+def _post_message_windows(hwnd: int, message: int, wparam: int, lparam: int) -> bool:
+    if not is_windows_native():
+        raise BlockedError("WM_CONTEXTMENU transport requires native Windows")
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    post_message = user32.PostMessageW
+    post_message.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+    post_message.restype = wintypes.BOOL
+    return bool(post_message(hwnd, message, wparam, lparam))
+
+
+def post_context_menu(
+    main_window: Any,
+    selected_row: Any,
+    process_identity: dict[str, Any],
+    root_identity: dict[str, Any],
+    executable: str | Path,
+    *,
+    post_message: Any | None = None,
+    point: tuple[int, int] | None = None,
+) -> None:
+    """Post exactly one bounded WM_CONTEXTMENU message to the owned root HWND."""
+    args = context_message_args(
+        main_window, selected_row, process_identity, root_identity, executable, point=point
+    )
+    transport = post_message or _post_message_windows
+    if not transport(*args):
+        raise BlockedError("PostMessageW(WM_CONTEXTMENU) failed")
 
 
 def _same_path(left: str | Path, right: str | Path) -> bool:
@@ -273,6 +425,122 @@ def _tree(main_window: Any) -> list[dict[str, Any]]:
     return [_control_record(control) for control in [main_window, *main_window.descendants()]]
 
 
+def _menu_label(control: Any) -> str:
+    raw = str(getattr(control.element_info, "name", "") or _window_text(control)).strip()
+    if raw in _MENU_LABELS:
+        return raw
+    if "\t" not in raw:
+        return ""
+    label, shortcut = raw.split("\t", 1)
+    label, shortcut = label.strip(), shortcut.strip()
+    return label if label in _MENU_LABELS and _SHORTCUT_RE.fullmatch(shortcut) else ""
+
+
+def recognize_context_menu_items(items: Sequence[Any]) -> list[dict[str, Any]]:
+    """Recognize two distinct exact menu entries without invoking either one."""
+    recognized: list[dict[str, Any]] = []
+    for item in items:
+        label = _menu_label(item)
+        if label:
+            recognized.append({"label": label, "record": _control_record(item)})
+    counts = {label: sum(entry["label"] == label for entry in recognized) for label in _MENU_LABELS}
+    if any(count != 1 for count in counts.values()):
+        raise ContractError(f"context menu entries were not distinct exact matches: {counts!r}")
+    runtime_ids = [json.dumps(entry["record"].get("runtimeID"), sort_keys=True, default=str) for entry in recognized]
+    if len(runtime_ids) != len(set(runtime_ids)):
+        raise ContractError("context menu entries share a runtime ID")
+    return recognized
+
+
+def _runtime_key(control: Any) -> str:
+    info = control.element_info
+    runtime_id = getattr(info, "runtime_id", None)
+    if runtime_id is not None:
+        return "runtimeID:" + json.dumps(_as_json_value(runtime_id), sort_keys=True, default=str)
+    return f"handle:{getattr(info, 'handle', None)!r}"
+
+
+def _is_visible(control: Any) -> bool:
+    try:
+        return bool(control.is_visible())
+    except Exception:
+        return True
+
+
+def _owned_context_menus(desktop: Any, main_window: Any, process_pid: int) -> list[Any]:
+    candidates = list(desktop.windows()) + list(main_window.descendants())
+    menus: list[Any] = []
+    seen: set[str] = set()
+    for control in candidates:
+        info = control.element_info
+        if (
+            getattr(info, "process_id", None) == process_pid
+            and getattr(info, "control_type", "") == "Menu"
+            and _is_visible(control)
+        ):
+            key = _runtime_key(control)
+            if key not in seen:
+                seen.add(key)
+                menus.append(control)
+    if len(menus) > 1:
+        raise ContractError(f"unexpected count of owned visible Menu roots: {len(menus)}")
+    return menus
+
+
+def _menu_items(menu: Any, process_pid: int) -> list[Any]:
+    items = []
+    for control in menu.descendants():
+        info = control.element_info
+        if (
+            getattr(info, "process_id", None) == process_pid
+            and getattr(info, "control_type", "") == "MenuItem"
+            and _is_visible(control)
+        ):
+            items.append(control)
+    return items
+
+
+def _window_process_identity(hwnd: int, psutil: Any) -> dict[str, Any]:
+    if not is_windows_native():
+        raise BlockedError("native root HWND identity requires Windows")
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    get_pid = user32.GetWindowThreadProcessId
+    get_pid.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+    get_pid.restype = wintypes.DWORD
+    pid = wintypes.DWORD(0)
+    if not get_pid(hwnd, ctypes.byref(pid)) or not pid.value:
+        raise BlockedError(f"GetWindowThreadProcessId failed for HWND {hwnd:#x}")
+    native = psutil.Process(int(pid.value))
+    return {
+        "pid": int(pid.value),
+        "create_time": float(native.create_time()),
+        "executable": str(native.exe()),
+    }
+
+
+def _wait_for_context_menu(
+    desktop: Any,
+    main_window: Any,
+    process: Any,
+    psutil: Any,
+    identity: dict[str, Any],
+    executable: Path,
+    baseline_keys: set[str],
+    timeout: float,
+) -> Any:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        _verify_process_identity(process, psutil, identity, executable)
+        menus = _owned_context_menus(desktop, main_window, identity["pid"])
+        fresh = [menu for menu in menus if _runtime_key(menu) not in baseline_keys]
+        if fresh:
+            if len(fresh) != 1:
+                raise ContractError(f"unexpected newly-visible owned Menu count: {len(fresh)}")
+            return fresh[0]
+        time.sleep(0.25)
+    raise RuntimeError("timed out waiting for newly-visible owned context Menu")
+
+
 def _capture(main_window: Any, output: Path, filename: str) -> str | None:
     try:
         main_window.capture_as_image().save(output / filename)
@@ -311,7 +579,97 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--source-sha", required=True)
     parser.add_argument("--archive-sha256", required=True)
+    parser.add_argument(
+        "--inspect-context-menu",
+        action="store_true",
+        help="opt in to SelectionItem/context-menu observation; never invokes a menu item",
+    )
     return parser.parse_args(argv)
+
+
+def inspect_context_menu(
+    *,
+    main_window: Any,
+    playlist: Any,
+    rows: Sequence[Any],
+    expected_rows: Sequence[str],
+    process: Any,
+    psutil: Any,
+    process_identity: dict[str, Any],
+    executable: Path,
+    desktop: Any,
+    output: Path,
+    fixtures: Sequence[Path],
+    fixture_hashes: dict[str, dict[str, Any]],
+    report: dict[str, Any],
+) -> None:
+    """Perform the opt-in SelectionItem/context-menu observation only."""
+    selected = select_exact_rows(rows, expected_rows, process_identity["pid"])
+    report["context_menu"] = {
+        "selected_rows": selected,
+        "menu_items_invoked": False,
+        "transport": "PostMessageW(WM_CONTEXTMENU)",
+    }
+
+    baseline_menus = _owned_context_menus(desktop, main_window, process_identity["pid"])
+    if baseline_menus:
+        raise ContractError("an owned Menu was already visible before the context request")
+    baseline_keys: set[str] = set()
+
+    _verify_process_identity(process, psutil, process_identity, executable)
+    hwnd = int(getattr(main_window.element_info, "handle", 0) or 0)
+    root_identity = _window_process_identity(hwnd, psutil)
+    _verify_process_identity(process, psutil, process_identity, executable)
+    post_context_menu(main_window, rows[0], process_identity, root_identity, executable)
+    report["context_menu"]["root_identity"] = root_identity
+    report["context_menu"]["message_posted_once"] = True
+
+    menu = _wait_for_context_menu(
+        desktop,
+        main_window,
+        process,
+        psutil,
+        process_identity,
+        executable,
+        baseline_keys,
+        timeout=10,
+    )
+    menu_tree = _tree(menu)
+    _write_json(output / "player-context-menu-uia.json", menu_tree)
+    screenshot = _capture(menu, output, "player-context-menu.png")
+    if screenshot is None:
+        raise ContractError("context menu screenshot could not be captured")
+    report["context_menu"].update(
+        {
+            "menu_runtimeID": _as_json_value(getattr(menu.element_info, "runtime_id", None)),
+            "newly_visible_names": [record["name"] for record in menu_tree if record["name"]],
+            "uia_tree_records": len(menu_tree),
+            "screenshot": screenshot,
+        }
+    )
+    recognized = recognize_context_menu_items(_menu_items(menu, process_identity["pid"]))
+    report["context_menu"]["recognized_items"] = recognized
+    report["context_menu"]["menu_items_invoked"] = False
+
+    _verify_process_identity(process, psutil, process_identity, executable)
+    after_rows = list(playlist.descendants(control_type="ListItem"))
+    after_actual = [_window_text(row) for row in after_rows]
+    exact_playlist_rows(after_actual, expected_rows)
+    report["context_menu"]["rows_after_menu"] = after_actual
+    retained_states: list[bool] = []
+    if len(after_rows) == len(expected_rows):
+        retained_states = [_selection_state(row) for row in after_rows]
+    report["context_menu"]["selection_retained"] = retained_states == [True, True, False]
+
+    unchanged = all(
+        path.is_file()
+        and path.stat().st_size == fixture_hashes[path.name]["size"]
+        and _sha256(path) == fixture_hashes[path.name]["sha256"]
+        for path in fixtures
+    )
+    if not unchanged:
+        raise ContractError("fixture bytes changed during context-menu inspection")
+    report["context_menu"]["filesystem_unchanged"] = True
 
 
 def run_inspection(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
@@ -401,6 +759,22 @@ def run_inspection(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
         if not unchanged:
             raise ContractError("fixture bytes changed during read-only inspection")
         report["filesystem_unchanged"] = True
+        if args.inspect_context_menu:
+            inspect_context_menu(
+                main_window=main_window,
+                playlist=playlist,
+                rows=rows,
+                expected_rows=expected,
+                process=process,
+                psutil=psutil,
+                process_identity=identity,
+                executable=package_info.executable,
+                desktop=desktop,
+                output=output,
+                fixtures=fixtures,
+                fixture_hashes=fixture_hashes,
+                report=report,
+            )
         report["status"] = "PASS"
     except BlockedError as exc:
         report["status"] = "BLOCKED"
