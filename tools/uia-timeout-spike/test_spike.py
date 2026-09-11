@@ -461,6 +461,64 @@ class SupervisorSubprocessTests(unittest.TestCase):
             self.assertTrue(result.cleanup_verified)
             self.assertTrue(result.terminate_sent or result.kill_sent)
 
+    def test_injected_termination_failure_reaches_cross_platform_kill_fallback(self):
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            worker = self._write_worker(
+                directory,
+                """
+                import json, time
+                print(json.dumps({'event': 'ready'}), flush=True)
+                time.sleep(3)
+                """,
+            )
+            output = directory / "run"
+            import supervisor
+
+            captured = {}
+            real_popen = supervisor.subprocess.Popen
+
+            class TerminationFailure:
+                def __init__(self, process):
+                    self.process = process
+
+                def terminate(self):
+                    raise OSError("injected terminate transport failure")
+
+                def __getattr__(self, name):
+                    return getattr(self.process, name)
+
+            def capture_popen(*args, **kwargs):
+                process = real_popen(*args, **kwargs)
+                captured["process"] = process
+                return TerminationFailure(process)
+
+            try:
+                with mock.patch.object(supervisor.subprocess, "Popen", side_effect=capture_popen):
+                    result = self._run(
+                        worker,
+                        output,
+                        execution_timeout=0.05,
+                        terminate_timeout=0.03,
+                        kill_timeout=0.2,
+                    )
+            finally:
+                process = captured.get("process")
+                if process is not None and process.poll() is None:
+                    process.terminate()
+                    try:
+                        process.wait(timeout=1.0)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait(timeout=1.0)
+
+            self.assertEqual(result.status, "TIMEOUT")
+            self.assertTrue(result.cleanup_verified)
+            self.assertTrue(result.terminate_sent)
+            self.assertTrue(result.kill_sent)
+            self.assertTrue(any("terminate transport failure" in error for error in result.secondary_errors))
+            self.assertIsNotNone(captured["process"].poll())
+
     def test_live_stderr_output_cap_fails_before_execution_deadline(self):
         with tempfile.TemporaryDirectory() as raw:
             directory = Path(raw)
