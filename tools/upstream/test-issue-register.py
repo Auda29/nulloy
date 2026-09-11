@@ -356,27 +356,51 @@ class IssueRegister(unittest.TestCase):
         self.assertEqual(snapshot['open_gates']['release'], 'not_authorized')
 
     def test_new_milestone_negative_controls_reject_uia_player_and_release_claims(self):
-        import copy
+        import shutil
+        import subprocess
+        import sys
+        import tempfile
 
-        def assert_no_unearned_claims(data):
-            self.assertFalse(data['native_windows_timeout_contract_milestone']['native_uia_query_executed'])
-            self.assertFalse(data['native_windows_timeout_contract_milestone']['player_package_present'])
-            self.assertTrue(data['player_observation_hardening_milestone']['no_menu_invocation'])
-            self.assertFalse(data['player_observation_hardening_milestone']['final_combined_acceptance'])
-            self.assertFalse(data['pr30_timeout_contracts_followup']['new_pr30_package_hash_acceptance'])
-
-        for key, field, bad in [
-            ('native_windows_timeout_contract_milestone', 'native_uia_query_executed', True),
-            ('native_windows_timeout_contract_milestone', 'player_package_present', True),
-            ('player_observation_hardening_milestone', 'no_menu_invocation', False),
-            ('player_observation_hardening_milestone', 'final_combined_acceptance', True),
-            ('pr30_timeout_contracts_followup', 'new_pr30_package_hash_acceptance', True),
-        ]:
-            with self.subTest(key=key, field=field):
-                mutated = copy.deepcopy(self.data)
-                mutated[key][field] = bad
-                with self.assertRaises(AssertionError):
-                    assert_no_unearned_claims(mutated)
+        timeout_test = 'test_reviewed_windows_timeout_contract_milestone_is_exact_and_bounded'
+        observation_test = 'test_player_observation_sixty_contract_milestone_is_exact_and_keeps_prior_53'
+        ci_test = 'test_pr30_ci_snapshot_is_not_new_package_acceptance'
+        mutations = [
+            ('native_windows_timeout_contract_milestone', 'native_uia_query_executed', True, timeout_test),
+            ('native_windows_timeout_contract_milestone', 'player_package_present', True, timeout_test),
+            ('player_observation_hardening_milestone', 'no_menu_invocation', False, observation_test),
+            ('player_observation_hardening_milestone', 'final_combined_acceptance', True, observation_test),
+            ('pr30_timeout_contracts_followup', 'new_pr30_package_hash_acceptance', True, ci_test),
+        ]
+        # Copy only inputs needed by these real contracts, never a live worktree.
+        # Explicit test names prevent recursive invocation of this mutation test.
+        with tempfile.TemporaryDirectory(prefix='nulloy-register-mutations-') as directory:
+            root = Path(directory)
+            script = root / 'tools/upstream/test-issue-register.py'
+            register = root / 'docs/upstream/issue-register.json'
+            script.parent.mkdir(parents=True)
+            register.parent.mkdir(parents=True)
+            shutil.copyfile(Path(__file__), script)
+            original = (ROOT / 'docs/upstream/issue-register.json').read_text(encoding='utf-8')
+            register.write_text(original, encoding='utf-8')
+            command = [sys.executable, '-B', str(script)]
+            baseline = subprocess.run(
+                command + ['IssueRegister.' + name for name in (timeout_test, observation_test, ci_test)],
+                cwd=root, capture_output=True, text=True, timeout=20,
+            )
+            self.assertEqual(baseline.returncode, 0, baseline.stdout + baseline.stderr)
+            self.assertIn('Ran 3 tests', baseline.stderr)
+            for key, field, bad, test_name in mutations:
+                with self.subTest(key=key, field=field):
+                    mutated = json.loads(original)
+                    mutated[key][field] = bad
+                    register.write_text(json.dumps(mutated), encoding='utf-8')
+                    result = subprocess.run(
+                        command + ['IssueRegister.' + test_name], cwd=root,
+                        capture_output=True, text=True, timeout=20,
+                    )
+                    self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                    self.assertIn('Ran 1 test', result.stderr)
+                    self.assertIn('FAILED (failures=1)', result.stderr)
 
     def test_storage_cleanup_followup_is_bounded_and_protects_evidence(self):
         cleanup = self.data['storage_cleanup_followup']
