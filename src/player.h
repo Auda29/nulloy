@@ -40,6 +40,7 @@ class NActionManager;
 class QString;
 class QTimer;
 class NTagReaderInterface;
+class NFileOpenBurst;
 
 class NPlayer : public QWidget
 {
@@ -66,6 +67,7 @@ private:
     QTimer *m_settingsSaveTimer;
     QTimer *m_writeDefaultPlaylistTimer;
     bool m_trayIconDoubleClickCheck;
+    NFileOpenBurst *m_fileOpenBurst;
 
     bool eventFilter(QObject *obj, QEvent *event);
     void writePlaylist(const QString &file, N::M3uExtention ext);
