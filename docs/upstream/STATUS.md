@@ -6,6 +6,8 @@ Snapshot: 2026-09-10T08:53:25.460309+00:00. Ursprüngliche Swarm-PRs #7–#25: 1
 
 Die [Paketbaseline](ACCEPTANCE_BASELINE.md) trennt das korrigierte Windows-ZIP, ältere interaktive EXE/Formatprüfung und offene Abnahmen. Die damalige Zurückstellung nativer Tests ist historisch: inzwischen sind automatisierte echte Windows-Tests auf entbehrlichen GitHub-Runnern freigegeben. Der [Folgestand der nativen Automation](NATIVE_AUTOMATION_STATUS.md) dokumentiert die offenen PRs #28/#29 und fehlgeschlagene Läufe; daraus folgt keine neue Paketabnahme. Historische Audit- und Review-Dateien bleiben unverändert.
 
+Nachtrag 2026-09-11: Das [isolierte PR15-Paket und seine Auswahlprobe](NATIVE_AUTOMATION_STATUS.md#nachtrag-isoliertes-pr15-paket-und-auswahlprobe) sind mit Buildcommit, ZIP-/EXE-Prüfsummen und getrenntem Prüfercommit dokumentiert. Start-/Format-/Playlistbelege bestanden, Zweifachauswahl belegt, Kontextmenüprobe fehlgeschlagen. Kein gemeinsames Endpaket und keine native Papierkorb-Abnahme. Das Register führt diesen Teilstand separat unter `package_inspection_followup`.
+
 Quelle: [ursprüngliche Analyse](../UPSTREAM_ISSUES_ANALYSIS.md). Der Swarm hat die 80 aufgeführten Issues mit ihren 126 Kommentaren erneut abgerufen und bewertet. Issue-IDs, Kommentar-IDs und alle Einzelzählungen wurden programmatisch gegen den Rohsnapshot geprüft.
 
 Die maschinenlesbare [Statusdatei](issue-register.json) enthält je Issue die Quelllinks, Codebelege, Entscheidung, konkrete nächste Prüfung und den Lieferstatus. Der textuelle Rohsnapshot der öffentlichen Issue-Threads ist unter [handoff-evidence/audit/snapshot.jsonl](handoff-evidence/audit/snapshot.jsonl) mitversioniert; sein SHA-256 steht in der Statusdatei. [Übergabe für ein anderes Gerät](HANDOFF.md).

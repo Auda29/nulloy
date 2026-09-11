@@ -130,6 +130,23 @@ class IssueRegister(unittest.TestCase):
                 self.assertNotIn('Qt5 not installed', ' '.join(delivery['limitations']))
                 self.assertNotIn('Qt5 runtime', ' '.join(delivery['limitations']))
 
+    def test_isolated_player_followup_does_not_close_final_gates(self):
+        followup = self.data.get('package_inspection_followup', {})
+        self.assertEqual(followup.get('build_run'), 34572047079)
+        self.assertEqual(followup.get('build_commit'), '9e1b3f060e649a64c698b2a5981dbfca1d741b84')
+        self.assertEqual(followup.get('qt6_zip_sha256'), '5558a6ed786051224f7dcf3228a230fa45c95959f3e363e5b06b48d446ccb833')
+        self.assertEqual(followup.get('qt6_exe_sha256'), 'd7d622c3a0afe88657fa108bebf72f7bfdc69777c9f1f626fe3fe26e589315f9')
+        self.assertEqual(followup.get('read_only_run'), 34574196605)
+        self.assertEqual(followup.get('selection_run'), 34575720227)
+        self.assertEqual(followup.get('selection_inspector_commit'), 'c838b013431ec31d972baa5e128f721fb3e89b9f')
+        self.assertEqual(followup.get('selection_status'), 'two_rows_verified_before_context_request')
+        self.assertEqual(followup.get('context_menu_status'), 'timeout')
+        self.assertEqual(followup.get('postaction_file_integrity'), 'not_verified_on_timeout')
+        self.assertEqual(followup.get('final_combined_acceptance'), False)
+        self.assertEqual(followup.get('native_trash_matrix'), 'open')
+        self.assertEqual(followup.get('macos_original'), 'open')
+        self.assertNotEqual(followup['build_commit'], followup['selection_inspector_commit'])
+
     def test_archived_snapshot_matches_audit_and_register(self):
         archive = ROOT / 'docs/upstream/handoff-evidence'
         raw = (archive / 'audit/snapshot.jsonl').read_bytes()

@@ -41,6 +41,17 @@ PR #26 (separate Python-Pfadkorrektur) ist mit `264b05ddbd732dcb6970d42bc5ab82ad
 ohne funktionale Draft-Änderungen. Die unveränderten berichteten Windows-Paket-IDs
 bleiben davon getrennt; siehe ACCEPTANCE_BASELINE.md.
 
+## Nachtrag 11. September: Paketbindung vor Papierkorb-Abnahme
+
+Der [aktuelle Teilnachweis](NATIVE_AUTOMATION_STATUS.md#nachtrag-isoliertes-pr15-paket-und-auswahlprobe)
+verwendet den isolierten Build `9e1b3f060e649a64c698b2a5981dbfca1d741b84`
+aus Lauf `34572047079`. Seine vollständigen Qt5-/Qt6-Prüfsummen und Grenzen stehen
+dort; nicht mit älteren kombinierten Paketen oder dem Prüfercommit verwechseln.
+Die Zweifachauswahl am Qt6-Player ist belegt, die Kontextmenüprobe läuft auf einen
+Timeout. Als Nächstes den gezielten Fokus-/Kontextmenüweg ohne Menüaktion prüfen.
+Die alte destruktive Probe bleibt gesperrt; keine abgeschlossene Papierkorbmatrix.
+Historische Belege, macOS- und übrige native Abnahmelücken bleiben erhalten.
+
 ## Offene Arbeit
 
 | PR | Thema | Nächster Schritt |

@@ -22,6 +22,54 @@ Die ursprünglichen negativen Explorer-Belege und ihre Paketzuordnung bleiben
 unverändert. Der weiter unten genannte nächste IPC-Testschritt ist historisch;
 die echte Explorer-Matrix sowie Papierkorb- und Fensterabnahmen bleiben offen.
 
+## Nachtrag: isoliertes PR15-Paket und Auswahlprobe
+
+Stand dieses Nachtrags: 2026-09-11T07:47:55Z. Die älteren Abschnitte und die
+ursprüngliche Paketbaseline bleiben historische Belege, keine aktuelle Freigabe.
+
+[Build 34572047079](https://github.com/Auda29/nulloy/actions/runs/34572047079)
+hat Qt5 und Qt6 nacheinander erfolgreich gebaut. Source-Commit:
+`9e1b3f060e649a64c698b2a5981dbfca1d741b84`. Dieser Stand enthält Integration plus
+PR #15, nicht die gemeinsame PR-#15/#16/#24-Abnahme. Die native Papierkorbprobe
+war bedingungslos deaktiviert und wurde nicht ausgeführt.
+
+| Paket | ZIP SHA-256 | EXE SHA-256 | Manifestdateien |
+| --- | --- | --- | --- |
+| Qt6 portable 0.10.0-alpha.2 | `5558a6ed786051224f7dcf3228a230fa45c95959f3e363e5b06b48d446ccb833` | `d7d622c3a0afe88657fa108bebf72f7bfdc69777c9f1f626fe3fe26e589315f9` | 490 |
+| Qt5 nicht portabel 0.9.9 | `fe9250ea46a1d7960f184022cacdb7022b790f33aa417843049eb16ee114e4f5` | `80570a796289a848b4d8c09d384f3502bfd2723dd98c038e5aa886e4123331ca` | 412 |
+
+Beide Pakete wurden heruntergeladen; ZIP-/EXE- und sämtliche Manifestdateien
+lokal gehasht. Die später separat geladenen Testartefakte sind den ZIP-Hashes
+zugeordnet. Unter beiden Toolkits bestehen Paketstart mit System32-only-PATH,
+WAV/MP3/FLAC/OGG/Opus/WavPack und Unicode-Tag-Roundtrips. Die Formatläufe melden
+jeweils drei PASS inklusive Init/Cleanup und einen separat übersprungenen
+Portable-Prozesstest, nicht drei Fachfälle. Headless-Audio ist keine Audioausgabe-
+Abnahme. Diese Ergebnisse dürfen nicht auf das spätere gemeinsame Paket wandern.
+
+[Playerinspektion 34574196605](https://github.com/Auda29/nulloy/actions/runs/34574196605),
+Prüfer `58b2dc9d43a4d7473e487729735e07b27d79050e`, besteht am obigen Qt6-ZIP:
+drei genaue WAV-Playlistzeilen, Screenshot, unveränderte Dateien und Cleanup.
+Keine UI-Aktion wurde ausgeführt.
+
+[Auswahlprobe 34575720227](https://github.com/Auda29/nulloy/actions/runs/34575720227),
+Prüfer `c838b013431ec31d972baa5e128f721fb3e89b9f`, ist insgesamt fehlgeschlagen:
+Die ersten zwei Zeilen wurden über SelectionItem nachweislich ausgewählt, aber
+das Kontextmenü öffnete sich nach der einmaligen HWND-Nachricht nicht. Kein
+Menüeintrag wurde ausgelöst. Die Prozesse und eigenen Tempverzeichnisse sind
+bereinigt. Dateierhalt ist in diesem Timeoutpfad nur vor der Interaktion geprüft;
+er wird nicht als nachträglicher Nachweis ausgegeben. Die vorherige Probe
+[34575571652](https://github.com/Auda29/nulloy/actions/runs/34575571652) stoppte
+bereits an einer falschen Python-bool-Annahme, die anschließend tests-first
+für den Win32-BOOL-Rückgabewert korrigiert wurde.
+
+Die Ergebnisse und Paketzuordnung sind auch
+[in PR #15 verlinkt](https://github.com/Auda29/nulloy/pull/15#issuecomment-5631014146)
+(Paket-/Startnachweis; der spätere Auswahl-Timeout steht oben).
+Nächste Prüfung ist der gezielte Qt-Fokus-/Kontextmenüweg ohne Menüaktion.
+Die destruktive Probe bleibt gesperrt. Recycling-/Abbruch-/Duplikat-/Wiedergabe-
+Matrix, macOS-Originalfall, echter Explorer, Fensterlücken und gemeinsame
+Gesamtabnahme bleiben offen. Kein Merge oder Release ist dadurch freigegeben.
+
 ## Geltungsbereich
 
 Manuelle Nutzertests stehen nicht zur Verfügung. Automatisierte echte native
