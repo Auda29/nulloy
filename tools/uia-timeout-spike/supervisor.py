@@ -31,6 +31,10 @@ class DiagnosticReadError(RuntimeError):
     """A live diagnostic stream could not be read."""
 
 
+class ProcessPollError(RuntimeError):
+    """A process-state inspection failed."""
+
+
 @dataclass
 class SupervisionResult:
     status: str
@@ -102,7 +106,22 @@ def _wait_for_exit(process: subprocess.Popen[bytes], timeout: float) -> bool:
         process.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
         return False
-    return process.poll() is not None
+    return True
+
+
+def _cached_returncode(process: subprocess.Popen[bytes]) -> int | None:
+    """Read Popen's cached return code without another poll inspection."""
+    try:
+        return process.returncode
+    except Exception:
+        return None
+
+
+def _poll_or_raise(process: subprocess.Popen[bytes]) -> int | None:
+    try:
+        return process.poll()
+    except Exception as exc:
+        raise ProcessPollError(f"process poll failed: {type(exc).__name__}: {exc}") from exc
 
 
 def _cleanup(
@@ -114,27 +133,44 @@ def _cleanup(
     terminate_sent = False
     kill_sent = False
     errors: list[str] = []
-    if process.poll() is None:
+    try:
+        returncode = process.poll()
+    except Exception as exc:
+        errors.append(f"cleanup poll failed: {type(exc).__name__}: {exc}")
+        returncode = _cached_returncode(process)
+    exited = returncode is not None
+    if not exited:
         terminate_sent = True
         try:
             process.terminate()
         except Exception as exc:
             errors.append(f"terminate failed: {type(exc).__name__}: {exc}")
         try:
-            _wait_for_exit(process, terminate_timeout)
+            exited = _wait_for_exit(process, terminate_timeout)
         except Exception as exc:
             errors.append(f"terminate wait failed: {type(exc).__name__}: {exc}")
-    if process.poll() is None:
+            exited = False
+    if not exited:
         kill_sent = True
         try:
             process.kill()
         except Exception as exc:
             errors.append(f"kill failed: {type(exc).__name__}: {exc}")
         try:
-            _wait_for_exit(process, kill_timeout)
+            exited = _wait_for_exit(process, kill_timeout)
         except Exception as exc:
             errors.append(f"kill wait failed: {type(exc).__name__}: {exc}")
-    return process.poll() is not None, terminate_sent, kill_sent, errors
+            exited = False
+    if not exited:
+        returncode = _cached_returncode(process)
+        if returncode is not None:
+            exited = True
+        else:
+            try:
+                exited = process.poll() is not None
+            except Exception as exc:
+                errors.append(f"cleanup verification poll failed: {type(exc).__name__}: {exc}")
+    return exited, terminate_sent, kill_sent, errors
 
 
 def _read_live_streams(stdout_path: Path, stderr_path: Path, cap: int) -> tuple[bytes, bool, bytes, bool]:
@@ -246,7 +282,7 @@ def run_supervised(
 
     try:
         readiness_deadline = time.monotonic() + readiness_timeout
-        while process.poll() is None and time.monotonic() < readiness_deadline:
+        while _poll_or_raise(process) is None and time.monotonic() < readiness_deadline:
             stdout_data, stdout_capped, stderr_data, stderr_capped = _read_live_streams(
                 stdout_path, stderr_path, output_cap
             )
@@ -257,12 +293,12 @@ def run_supervised(
             if ready:
                 break
             time.sleep(min(0.01, max(0.001, readiness_deadline - time.monotonic())))
-        if failure_kind is None and not ready and process.poll() is None:
+        if failure_kind is None and not ready and _poll_or_raise(process) is None:
             timed_out = True
             timeout_phase = "readiness"
-        if failure_kind is None and not timed_out and ready and process.poll() is None:
+        if failure_kind is None and not timed_out and ready and _poll_or_raise(process) is None:
             execution_deadline = time.monotonic() + execution_timeout
-            while process.poll() is None and time.monotonic() < execution_deadline:
+            while _poll_or_raise(process) is None and time.monotonic() < execution_deadline:
                 stdout_data, stdout_capped, stderr_data, stderr_capped = _read_live_streams(
                     stdout_path, stderr_path, output_cap
                 )
@@ -270,9 +306,12 @@ def run_supervised(
                     failure_kind = "output_cap"
                     break
                 time.sleep(min(0.01, max(0.001, execution_deadline - time.monotonic())))
-            if failure_kind is None and process.poll() is None:
+            if failure_kind is None and _poll_or_raise(process) is None:
                 timed_out = True
                 timeout_phase = "execution"
+    except ProcessPollError as exc:
+        failure_kind = "supervision"
+        primary_error = str(exc)
     except DiagnosticReadError as exc:
         failure_kind = "diagnostic_read"
         primary_error = str(exc)
@@ -280,16 +319,9 @@ def run_supervised(
         failure_kind = "supervision"
         primary_error = f"{type(exc).__name__}: {exc}"
     finally:
-        try:
-            if process.poll() is None:
-                cleanup_verified, terminate_sent, kill_sent, cleanup_errors = _cleanup(
-                    process, terminate_timeout, kill_timeout
-                )
-            else:
-                cleanup_verified = process.poll() is not None
-        except Exception as exc:
-            cleanup_verified = False
-            cleanup_errors.append(f"cleanup inspection failed: {type(exc).__name__}: {exc}")
+        cleanup_verified, terminate_sent, kill_sent, cleanup_errors = _cleanup(
+            process, terminate_timeout, kill_timeout
+        )
 
     stdout_data, stdout_capped, stdout_error = _read_final_stream(stdout_path, output_cap, "stdout")
     stderr_data, stderr_capped, stderr_error = _read_final_stream(stderr_path, output_cap, "stderr")
@@ -310,8 +342,18 @@ def run_supervised(
     elif stdout_capped or stderr_capped:
         if failure_kind is None:
             failure_kind = "output_cap"
-    elif not primary_error and failure_kind is None:
+    returncode = _cached_returncode(process)
+    try:
         returncode = process.poll()
+    except Exception as exc:
+        error = f"final process poll failed: {type(exc).__name__}: {exc}"
+        if primary_error or failure_kind is not None:
+            secondary_errors.append(error)
+        else:
+            primary_error = error
+            failure_kind = "supervision"
+
+    if not primary_error and failure_kind is None:
         if returncode != 0:
             failure_kind = "child_exit"
         elif not ready_at_end:
@@ -319,7 +361,6 @@ def run_supervised(
         elif payload.get("status") != "PASS":
             failure_kind = "child_result"
 
-    returncode = process.poll()
     if not cleanup_verified and not timed_out:
         failure_kind = failure_kind or "cleanup_uncertain"
     if timed_out:
