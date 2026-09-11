@@ -717,6 +717,14 @@ def _owned_surface_diagnostics(desktop: Any, process_pid: int) -> dict[str, Any]
     }
 
 
+def _record_exception(report: dict[str, Any], exc: Exception) -> None:
+    report["error"] = str(exc)
+    report["error_type"] = type(exc).__name__
+    diagnostics = getattr(exc, "diagnostics", None)
+    if diagnostics and diagnostics.get("write_errors"):
+        report["diagnostics_error"] = diagnostics
+
+
 def _owned_visible_popups(desktop: Any, main_window: Any, process_pid: int) -> list[Any]:
     """Reject any additional visible owned top-level window before input."""
     main_handle = int(getattr(main_window.element_info, "handle", 0) or 0)
@@ -793,12 +801,26 @@ def _wait_for_context_menu(
                 raise ContractError(f"unexpected newly-visible owned Menu count: {len(fresh)}")
             return fresh[0]
         time.sleep(0.25)
+    timeout_error = RuntimeError("timed out waiting for newly-visible owned context Menu")
+    timeout_error.diagnostics = {
+        "path": str(diagnostics_path) if diagnostics_path is not None else None,
+        "write_errors": [],
+    }
     if diagnostics_path is not None:
         try:
             _write_json(diagnostics_path, _owned_surface_diagnostics(desktop, identity["pid"]))
-        except Exception as exc:
-            _write_json(diagnostics_path, {"error": repr(exc), "process_pid": identity["pid"]})
-    raise RuntimeError("timed out waiting for newly-visible owned context Menu")
+        except Exception as first_error:
+            timeout_error.diagnostics["write_errors"].append(
+                {"stage": "diagnostics", "error": repr(first_error)}
+            )
+            try:
+                _write_json(diagnostics_path, {"error": repr(first_error), "process_pid": identity["pid"]})
+            except Exception as second_error:
+                timeout_error.diagnostics["write_errors"].append(
+                    {"stage": "fallback", "error": repr(second_error)}
+                )
+            raise timeout_error from first_error
+    raise timeout_error
 
 
 def _capture(main_window: Any, output: Path, filename: str) -> str | None:
@@ -1215,14 +1237,13 @@ def run_inspection(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
         report["error"] = str(exc)
     except Exception as exc:
         report["status"] = "FAIL"
-        report["error"] = str(exc)
-        report["error_type"] = type(exc).__name__
+        _record_exception(report, exc)
         if main_window is not None:
             try:
                 _write_json(output / "player-uia-failure.json", _tree(main_window))
                 _capture(main_window, output, "player-failure.png")
             except Exception as capture_exc:
-                report["diagnostics_error"] = repr(capture_exc)
+                report["capture_diagnostics_error"] = repr(capture_exc)
     finally:
         if fixtures and fixture_hashes:
             try:

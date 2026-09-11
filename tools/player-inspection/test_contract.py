@@ -790,6 +790,64 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(len(diagnostics["top_level_surfaces"]), 1)
         self.assertEqual(diagnostics["top_level_surfaces"][0]["surface"]["name"], "main")
 
+    def test_context_menu_timeout_preserves_timeout_and_both_diagnostic_write_failures(self):
+        main = _FakeSurface("main")
+        identity = {"pid": 4242}
+        first_error = RuntimeError("primary diagnostic write failed")
+        second_error = OSError("fallback diagnostic write failed")
+        with mock.patch.object(MODULE, "_write_json", side_effect=[first_error, second_error]) as writer:
+            with self.assertRaises(RuntimeError) as raised:
+                MODULE._wait_for_context_menu(
+                    _FakeDesktop([main]),
+                    main,
+                    process=None,
+                    psutil=None,
+                    identity=identity,
+                    executable=Path("Nulloy.exe"),
+                    baseline_keys=set(),
+                    timeout=0,
+                    diagnostics_path=Path("unwritable") / "discovery.json",
+                )
+
+        self.assertEqual(str(raised.exception), "timed out waiting for newly-visible owned context Menu")
+        self.assertEqual(writer.call_count, 2)
+        diagnostics = raised.exception.diagnostics
+        self.assertEqual(
+            [item["error"] for item in diagnostics["write_errors"]],
+            [repr(first_error), repr(second_error)],
+        )
+        self.assertIs(raised.exception.__cause__, first_error)
+
+    def test_timeout_diagnostics_enter_report_without_overwriting_cleanup_status(self):
+        main = _FakeSurface("main")
+        identity = {"pid": 4242}
+        first_error = RuntimeError("primary diagnostic write failed")
+        second_error = OSError("fallback diagnostic write failed")
+        with mock.patch.object(MODULE, "_write_json", side_effect=[first_error, second_error]):
+            with self.assertRaises(RuntimeError) as raised:
+                MODULE._wait_for_context_menu(
+                    _FakeDesktop([main]),
+                    main,
+                    process=None,
+                    psutil=None,
+                    identity=identity,
+                    executable=Path("Nulloy.exe"),
+                    baseline_keys=set(),
+                    timeout=0,
+                    diagnostics_path=Path("unwritable") / "discovery.json",
+                )
+
+        report = {"status": "FAIL", "cleanup": {"process_cleanup_verified": True, "errors": []}}
+        MODULE._record_exception(report, raised.exception)
+        self.assertEqual(report["status"], "FAIL")
+        self.assertEqual(report["error"], "timed out waiting for newly-visible owned context Menu")
+        self.assertEqual(report["error_type"], type(raised.exception).__name__)
+        self.assertEqual(
+            [item["error"] for item in report["diagnostics_error"]["write_errors"]],
+            [repr(first_error), repr(second_error)],
+        )
+        self.assertEqual(report["cleanup"], {"process_cleanup_verified": True, "errors": []})
+
     def test_context_menu_flag_is_opt_in_and_default_mode_has_no_action(self):
         args = MODULE.parse_args(
             [
