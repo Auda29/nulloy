@@ -363,9 +363,11 @@ def run_supervised(
 
     if not cleanup_verified and not timed_out:
         failure_kind = failure_kind or "cleanup_uncertain"
-    if timed_out:
+    if not cleanup_verified:
+        status = "FAIL"
+    elif timed_out:
         status = "TIMEOUT"
-    elif failure_kind is not None or not cleanup_verified:
+    elif failure_kind is not None:
         status = "FAIL"
     else:
         status = "SUCCESS"
