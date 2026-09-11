@@ -339,26 +339,24 @@ class SupervisorSubprocessTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     validate_deadline(value, "deadline")
 
-    def test_cli_uses_real_subprocess_and_serializes_result(self):
+    def test_cli_uses_owned_worker_and_serializes_linux_failure(self):
         with tempfile.TemporaryDirectory() as raw:
             directory = Path(raw)
-            worker = self._write_worker(
-                directory,
-                """
-                import json
-                print(json.dumps({'event': 'ready'}), flush=True)
-                print(json.dumps({'status': 'PASS'}), flush=True)
-                """,
-            )
             output = directory / "cli-run"
             completed = subprocess.run(
                 [
                     sys.executable,
                     str(HERE / "supervisor.py"),
-                    "--worker-script",
-                    str(worker),
                     "--output-dir",
                     str(output),
+                    "--hwnd",
+                    "0x10",
+                    "--pid",
+                    "1234",
+                    "--create-time",
+                    "10.5",
+                    "--exe",
+                    "/owned.exe",
                     "--readiness-timeout",
                     "0.5",
                     "--execution-timeout",
@@ -372,10 +370,34 @@ class SupervisorSubprocessTests(unittest.TestCase):
                 check=False,
             )
 
-            self.assertEqual(completed.returncode, 0)
+            self.assertEqual(completed.returncode, 1 if os.name != "nt" else 0)
             cli_result = json.loads(completed.stdout)
-            self.assertEqual(cli_result["status"], "SUCCESS")
-            self.assertEqual(cli_result["returncode"], 0)
+            if os.name != "nt":
+                self.assertEqual(cli_result["status"], "FAIL")
+                self.assertEqual(cli_result["failure_kind"], "child_exit")
+            self.assertTrue((output / "result.json").is_file())
+
+    def test_cli_rejects_worker_script_replacement_option(self):
+        with tempfile.TemporaryDirectory() as raw:
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(HERE / "supervisor.py"),
+                    "--worker-script",
+                    str(Path(raw) / "injected.py"),
+                    "--output-dir",
+                    str(Path(raw) / "run"),
+                ],
+                cwd=HERE,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(completed.returncode, 2)
+            self.assertIn("unrecognized arguments", completed.stderr)
 
 
 if __name__ == "__main__":
