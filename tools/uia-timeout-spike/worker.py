@@ -119,6 +119,11 @@ def inspect_target(hwnd_raw: str, pid_raw: str, create_time_raw: str, exe: str) 
     _emit({"event": "ready"})
     snapshot = _read_only_snapshot(hwnd, pid)
 
+    native_pid_after = _native_window_pid(hwnd)
+    if native_pid_after != pid:
+        raise RuntimeError(
+            f"HWND owner changed during UIA query: native={native_pid_after}, requested={pid}"
+        )
     after = _identity(psutil.Process(pid))
     if after != before or after != expected:
         raise RuntimeError(f"target identity changed during UIA query: before={before!r}, after={after!r}")

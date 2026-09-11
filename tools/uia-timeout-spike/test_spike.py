@@ -13,12 +13,62 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import types
 import unittest
 from pathlib import Path
 from unittest import mock
 
 
 HERE = Path(__file__).resolve().parent
+
+
+class WorkerIdentityTests(unittest.TestCase):
+    def test_native_hwnd_owner_is_revalidated_after_uia_traversal(self):
+        import worker
+
+        class Info:
+            name = "owned"
+            control_type = "Window"
+            automation_id = "root"
+            class_name = "FakeWindow"
+            process_id = 1234
+
+        class Root:
+            element_info = Info()
+
+            def descendants(self):
+                return []
+
+        class DesktopFactory:
+            def __init__(self, **kwargs):
+                pass
+
+            def window(self, **kwargs):
+                return self
+
+            def wrapper_object(self):
+                return Root()
+
+        class Process:
+            pid = 1234
+
+            def create_time(self):
+                return 10.5
+
+            def exe(self):
+                return "/owned.exe"
+
+        psutil_module = types.ModuleType("psutil")
+        psutil_module.Process = lambda pid: Process()
+        pywinauto_module = types.ModuleType("pywinauto")
+        pywinauto_module.Desktop = DesktopFactory
+        native_pids = iter((1234, 4321))
+
+        with mock.patch.object(worker.os, "name", "nt"):
+            with mock.patch.object(worker, "_native_window_pid", side_effect=lambda hwnd: next(native_pids)):
+                with mock.patch.dict(sys.modules, {"psutil": psutil_module, "pywinauto": pywinauto_module}):
+                    with self.assertRaisesRegex(RuntimeError, "HWND owner changed"):
+                        worker.inspect_target("0x10", "1234", "10.5", "/owned.exe")
 
 
 class SupervisorSubprocessTests(unittest.TestCase):
