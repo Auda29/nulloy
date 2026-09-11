@@ -149,6 +149,18 @@ class ContractTests(unittest.TestCase):
                 [f"{p.name} (0:30)" for p in paths],
             )
 
+    def test_selection_state_accepts_native_bool_integers_not_truthy_objects(self):
+        row = _FakeRow("one.wav (0:30)", [], [])
+        for value, expected in ((0, False), (1, True), (False, False), (True, True)):
+            with self.subTest(value=value):
+                row.selected = value
+                self.assertIs(MODULE._selection_state(row), expected)
+        for value in (None, "false", "1", 0.0, 1.0, 2, object()):
+            with self.subTest(invalid=repr(value)):
+                row.selected = value
+                with self.assertRaises(MODULE.ContractError):
+                    MODULE._selection_state(row)
+
     def test_selection_uses_first_select_then_second_add_and_no_extra_row(self):
         expected = ["one.wav (0:30)", "two.wav (0:30)", "three.wav (0:30)"]
         actions = []

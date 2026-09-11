@@ -218,9 +218,14 @@ def _selection_state(row: Any) -> bool:
         value = getattr(pattern, "CurrentIsSelected")
     except Exception as exc:
         raise BlockedError(f"cannot read UIA SelectionItem state: {exc!r}") from exc
-    if type(value) is not bool:
-        raise ContractError(f"SelectionItem.CurrentIsSelected is not boolean for {_row_fullname(row)!r}")
-    return value
+    # UIAutomation exposes BOOL (an integer through comtypes), not VARIANT_BOOL.
+    # Accept canonical 0/1 only; never infer state from arbitrary Python truthiness.
+    if type(value) not in (bool, int) or value not in (0, 1):
+        raise ContractError(
+            f"SelectionItem.CurrentIsSelected has unsupported value {value!r} "
+            f"({type(value).__name__}) for {_row_fullname(row)!r}"
+        )
+    return bool(value)
 
 
 def select_exact_rows(rows: Sequence[Any], expected: Sequence[str], process_pid: int) -> list[str]:
