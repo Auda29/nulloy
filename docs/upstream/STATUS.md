@@ -130,7 +130,7 @@ Papierkorbaktion.
 
 ## Nachtrag 2026-09-11: Konsolidierung vor PR30-Merge
 
-Der append-only-Konsolidierungsstand ist in [newCONSOLIDATION.md](newCONSOLIDATION.md)
+Der append-only-Konsolidierungsstand ist in [CONSOLIDATION.md](CONSOLIDATION.md)
 und im Registerfeld `consolidation_snapshot` festgehalten. Die verifizierte
 Bestandsaufnahme **nach** den Retirements lautet 12 Remote-Branches, 11 lokale
 Branches und 10 Worktrees; der Stand davor war 33/34/33, jeweils sauber. Exakt

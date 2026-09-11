@@ -135,7 +135,7 @@ Weiterhin offen und vor einer kombinierten Freigabe zu erledigen: PR15 Recycling
 
 ## Nachtrag 2026-09-11: Konsolidierungsübergabe vor PR30-Merge
 
-Der vollständige append-only-Betriebsstand steht in [newCONSOLIDATION.md](newCONSOLIDATION.md)
+Der vollständige append-only-Betriebsstand steht in [CONSOLIDATION.md](CONSOLIDATION.md)
 und im Feld `consolidation_snapshot` des Registers. Er beschreibt den Stand nach
 den verifizierten Retirements: 12 Remote-Branches, 11 lokale Branches und 10
 Worktrees, zuvor 33/34/33, jeweils sauber. Die 18 abgeschlossenen PR-Branches

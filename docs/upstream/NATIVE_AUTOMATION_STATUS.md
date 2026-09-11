@@ -196,7 +196,7 @@ The native worker is not integrated into the player; that is future work. The
 prior 60-test player observation and the earlier 53-test context-menu milestone
 remain separate historical observations and are not replaced by this record.
 
-The consolidation handoff is [newCONSOLIDATION.md](newCONSOLIDATION.md), with
+The consolidation handoff is [CONSOLIDATION.md](CONSOLIDATION.md), with
 machine-readable fields `native_readonly_uia_milestone` and
 `consolidation_snapshot` in `issue-register.json`. It records the post-retirement
 12/11/10 branch/local/worktree snapshot, exact retired PR set, six archived
@@ -207,5 +207,7 @@ Linux `34597690744` succeeded, but this is branch CI only and not package or
 combined acceptance. Integration `919468efc32f4d038c96d7276a799794dab2e86e` and
 `master` `027d81a583b07457a4fa5f18b3e7dcca50b05b58` remain separate.
 
-The handoff is documentation only: no product fix, native acceptance, build,
-CI trigger, push, or workflow change is part of this goal.
+This handoff adds no product fix or native acceptance. Publishing the updated
+PR30 head, running its required CI and merging only that reviewed documentation
+PR into integration are part of this consolidation goal. No new native probe
+or workflow change is authorized here.

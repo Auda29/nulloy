@@ -5174,6 +5174,12 @@
       "evidence": "/home/hermes/workspace/nulloy-status-current/uia-timeout-native-34600044236/parent-verification.json",
       "runtime_source_line_endings": "explicit Windows CRLF checkout hashes verified"
     },
+    "runtime_sha256": {
+      "fixture.py": "50109c32c39bd7863e0273e197e1170299b0f8bdb720251a1b462e251d187da0",
+      "run_probe.py": "27a11e31686bbae223710bf12648ac70cdba2123f702b5907977a950e2eb491e",
+      "supervisor.py": "6f62c97553a6e513a597bf6a53680a36c9dec9852a8cccb5ab1100744a6737d3",
+      "worker.py": "0b70bfc373904dee5bf96d86da1e6aeb8f55d1f62980c75b2657bdb6ec83d3c0"
+    },
     "limits": [
       "The blocked-worker timeout proves containment only; interruption inside COM is not proven.",
       "No player package, player start, menu/input action, recycling action, or final acceptance was executed."
@@ -5229,7 +5235,7 @@
         "number": 15,
         "state": "OPEN",
         "head_sha": "774894c4eba7b646beafb38313fe0dc73cfb4671",
-        "purpose": "product paperbin review; no formal native acceptance"
+        "purpose": "independently reviewed trash production correction; final-player native matrix still pending"
       },
       {
         "number": 16,
@@ -5259,7 +5265,7 @@
         "number": 30,
         "state": "OPEN",
         "head_sha": "1e44a4477929cbd1bad7b36c204f8466f8711f69",
-        "purpose": "documentation handoff branch; merge only after review and the recorded CI",
+        "purpose": "historical head/CI snapshot; updated documentation head requires fresh independent review and fresh required CI before merge",
         "ci": {
           "windows": {
             "run": 34597690721,

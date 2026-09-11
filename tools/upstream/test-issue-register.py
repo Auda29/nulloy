@@ -355,6 +355,19 @@ class IssueRegister(unittest.TestCase):
         self.assertFalse(snapshot['final_combined_acceptance'])
         self.assertEqual(snapshot['open_gates']['release'], 'not_authorized')
 
+    def test_consolidation_handoff_has_recovery_and_remaining_acceptance(self):
+        handoff = (ROOT / 'docs/upstream/CONSOLIDATION.md').read_text(encoding='utf-8')
+        for required in ('RECOVERY.md', 'Recycling possible and unavailable',
+                         'cancel and partial cancel', 'current/next track',
+                         'cold and running player', 'Enqueue/Play-enqueued',
+                         'original macOS case', 'Mixed DPI', 'PR29',
+                         'fresh CI for the updated PR30 head'):
+            self.assertIn(required, handoff)
+        self.assertEqual(set(self.data['native_readonly_uia_milestone']['runtime_sha256']),
+                         {'fixture.py', 'run_probe.py', 'supervisor.py', 'worker.py'})
+        for digest in self.data['native_readonly_uia_milestone']['runtime_sha256'].values():
+            self.assertRegex(digest, r'^[0-9a-f]{64}$')
+
     def test_native_readonly_uia_milestone_is_bounded_and_not_action_ready(self):
         milestone = self.data['native_readonly_uia_milestone']
         self.assertEqual(milestone['run'], 34600044236)
