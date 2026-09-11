@@ -53,6 +53,7 @@ private:
 
     Qt::WindowFrameSection getSection(const QPoint &pos);
     void updateCursor(Qt::WindowFrameSection section);
+    void ensureVisibleGeometry();
 
 #ifdef Q_OS_WIN
     bool m_framelessShadow;
