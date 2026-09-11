@@ -55,7 +55,7 @@ reports `native_acceptance_false: true`.
 
 ```bash
 /home/hermes/workspace/nulloy-status-current/uia-fixture-venv/bin/python \
-  -m unittest -v tools/uia-timeout-native/test_probe.py
+  -m unittest discover -v -s tools/uia-timeout-native -p 'test_probe.py'
 ```
 
 No native Windows UIA query was performed in the Linux implementation run.

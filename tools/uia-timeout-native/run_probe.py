@@ -84,11 +84,38 @@ def _live_identity(process: subprocess.Popen[bytes]) -> tuple[int, float, str]:
     return int(live.pid), float(live.create_time()), str(live.exe())
 
 
-def _validate_target(state: dict[str, Any], process: subprocess.Popen[bytes], *, non_native: bool) -> dict[str, Any]:
+def _native_window_pid(hwnd: int) -> int:
+    """Use the reviewed typed Win32 ownership helper without importing UIA."""
+    sys.path.insert(0, str(SPIKE))
+    try:
+        from worker import _native_window_pid as owner_pid
+
+        return int(owner_pid(hwnd))
+    finally:
+        try:
+            sys.path.remove(str(SPIKE))
+        except ValueError:
+            pass
+
+
+def _validate_target(
+    state: dict[str, Any],
+    process: subprocess.Popen[bytes],
+    *,
+    non_native: bool,
+    launch_identity: tuple[int, float, str],
+    expected_nonce: str,
+    expected_target: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     pid, create_time, executable = _live_identity(process)
+    if (pid, create_time, executable) != launch_identity:
+        raise ProbeFailure("fixture_identity", "live fixture identity differs from launch-pinned identity")
     nonce = state.get("nonce")
-    if not isinstance(nonce, str) or not nonce:
-        raise ProbeFailure("fixture_identity", "fixture nonce is missing")
+    if nonce != expected_nonce:
+        raise ProbeFailure(
+            "fixture_identity",
+            f"fixture nonce differs from launch nonce: expected={expected_nonce!r}, actual={nonce!r}",
+        )
     if state.get("pid") != pid:
         raise ProbeFailure("fixture_identity", f"fixture PID mismatch: record={state.get('pid')!r}, live={pid}")
     if float(state.get("create_time")) != create_time:
@@ -106,6 +133,26 @@ def _validate_target(state: dict[str, Any], process: subprocess.Popen[bytes], *,
             "fixture_identity",
             f"unexpected Qt platform: expected={expected_platform!r}, actual={state.get('qt_platform')!r}",
         )
+    if expected_target is not None:
+        expected_state = {
+            "nonce": expected_target["nonce"],
+            "pid": expected_target["pid"],
+            "create_time": expected_target["create_time"],
+            "executable": expected_target["exe"],
+            "hwnd": expected_target["hwnd"],
+            "qt_version": expected_target["qt_version"],
+            "qt_platform": expected_target["qt_platform"],
+        }
+        actual_state = {key: state.get(key) for key in expected_state}
+        if actual_state != expected_state:
+            raise ProbeFailure("fixture_identity", "fixture state differs from the launch-pinned target")
+    if not non_native:
+        try:
+            native_pid = _native_window_pid(hwnd)
+        except Exception as exc:
+            raise ProbeFailure("fixture_identity", f"native HWND owner PID lookup failed: {type(exc).__name__}: {exc}") from exc
+        if native_pid != pid:
+            raise ProbeFailure(f"fixture_identity", f"HWND owner PID mismatch: native={native_pid}, fixture={pid}")
     return {
         "nonce": nonce,
         "pid": pid,
@@ -156,7 +203,7 @@ def _snapshot_is_owned(payload: dict[str, Any], target: dict[str, Any]) -> tuple
         return False, "snapshot contains a record outside the fixture PID"
     label = target["label"]
     title = target["window_title"]
-    if not any(item.get("name") == label or item.get("window_title") == title for item in snapshot):
+    if not any(item.get("name") in (label, title) for item in snapshot):
         return False, "snapshot lacks the exact fixture label/window title carrying the nonce"
     return True, ""
 
@@ -228,8 +275,10 @@ def _cleanup_fixture(process: subprocess.Popen[bytes], terminate_timeout: float 
             exited = True
     except Exception as exc:
         record("cleanup verification poll failed", exc)
+    returncode = None
     try:
-        if not exited and process.returncode is not None:
+        returncode = process.returncode
+        if not exited and returncode is not None:
             exited = True
     except Exception as exc:
         record("cleanup returncode verification failed", exc)
@@ -237,7 +286,7 @@ def _cleanup_fixture(process: subprocess.Popen[bytes], terminate_timeout: float 
         "verified": bool(exited and not errors and not primary),
         "terminate_sent": terminate_sent,
         "kill_sent": kill_sent,
-        "returncode": process.returncode,
+        "returncode": returncode,
         "primary_error": primary,
         "secondary_errors": errors,
     }
@@ -256,6 +305,29 @@ def _write_report(path: Path, report: dict[str, Any]) -> None:
 
 def _write_state_copy(evidence_dir: Path, name: str, state: dict[str, Any]) -> None:
     _write_report(evidence_dir / name, state)
+
+
+def _safe_write_final_report(path: Path, report: dict[str, Any]) -> None:
+    try:
+        _write_report(path, report)
+    except Exception as exc:
+        detail = f"{type(exc).__name__}: {exc}"
+        report["report_write_error"] = detail
+        if report.get("failure_kind"):
+            report.setdefault("secondary_errors", []).append(f"report_write: {detail}")
+        else:
+            report["failure_kind"] = "report_write"
+            report["failure_detail"] = detail
+        report["outcome"] = "FAIL"
+
+
+def _preserve_failure(report: dict[str, Any], kind: str, detail: str) -> None:
+    if not report.get("failure_kind"):
+        report["failure_kind"] = kind
+        report["failure_detail"] = detail
+    else:
+        report.setdefault("secondary_errors", []).append(f"{kind}: {detail}")
+    report["outcome"] = "FAIL"
 
 
 def _runtime_hashes() -> dict[str, str]:
@@ -295,14 +367,14 @@ def run_probe(
     ``query_runner`` and ``non_native_test`` are a trusted Python test seam,
     never exposed by the CLI.  A seam run is explicitly marked non-native.
     """
+    if query_runner is not None and not non_native_test:
+        raise ValueError("query_runner requires non_native_test=True; injected queries are never native acceptance")
     if not non_native_test and os.name != "nt":
         raise RuntimeError("native controller requires Windows; use non_native_test with an injected query seam")
     if query_runner is None:
         query_runner = _query_default
-    evidence_dir = _new_evidence_dir(Path(evidence_root).resolve())
-    temp_parent = Path(tempfile.mkdtemp(prefix="uia-timeout-native-"))
-    child_root = temp_parent / "fixture-root"
     nonce = _nonce()
+    evidence_dir = _new_evidence_dir(Path(evidence_root).resolve())
     fixture_stdout_path = evidence_dir / "fixture.stdout"
     fixture_stderr_path = evidence_dir / "fixture.stderr"
     report: dict[str, Any] = {
@@ -312,17 +384,26 @@ def run_probe(
         "native_acceptance_false": bool(non_native_test),
         "native_platform": os.name,
         "evidence_dir": str(evidence_dir),
-        "owned_temp_parent": str(temp_parent),
         "fixture": {"script": str(FIXTURE), "nonce": nonce, "stdout_path": str(fixture_stdout_path), "stderr_path": str(fixture_stderr_path)},
         "raw_supervisor_reports": [],
-        "runtime_sha256": _runtime_hashes(),
         "github_workflow_sha": _workflow_sha(),
         "github_workflow_sha_note": "None is expected for local/non-native execution",
         "configured_stage_budget_s": DEFAULT_STAGE_BUDGET,
         "failure_kind": "",
         "failure_detail": "",
     }
+    try:
+        report["runtime_sha256"] = _runtime_hashes()
+    except Exception as exc:
+        _preserve_failure(report, "runtime_hash", f"{type(exc).__name__}: {exc}")
+        _safe_write_final_report(evidence_dir / "final-report.json", report)
+        return report
+
+    temp_parent = Path(tempfile.mkdtemp(prefix="uia-timeout-native-"))
+    child_root = temp_parent / "fixture-root"
+    report["owned_temp_parent"] = str(temp_parent)
     process: subprocess.Popen[bytes] | None = None
+    launch_identity: tuple[int, float, str] | None = None
     stdout_handle = None
     stderr_handle = None
     root_state = child_root / "state.json"
@@ -351,8 +432,15 @@ def run_probe(
             env=env,
             close_fds=True,
         )
+        launch_identity = _live_identity(process)
         first = _await_state(process, root_state, lambda state: state.get("heartbeat", -1) >= 2 and state.get("phase") == "responsive", 10.0)
-        target = _validate_target(first, process, non_native=non_native_test)
+        target = _validate_target(
+            first,
+            process,
+            non_native=non_native_test,
+            launch_identity=launch_identity,
+            expected_nonce=nonce,
+        )
         target["initial_heartbeat"] = first["heartbeat"]
         _write_state_copy(evidence_dir, "responsive-state.json", first)
         report["target"] = target
@@ -363,6 +451,16 @@ def run_probe(
         responsive_result = _as_dict(query_runner(target.copy(), stage_dir, "responsive"))
         responsive_duration = time.monotonic() - started
         _record_query(report, "responsive", responsive_result, responsive_duration)
+        responsive_capture = _read_state(root_state)
+        _write_state_copy(evidence_dir, "responsive-postquery-state.json", responsive_capture)
+        _validate_target(
+            responsive_capture,
+            process,
+            non_native=non_native_test,
+            launch_identity=launch_identity,
+            expected_nonce=nonce,
+            expected_target=target,
+        )
         if not responsive_result.get("cleanup_verified", False):
             raise ProbeFailure("responsive_cleanup", "responsive worker cleanup is uncertain")
         valid, detail = _validate_responsive(responsive_result, target)
@@ -376,7 +474,14 @@ def run_probe(
         _atomic_request(child_root, nonce)
         blocked = _await_state(process, root_state, lambda state: state.get("phase") == "blocked" and state.get("block_count") == 1, 5.0)
         _write_state_copy(evidence_dir, "blocked-state.json", blocked)
-        blocked_identity = _validate_target(blocked, process, non_native=non_native_test)
+        blocked_identity = _validate_target(
+            blocked,
+            process,
+            non_native=non_native_test,
+            launch_identity=launch_identity,
+            expected_nonce=nonce,
+            expected_target=target,
+        )
         if blocked_identity != {key: target[key] for key in blocked_identity}:
             raise ProbeFailure("blocked_identity", "fixture identity changed at block boundary")
         blocked_heartbeat = blocked["heartbeat"]
@@ -403,6 +508,14 @@ def run_probe(
         report["blocked"]["query"] = blocked_result
         capture = _read_state(root_state)
         _write_state_copy(evidence_dir, "blocked-postquery-state.json", capture)
+        _validate_target(
+            capture,
+            process,
+            non_native=non_native_test,
+            launch_identity=launch_identity,
+            expected_nonce=nonce,
+            expected_target=target,
+        )
         report["blocked"]["capture_state"] = capture
         continuously_blocked = capture.get("phase") == "blocked" and capture.get("heartbeat") == blocked_heartbeat
         report["blocked"]["query_while_continuously_blocked"] = continuously_blocked
@@ -446,35 +559,72 @@ def run_probe(
         report["failure_detail"] = f"{type(exc).__name__}: {exc}"
         report["outcome"] = "FAIL"
     finally:
-        if root_state.exists():
+        report.setdefault("cleanup_diagnostics", [])
+        try:
+            state_exists = root_state.exists()
+        except Exception as exc:
+            state_exists = False
+            detail = f"final state existence check failed: {type(exc).__name__}: {exc}"
+            report["final_state_error"] = detail
+            report["cleanup_diagnostics"].append(detail)
+            _preserve_failure(report, "final_state_read", detail)
+        if state_exists:
             try:
                 final_state = _read_state(root_state)
             except Exception as exc:
-                report["final_state_error"] = f"{type(exc).__name__}: {exc}"
+                detail = f"final state read failed: {type(exc).__name__}: {exc}"
+                report["final_state_error"] = detail
+                report["cleanup_diagnostics"].append(detail)
+                _preserve_failure(report, "final_state_read", detail)
         if process is not None:
-            cleanup = _cleanup_fixture(process)
+            try:
+                cleanup = _cleanup_fixture(process)
+            except Exception as exc:
+                detail = f"cleanup raised: {type(exc).__name__}: {exc}"
+                cleanup = {
+                    "verified": False,
+                    "primary_error": detail,
+                    "secondary_errors": [],
+                }
+                report["cleanup_diagnostics"].append(detail)
         report["fixture_cleanup"] = cleanup
+        if cleanup.get("primary_error"):
+            report["cleanup_diagnostics"].append(str(cleanup["primary_error"]))
+        report["cleanup_diagnostics"].extend(str(error) for error in cleanup.get("secondary_errors", []))
         if stdout_handle is not None:
-            stdout_handle.close()
+            try:
+                stdout_handle.close()
+            except Exception as exc:
+                detail = f"stdout close failed: {type(exc).__name__}: {exc}"
+                report["cleanup_diagnostics"].append(detail)
+                _preserve_failure(report, "stream_close", detail)
         if stderr_handle is not None:
-            stderr_handle.close()
+            try:
+                stderr_handle.close()
+            except Exception as exc:
+                detail = f"stderr close failed: {type(exc).__name__}: {exc}"
+                report["cleanup_diagnostics"].append(detail)
+                _preserve_failure(report, "stream_close", detail)
         report["final_fixture_state"] = final_state
         if final_state is not None:
-            _write_state_copy(evidence_dir, "final-state.json", final_state)
+            try:
+                _write_state_copy(evidence_dir, "final-state.json", final_state)
+            except Exception as exc:
+                detail = f"final state copy failed: {type(exc).__name__}: {exc}"
+                report["cleanup_diagnostics"].append(detail)
+                _preserve_failure(report, "final_state_write", detail)
         if not cleanup.get("verified", False):
-            report["outcome"] = "FAIL"
-            report["failure_kind"] = "fixture_cleanup"
-            report["failure_detail"] = cleanup.get("primary_error") or "fixture cleanup could not be verified"
+            detail = cleanup.get("primary_error") or "fixture cleanup could not be verified"
+            _preserve_failure(report, "fixture_cleanup", detail)
         elif temp_parent.exists():
             try:
                 shutil.rmtree(temp_parent)
             except Exception as exc:
-                report["outcome"] = "FAIL"
-                report["failure_kind"] = "fixture_temp_cleanup"
-                report["failure_detail"] = f"{type(exc).__name__}: {exc}"
-                report.setdefault("fixture_cleanup", {}).setdefault("secondary_errors", []).append(report["failure_detail"])
+                detail = f"{type(exc).__name__}: {exc}"
+                report["cleanup_diagnostics"].append(f"fixture_temp_cleanup: {detail}")
+                _preserve_failure(report, "fixture_temp_cleanup", detail)
         report["owned_temp_parent_retained"] = temp_parent.exists()
-        _write_report(evidence_dir / "final-report.json", report)
+        _safe_write_final_report(evidence_dir / "final-report.json", report)
     return report
 
 
