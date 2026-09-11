@@ -127,6 +127,121 @@ class SupervisorSubprocessTests(unittest.TestCase):
             self.assertTrue((output / "result.json").is_file())
             self.assertIsNotNone(captured["process"].poll())
 
+    def test_persistent_poll_failure_emits_result_and_records_cleanup_attempt(self):
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            worker = self._write_worker(
+                directory,
+                """
+                import json, time
+                print(json.dumps({'event': 'ready'}), flush=True)
+                time.sleep(3)
+                """,
+            )
+            output = directory / "run"
+            import supervisor
+
+            captured = {}
+            real_popen = supervisor.subprocess.Popen
+
+            class PersistentPollFailure:
+                def __init__(self, process):
+                    self.process = process
+
+                def poll(self):
+                    raise OSError("persistent injected poll failure")
+
+                def __getattr__(self, name):
+                    return getattr(self.process, name)
+
+            def capture_popen(*args, **kwargs):
+                process = real_popen(*args, **kwargs)
+                captured["process"] = process
+                return PersistentPollFailure(process)
+
+            try:
+                with mock.patch.object(supervisor.subprocess, "Popen", side_effect=capture_popen):
+                    result = self._run(worker, output, readiness_timeout=0.08)
+            finally:
+                process = captured.get("process")
+                if process is not None and process.poll() is None:
+                    process.terminate()
+                    try:
+                        process.wait(timeout=1.0)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait(timeout=1.0)
+
+            self.assertEqual(result.status, "FAIL")
+            self.assertFalse(result.success)
+            self.assertIn("persistent injected poll failure", result.primary_error)
+            self.assertTrue(result.terminate_sent)
+            self.assertTrue((output / "result.json").is_file())
+            self.assertTrue(any("cleanup" in error for error in result.secondary_errors))
+            self.assertTrue(result.cleanup_verified)
+            self.assertIsNotNone(captured["process"].poll())
+
+    def test_one_shot_poll_failure_after_wait_still_reports_reaped_child(self):
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            worker = self._write_worker(
+                directory,
+                """
+                import json, time
+                print(json.dumps({'event': 'ready'}), flush=True)
+                time.sleep(3)
+                """,
+            )
+            output = directory / "run"
+            import supervisor
+
+            captured = {}
+            real_popen = supervisor.subprocess.Popen
+
+            class OneShotPollFailure:
+                def __init__(self, process):
+                    self.process = process
+                    self.fail_next_poll = False
+
+                def poll(self):
+                    if self.fail_next_poll:
+                        self.fail_next_poll = False
+                        raise OSError("one-shot injected poll failure")
+                    return self.process.poll()
+
+                def wait(self, *args, **kwargs):
+                    result = self.process.wait(*args, **kwargs)
+                    self.fail_next_poll = True
+                    return result
+
+                def __getattr__(self, name):
+                    return getattr(self.process, name)
+
+            def capture_popen(*args, **kwargs):
+                process = real_popen(*args, **kwargs)
+                captured["process"] = process
+                return OneShotPollFailure(process)
+
+            try:
+                with mock.patch.object(supervisor.subprocess, "Popen", side_effect=capture_popen):
+                    result = self._run(worker, output, execution_timeout=0.08)
+            finally:
+                process = captured.get("process")
+                if process is not None and process.poll() is None:
+                    process.terminate()
+                    try:
+                        process.wait(timeout=1.0)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait(timeout=1.0)
+
+            self.assertEqual(result.status, "TIMEOUT")
+            self.assertEqual(result.failure_kind, "timeout")
+            self.assertTrue(result.cleanup_verified)
+            self.assertTrue(any("one-shot injected poll failure" in error for error in result.secondary_errors))
+            self.assertIsNotNone(captured["process"].poll())
+
+    @unittest.skipUnless(os.name != "nt", "SIGTERM-resistant cleanup fallback is POSIX-specific")
     def test_unexpected_wait_failure_still_reaches_kill_fallback(self):
         with tempfile.TemporaryDirectory() as raw:
             directory = Path(raw)
