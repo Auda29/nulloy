@@ -5145,5 +5145,142 @@
       "release": "not_authorized"
     },
     "evidence": "/home/hermes/workspace/nulloy-status-current/native-timeout-register-live.json"
+  },
+  "native_readonly_uia_milestone": {
+    "status": "verified_windows_owned_qt_responsive_snapshot",
+    "run": 34600044236,
+    "workflow_sha": "492e7f04150783818915146ad6232892b1af21c4",
+    "branch": "test/windows-uia-timeout-native",
+    "responsive_native_uia_snapshot_verified": true,
+    "blocked_worker_supervision_seconds": 5.046999999999969,
+    "classification": "execution_timeout_worker_containment_only",
+    "worker_and_fixture_cleanup_verified": true,
+    "stdout_artifact_consistent": true,
+    "supervisor_contracts": {
+      "passed": 16,
+      "skipped": 2
+    },
+    "fixture_contracts": {
+      "passed": 4,
+      "skipped": 0
+    },
+    "com_call_interruption_proven": false,
+    "packaged_player_or_trash_acceptance": false,
+    "player_started": false,
+    "menu_invoked": false,
+    "destructive_action_executed": false,
+    "safe_action_ready": false,
+    "provenance": {
+      "evidence": "/home/hermes/workspace/nulloy-status-current/uia-timeout-native-34600044236/parent-verification.json",
+      "runtime_source_line_endings": "explicit Windows CRLF checkout hashes verified"
+    },
+    "limits": [
+      "The blocked-worker timeout proves containment only; interruption inside COM is not proven.",
+      "No player package, player start, menu/input action, recycling action, or final acceptance was executed."
+    ]
+  },
+  "consolidation_snapshot": {
+    "status": "pre_pr30_merge_operational_snapshot",
+    "source_inventory": "inventory-after-retirements.json",
+    "purpose": "Retire completed work, archive experiments, document open PRs, merge PR30 after review and CI, then stop.",
+    "provenance": {
+      "inventory": "inventory-after-retirements.json",
+      "scope": "before parent merge of PR30"
+    },
+    "counts": {
+      "remote_branches": 12,
+      "local_branches": 11,
+      "worktrees": 10,
+      "dirty_worktrees": 0
+    },
+    "retired": {
+      "merged_prs": [7, 8, 9, 10, 11, 12, 13, 14, 17, 18, 19, 20, 21, 22, 23, 25, 26, 27],
+      "merged_pr_branches_removed": 18,
+      "experiment_branch_states": 6,
+      "experiment_remote_branches_removed": 3,
+      "experiment_local_branches_removed": 5,
+      "experiment_worktrees_removed": 5,
+      "archive_note": "Original refs, histories, failures, untracked and ignored evidence are preserved in the private verified archive. The old codex branch combined production from PR15, PR16, and PR24; it is not proof that all changes came from one isolated source."
+    },
+    "retained_branches": [
+      {
+        "branch": "test/windows-player-inspection",
+        "sha": "4ab11fa4eb11ebd6844fc8290b8d362085da1b6d",
+        "purpose": "primary automation work strand; actual packaged-player tooling"
+      },
+      {
+        "branch": "test/windows-uia-timeout-native",
+        "sha": "492e7f04150783818915146ad6232892b1af21c4",
+        "purpose": "supporting proof-only timeout/native UIA milestone; not yet ported into the player"
+      },
+      {
+        "branch": "test/windows-trash-build-only",
+        "sha": "9e1b3f060e649a64c698b2a5981dbfca1d741b84",
+        "purpose": "frozen package anchor; Integration plus PR15 package identity"
+      },
+      {
+        "branch": "test/windows-desktop-probe",
+        "sha": "f34c6fd0118a0b2d32f4ff79b127809b7586493e",
+        "purpose": "specialized Explorer dependency for PR28; keep open, no final PASS"
+      }
+    ],
+    "open_prs": [
+      {
+        "number": 15,
+        "state": "OPEN",
+        "head_sha": "774894c4eba7b646beafb38313fe0dc73cfb4671",
+        "purpose": "product paperbin review; no formal native acceptance"
+      },
+      {
+        "number": 16,
+        "state": "OPEN",
+        "head_sha": "791ea82705898652d15866be7b77e3ad5f720976",
+        "purpose": "monitor-restoration gaps: mixed DPI, maximised window, skins, minimise/restore"
+      },
+      {
+        "number": 24,
+        "state": "OPEN",
+        "head_sha": "21848c11d6ca4dc1e1c8552285ffc1b84946a029",
+        "purpose": "external open burst; depends on PR29 IPC and needs separate-opening plus large-selection stopgap coverage"
+      },
+      {
+        "number": 28,
+        "state": "OPEN",
+        "head_sha": "f34c6fd0118a0b2d32f4ff79b127809b7586493e",
+        "purpose": "desktop probe only; does not fix the product and depends on PR24/PR29; do not close in this goal"
+      },
+      {
+        "number": 29,
+        "state": "OPEN",
+        "head_sha": "9d7de5108f842269ffa2a99048d69577a123d1ac",
+        "purpose": "tests green for the IPC component path; no Explorer PASS"
+      },
+      {
+        "number": 30,
+        "state": "OPEN",
+        "head_sha": "1e44a4477929cbd1bad7b36c204f8466f8711f69",
+        "purpose": "documentation handoff branch; merge only after review and the recorded CI",
+        "ci": {
+          "windows": {
+            "run": 34597690721,
+            "conclusion": "success"
+          },
+          "linux": {
+            "run": 34597690744,
+            "conclusion": "success"
+          }
+        }
+      }
+    ],
+    "anchors": {
+      "integration": "919468efc32f4d038c96d7276a799794dab2e86e",
+      "master": "027d81a583b07457a4fa5f18b3e7dcca50b05b58"
+    },
+    "limits": [
+      "This is the operational snapshot before the parent merge of PR30; it does not claim that merge already happened or predict its final SHA or counts.",
+      "Do not treat PR30 CI as package acceptance.",
+      "All documented product work is based on integration, not master. The qml branch is untouched legacy, not new active work.",
+      "Historical Qt spike, unsafe trash probe, and the now-combined supervisor/fixture and single-issue-262 documentation remain archived rather than reclassified."
+    ]
   }
 }

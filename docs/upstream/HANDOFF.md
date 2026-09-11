@@ -132,3 +132,36 @@ Der native Supervisor-/Qt-Fixture-Nachweis [34595596113](https://github.com/Auda
 Die Playerbeobachtung [34589940677](https://github.com/Auda29/nulloy/actions/runs/34589940677) besteht mit 60 Tests am selben isolierten Qt6-Paket aus `34572047079` / `9e1b3f060e649a64c698b2a5981dbfca1d741b84`. Zwei von drei Zeilen blieben nach genau einem guarded Right-Click ausgewählt; es gab keine Menüaktion, keine Fixtureänderung und bestätigte Bereinigung. Der frühere 53-PASS-Lauf `34584964888` bleibt als eigener historischer Milestone erhalten. Dieser Nachweis autorisiert keine destruktive Papierkorbaktion.
 
 Weiterhin offen und vor einer kombinierten Freigabe zu erledigen: PR15 Recycling-/Abbruch-/Teilabbruch-/Duplikat-/Play-Pause-Stop-Matrix, Original-macOS-Fall, echte Explorer-Kalt-/Warmstart-/Enqueue-/Pause-/große-Auswahl-Matrix für PR24, PR16 Mixed-DPI/maximiert/Skins, abschließendes kombiniertes Qt5/Qt6-Paket sowie Releaseentscheidung. `master` und Release bleiben unangetastet; kein automatischer Release.
+
+## Nachtrag 2026-09-11: Konsolidierungsübergabe vor PR30-Merge
+
+Der vollständige append-only-Betriebsstand steht in [newCONSOLIDATION.md](newCONSOLIDATION.md)
+und im Feld `consolidation_snapshot` des Registers. Er beschreibt den Stand nach
+den verifizierten Retirements: 12 Remote-Branches, 11 lokale Branches und 10
+Worktrees, zuvor 33/34/33, jeweils sauber. Die 18 abgeschlossenen PR-Branches
+#7–#14, #17–#23, #25–#27 und sechs Experimentzustände (3 Remote, 5 lokal,
+5 Worktrees) sind archiviert bzw. entfernt. Die private Ablage erhält originale
+SHAs, Historien, Fehlschläge und ungetrackte/ignorierte Evidenz. Die alte Codex-
+Kombination aus PR15/16/24 ist nicht die isolierte `9e1b3f0`-Quelle; eine
+Gesamtbehauptung „alle Änderungen gemergt“ ist ausdrücklich ausgeschlossen.
+
+Beibehalten werden die vier exakten Branch-Anker für Playerinspektion,
+proof-only UIA-Timeout, eingefrorenes PR15-Paket und die spezialisierte PR28-
+Explorerprobe. PR15 bleibt Review ohne formale native Abnahme; PR16 behält die
+Mixed-DPI-/maximiert-/Skins-/Minimieren-Wiederherstellen-Lücken; PR24 bleibt von
+PR29-IPC abhängig und braucht getrennte Öffnungs- und Großauswahlabdeckung; PR28
+ist kein Produktfix und bleibt offen ohne finalen PASS; PR29 hat grüne Tests,
+aber keinen Explorer-PASS. `qml` bleibt Legacy und wird nicht neue aktive Arbeit.
+
+PR30 ist hier vor dem Eltern-Merge mit Head
+`1e44a4477929cbd1bad7b36c204f8466f8711f69` dokumentiert. Windows `34597690721`
+und Linux `34597690744` sind erfolgreiche Branch-CI; daraus folgt keine neue
+Paket-Hashannahme oder kombinierte Endabnahme. Integration
+`919468efc32f4d038c96d7276a799794dab2e86e` und `master`
+`027d81a583b07457a4fa5f18b3e7dcca50b05b58` bleiben getrennt.
+
+Die Wiederherstellung erfolgt nur in einem neuen Verzeichnis: Bundle klonen,
+dann mit `git worktree add` den exakten SHA auschecken und selektive Archive mit
+`tar --skip-old-files` einspielen. Git-Bundles enthalten keine ungetrackten
+Dateien; private Archivpfade sind keine öffentlichen Upload-Ziele. Der Eltern-
+prozess kann den Archiv-Branch nach eigener Backup-Prüfung später entfernen.

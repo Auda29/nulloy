@@ -355,6 +355,81 @@ class IssueRegister(unittest.TestCase):
         self.assertFalse(snapshot['final_combined_acceptance'])
         self.assertEqual(snapshot['open_gates']['release'], 'not_authorized')
 
+    def test_native_readonly_uia_milestone_is_bounded_and_not_action_ready(self):
+        milestone = self.data['native_readonly_uia_milestone']
+        self.assertEqual(milestone['run'], 34600044236)
+        self.assertEqual(milestone['workflow_sha'],
+                         '492e7f04150783818915146ad6232892b1af21c4')
+        self.assertEqual(milestone['branch'], 'test/windows-uia-timeout-native')
+        self.assertTrue(milestone['responsive_native_uia_snapshot_verified'])
+        self.assertEqual(milestone['blocked_worker_supervision_seconds'],
+                         5.046999999999969)
+        self.assertEqual(milestone['classification'],
+                         'execution_timeout_worker_containment_only')
+        self.assertTrue(milestone['worker_and_fixture_cleanup_verified'])
+        self.assertTrue(milestone['stdout_artifact_consistent'])
+        self.assertEqual(milestone['supervisor_contracts'], {'passed': 16, 'skipped': 2})
+        self.assertEqual(milestone['fixture_contracts'], {'passed': 4, 'skipped': 0})
+        self.assertFalse(milestone['com_call_interruption_proven'])
+        self.assertFalse(milestone['packaged_player_or_trash_acceptance'])
+        self.assertFalse(milestone['player_started'])
+        self.assertFalse(milestone['menu_invoked'])
+        self.assertFalse(milestone['destructive_action_executed'])
+        self.assertFalse(milestone['safe_action_ready'])
+        self.assertEqual(milestone['limits'], [
+            'The blocked-worker timeout proves containment only; interruption inside COM is not proven.',
+            'No player package, player start, menu/input action, recycling action, or final acceptance was executed.',
+        ])
+
+    def test_consolidation_snapshot_is_pre_merge_and_preserves_open_work(self):
+        snapshot = self.data['consolidation_snapshot']
+        self.assertEqual(snapshot['status'], 'pre_pr30_merge_operational_snapshot')
+        self.assertEqual(snapshot['source_inventory'], 'inventory-after-retirements.json')
+        self.assertEqual(snapshot['counts'], {
+            'remote_branches': 12,
+            'local_branches': 11,
+            'worktrees': 10,
+            'dirty_worktrees': 0,
+        })
+        self.assertEqual(snapshot['retired']['merged_prs'],
+                         [7, 8, 9, 10, 11, 12, 13, 14, 17, 18, 19, 20, 21, 22, 23, 25, 26, 27])
+        self.assertEqual(snapshot['retired']['experiment_branch_states'], 6)
+        branches = {entry['branch']: entry for entry in snapshot['retained_branches']}
+        self.assertEqual({name: entry['sha'] for name, entry in branches.items()}, {
+            'test/windows-player-inspection':
+                '4ab11fa4eb11ebd6844fc8290b8d362085da1b6d',
+            'test/windows-uia-timeout-native':
+                '492e7f04150783818915146ad6232892b1af21c4',
+            'test/windows-trash-build-only':
+                '9e1b3f060e649a64c698b2a5981dbfca1d741b84',
+            'test/windows-desktop-probe':
+                'f34c6fd0118a0b2d32f4ff79b127809b7586493e',
+        })
+        self.assertIn('primary automation work strand', branches['test/windows-player-inspection']['purpose'])
+        self.assertIn('proof-only', branches['test/windows-uia-timeout-native']['purpose'])
+        self.assertIn('frozen package anchor', branches['test/windows-trash-build-only']['purpose'])
+        self.assertIn('PR28', branches['test/windows-desktop-probe']['purpose'])
+        prs = {entry['number']: entry for entry in snapshot['open_prs']}
+        self.assertEqual(set(prs), {15, 16, 24, 28, 29, 30})
+        self.assertEqual(prs[30]['head_sha'],
+                         '1e44a4477929cbd1bad7b36c204f8466f8711f69')
+        self.assertEqual(prs[30]['ci'], {
+            'windows': {'run': 34597690721, 'conclusion': 'success'},
+            'linux': {'run': 34597690744, 'conclusion': 'success'},
+        })
+        self.assertTrue(all(entry['state'] == 'OPEN' for entry in snapshot['open_prs']))
+        self.assertEqual(snapshot['anchors'], {
+            'integration': '919468efc32f4d038c96d7276a799794dab2e86e',
+            'master': '027d81a583b07457a4fa5f18b3e7dcca50b05b58',
+        })
+        self.assertEqual(snapshot['provenance'], {
+            'inventory': 'inventory-after-retirements.json',
+            'scope': 'before parent merge of PR30',
+        })
+        self.assertTrue(any('before the parent merge of PR30' in limit
+                            for limit in snapshot['limits']))
+        self.assertIn('Do not treat PR30 CI as package acceptance.', snapshot['limits'])
+
     def test_new_milestone_negative_controls_reject_uia_player_and_release_claims(self):
         import shutil
         import subprocess
@@ -364,12 +439,16 @@ class IssueRegister(unittest.TestCase):
         timeout_test = 'test_reviewed_windows_timeout_contract_milestone_is_exact_and_bounded'
         observation_test = 'test_player_observation_sixty_contract_milestone_is_exact_and_keeps_prior_53'
         ci_test = 'test_pr30_ci_snapshot_is_not_new_package_acceptance'
+        uia_test = 'test_native_readonly_uia_milestone_is_bounded_and_not_action_ready'
+        consolidation_test = 'test_consolidation_snapshot_is_pre_merge_and_preserves_open_work'
         mutations = [
             ('native_windows_timeout_contract_milestone', 'native_uia_query_executed', True, timeout_test),
             ('native_windows_timeout_contract_milestone', 'player_package_present', True, timeout_test),
             ('player_observation_hardening_milestone', 'no_menu_invocation', False, observation_test),
             ('player_observation_hardening_milestone', 'final_combined_acceptance', True, observation_test),
             ('pr30_timeout_contracts_followup', 'new_pr30_package_hash_acceptance', True, ci_test),
+            ('native_readonly_uia_milestone', 'safe_action_ready', True, uia_test),
+            ('consolidation_snapshot', 'status', 'merged', consolidation_test),
         ]
         # Copy only inputs needed by these real contracts, never a live worktree.
         # Explicit test names prevent recursive invocation of this mutation test.
@@ -384,11 +463,12 @@ class IssueRegister(unittest.TestCase):
             register.write_text(original, encoding='utf-8')
             command = [sys.executable, '-B', str(script)]
             baseline = subprocess.run(
-                command + ['IssueRegister.' + name for name in (timeout_test, observation_test, ci_test)],
+                command + ['IssueRegister.' + name for name in
+                           (timeout_test, observation_test, ci_test, uia_test, consolidation_test)],
                 cwd=root, capture_output=True, text=True, timeout=20,
             )
             self.assertEqual(baseline.returncode, 0, baseline.stdout + baseline.stderr)
-            self.assertIn('Ran 3 tests', baseline.stderr)
+            self.assertIn('Ran 5 tests', baseline.stderr)
             for key, field, bad, test_name in mutations:
                 with self.subTest(key=key, field=field):
                     mutated = json.loads(original)

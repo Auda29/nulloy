@@ -178,3 +178,34 @@ The exact PR30 live snapshot fetched at `2026-09-11T11:50:53.817380+00:00` recor
 The exact player inspector commit `4ab11fa4eb11ebd6844fc8290b8d362085da1b6d` passed run [34589940677](https://github.com/Auda29/nulloy/actions/runs/34589940677) with 60 contract tests, two reports, provenance/artifact equality, final fixture preservation, and cleanup verification. It used the same isolated Qt6 package from build run `34572047079` / source commit `9e1b3f060e649a64c698b2a5981dbfca1d741b84`, ZIP `5558a6ed786051224f7dcf3228a230fa45c95959f3e363e5b06b48d446ccb833`, and EXE `d7d622c3a0afe88657fa108bebf72f7bfdc69777c9f1f626fe3fe26e589315f9`. Exactly two of three rows remained selected after one guarded right-click (`input_count=2`); no MenuItem was invoked and fixture bytes were unchanged. The earlier 53-pass run `34584964888` remains separately recorded and was not overwritten.
 
 This is a read-only observation, not a destructive-action readiness or final acceptance. PR15 trash/recycling/cancel/partial-cancel/duplicate/playback matrix, PR24 Explorer, PR16 DPI/window, original macOS, combined Qt5/Qt6 package acceptance, and release remain open. Historical FAILs `34582957766` and `34584359190` remain unchanged.
+
+## Nachtrag 2026-09-11: latest native UIA milestone and consolidation handoff
+
+Workflow `492e7f04150783818915146ad6232892b1af21c4`, run `34600044236`, verified
+the Windows-owned Qt responsive native-UIA snapshot. The blocked worker was held
+for `5.046999999999969` seconds; the result is **execution-timeout worker
+containment only**, not proof of interruption inside COM. Supervisor contracts
+were 16 PASS with two explicit POSIX-only skips, and the harmless Qt fixture
+passed four of four tests. Worker/fixture cleanup and stdout-artifact consistency
+were verified; runtime source hashes were checked with explicit Windows CRLF
+checkout handling.
+
+No player package was present or started. No menu, input, recycling, or other
+destructive action was executed, and this milestone is not safe-action ready.
+The native worker is not integrated into the player; that is future work. The
+prior 60-test player observation and the earlier 53-test context-menu milestone
+remain separate historical observations and are not replaced by this record.
+
+The consolidation handoff is [newCONSOLIDATION.md](newCONSOLIDATION.md), with
+machine-readable fields `native_readonly_uia_milestone` and
+`consolidation_snapshot` in `issue-register.json`. It records the post-retirement
+12/11/10 branch/local/worktree snapshot, exact retired PR set, six archived
+experiment states, private evidence preservation, four retained branch anchors,
+and all six open PRs. PR30 remains documented before its possible parent merge at
+exact head `1e44a4477929cbd1bad7b36c204f8466f8711f69`; Windows `34597690721` and
+Linux `34597690744` succeeded, but this is branch CI only and not package or
+combined acceptance. Integration `919468efc32f4d038c96d7276a799794dab2e86e` and
+`master` `027d81a583b07457a4fa5f18b3e7dcca50b05b58` remain separate.
+
+The handoff is documentation only: no product fix, native acceptance, build,
+CI trigger, push, or workflow change is part of this goal.

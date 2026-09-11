@@ -124,3 +124,36 @@ Der Live-API-Snapshot vom `2026-09-11T11:50:53.817380+00:00` bestätigt PR #30 u
 Der geprüfte Windows-Supervisor-/Qt-Fixture-Vertrag [34595596113](https://github.com/Auda29/nulloy/actions/runs/34595596113) ist separat als PASS dokumentiert: 18 Supervisor-Tests, davon 16 PASS und zwei ausdrücklich POSIX-bedingt übersprungen; vier harmlose Qt-Fixture-Tests PASS. Reviewte Quellen sind Supervisor `68cdc90f369d6c5f507c81cf757befb509dbfeb9`, Fixture `b7d228e885841cb796ed9d31fa79526864dba031` und assembled native commit `ca49815db8db16b8704cc82f89336e09f8ed2d70`; alle fünf Laufzeitskript-Hashes sind im Register und Elternnachweis festgehalten. Dies war kein Player-Paket und keine tatsächliche UIA-Abfrage: HWND `0` wurde vor der Query abgewiesen, die synthetische PID-Prüfung ist kein nativer UIA-Nachweis. COM-/Provider-Query bleibt `not_executed`; daraus folgen keine UIA-, Player- oder Release-Behauptungen.
 
 Die Playerbeobachtung [34589940677](https://github.com/Auda29/nulloy/actions/runs/34589940677) bestand mit 60 Vertragsprüfungen am exakt gebundenen Qt6-Paket aus Buildlauf `34572047079` / Commit `9e1b3f060e649a64c698b2a5981dbfca1d741b84` (ZIP `5558a6ed786051224f7dcf3228a230fa45c95959f3e363e5b06b48d446ccb833`, EXE `d7d622c3a0afe88657fa108bebf72f7bfdc69777c9f1f626fe3fe26e589315f9`; Prüfer `4ab11fa4eb11ebd6844fc8290b8d362085da1b6d`). Zwei von drei Zeilen blieben nach einem guarded Right-Click ausgewählt; kein Menüeintrag wurde aufgerufen, die Fixture-Dateien blieben unverändert und die Bereinigung ist bestätigt. Dies erweitert den bestehenden 53-PASS-Nachweis aus Lauf `34584964888`; er wird nicht überschrieben. PR15-Papierkorbmatrix, PR24 Explorer, PR16 DPI/Fenster, macOS, kombinierte Qt5/Qt6-Endabnahme und Release bleiben offen.
+
+Die laufende Beobachtung bleibt ausschließlich nichtdestruktiv; sie ist keine
+Papierkorbaktion.
+
+## Nachtrag 2026-09-11: Konsolidierung vor PR30-Merge
+
+Der append-only-Konsolidierungsstand ist in [newCONSOLIDATION.md](newCONSOLIDATION.md)
+und im Registerfeld `consolidation_snapshot` festgehalten. Die verifizierte
+Bestandsaufnahme **nach** den Retirements lautet 12 Remote-Branches, 11 lokale
+Branches und 10 Worktrees; der Stand davor war 33/34/33, jeweils sauber. Exakt
+18 bereits gemergte PR-Branches (#7–#14, #17–#23, #25–#27) sowie sechs
+Experimentzustände wurden archiviert bzw. entfernt. Das Archiv bewahrt die
+Original-SHAs, Historien, Fehlschläge sowie ungetrackte/ignorierte Nachweise.
+Die alte Codex-Branch war eine kombinierte Produktionsquelle und ist nicht mit
+der isolierten `9e1b3f0`-Trash-Quelle gleichzusetzen; daraus folgt keine Aussage,
+dass alle Änderungen gemergt seien.
+
+Erhalten bleiben die vier dokumentierten Branch-Anker für Playerinspektion,
+proof-only UIA-Timeout, eingefrorenes Paket und PR28-Desktopprobe. PR15
+(Papierkorb-Review ohne formale native Abnahme), PR16 (Mixed-DPI/maximiert/Skins/
+Minimieren-Wiederherstellen), PR24 (externe Mehrfachöffnung mit PR29-IPC-
+Abhängigkeit sowie getrennte Öffnungs-/Großauswahl-Lücke), PR28 (kein
+Produktfix, PR24/PR29-Abhängigkeit, offen ohne finalen PASS) und PR29 (grüne
+Tests, aber kein Explorer-PASS) bleiben offen. `qml` ist unangetastetes Legacy,
+keine neue aktive Arbeit.
+
+PR30 ist in diesem Snapshot exakt auf `1e44a4477929cbd1bad7b36c204f8466f8711f69`
+offen; Windows-Lauf `34597690721` und Linux-Lauf `34597690744` sind erfolgreich.
+Das ist nur Branch-CI, keine Paket- oder kombinierte Endabnahme. Integration
+`919468efc32f4d038c96d7276a799794dab2e86e` und `master`
+`027d81a583b07457a4fa5f18b3e7dcca50b05b58` bleiben getrennt. Der Eintrag ist
+vor dem möglichen späteren Merge durch den Elternprozess geschrieben und
+behauptet diesen Merge nicht.
