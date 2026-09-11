@@ -2,12 +2,20 @@ name: Windows x64 CMake
 
 on:
   push:
-    branches: [master]
-    tags: ['v*']
+    branches: [master, 'codex/phase-2-*', 'codex/phase-3-*', 'codex/phase-4-*']
   pull_request:
-    branches: [master]
   workflow_dispatch:
+    inputs:
+      upload_packages:
+        description: 'Upload Qt5/Qt6 packages for a planned acceptance run (3 days)'
+        type: boolean
+        default: false
   workflow_call:
+    inputs:
+      upload_packages:
+        description: 'Explicitly retain packages for the calling workflow'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -91,8 +99,10 @@ jobs:
           cmake --build .phase3/skin-probe -j 4
           ctest --test-dir .phase3/skin-probe --output-on-failure
       - name: Upload test package
+        if: ${{ inputs.upload_packages == true }}
         uses: actions/upload-artifact@v4
         with:
+          retention-days: 3
           name: Nulloy-Qt${{ matrix.qt }}-windows-x64
           path: |
             ${{ matrix.build }}/*-windows-x64.zip
@@ -103,6 +113,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Windows-Qt${{ matrix.qt }}-test-evidence
+          retention-days: 7
           path: |
             ${{ matrix.build }}/*-results.txt
             ${{ matrix.build }}/toolchain.txt
