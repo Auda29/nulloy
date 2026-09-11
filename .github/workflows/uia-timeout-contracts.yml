@@ -44,7 +44,9 @@ jobs:
           assert not os.environ.get('QT_QPA_PLATFORM'), 'do not substitute offscreen Qt'
           sources = sorted(Path('tools/uia-timeout-spike').glob('*.py'))
           sources += sorted(Path('tools/uia-timeout-fixture').glob('*.py'))
+          sources += sorted(Path('tools/uia-timeout-native').glob('*.py'))
           provenance = {
+              'scope': 'contracts_only',
               'commit': os.environ['GITHUB_SHA'],
               'run_id': os.environ['GITHUB_RUN_ID'],
               'platform': platform.platform(),
@@ -54,6 +56,7 @@ jobs:
               'psutil': psutil.__version__,
               'native_uia_query_executed': False,
               'player_started': False,
+              'source_files': [str(p) for p in sources],
               'hashes': {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources},
           }
           (output / 'provenance.json').write_text(json.dumps(provenance, indent=2), encoding='utf-8')
@@ -85,6 +88,55 @@ jobs:
               if (not result.wasSuccessful() or result.testsRun != expected_count
                       or observed_skips != expected_skips or result.expectedFailures):
                   raise SystemExit(1)
+      - name: Run reviewed native Windows UIA fixture controller
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+          import subprocess
+          import sys
+
+          output = Path('evidence/native-uia')
+          output.mkdir(parents=True, exist_ok=True)
+          stdout_path = output / 'controller.stdout'
+          stderr_path = output / 'controller.stderr'
+          wrapper_path = output / 'wrapper.json'
+          command = [
+              sys.executable,
+              '-B',
+              'tools/uia-timeout-native/run_probe.py',
+              '--evidence-root',
+              'evidence/native-uia',
+          ]
+          with stdout_path.open('wb') as stdout_handle, stderr_path.open('wb') as stderr_handle:
+              try:
+                  completed = subprocess.run(
+                      command,
+                      stdin=subprocess.DEVNULL,
+                      stdout=stdout_handle,
+                      stderr=stderr_handle,
+                      shell=False,
+                      timeout=120,
+                      check=False,
+                  )
+              except subprocess.TimeoutExpired as exc:
+                  wrapper_path.write_text(json.dumps({
+                      'outcome': 'FAIL',
+                      'failure_kind': 'outer_timeout',
+                      'cleanup': 'uncertain',
+                      'native_exit_code': None,
+                      'timeout_seconds': 120,
+                      'detail': str(exc),
+                  }, indent=2) + '\n', encoding='utf-8')
+                  raise SystemExit(124)
+          wrapper_path.write_text(json.dumps({
+              'outcome': 'controller_exit',
+              'native_exit_code': completed.returncode,
+              'controller_report_authoritative': True,
+              'stdout': str(stdout_path),
+              'stderr': str(stderr_path),
+          }, indent=2) + '\n', encoding='utf-8')
+          raise SystemExit(completed.returncode)
       - name: Preserve contract evidence even on failure
         if: always()
         uses: actions/upload-artifact@v4
