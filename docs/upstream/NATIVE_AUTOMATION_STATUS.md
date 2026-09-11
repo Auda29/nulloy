@@ -150,3 +150,17 @@ Explorer-Matrix am gemeinsamen Paket nicht.
   Gesamtdurchlauf. Hardware-/Audio-/Plattformlücken ausdrücklich erhalten.
 
 Kein automatischer Merge der funktionalen Drafts, kein automatischer Release.
+
+## Nachtrag 2026-09-11: isoliertes Kontextmenü-Milestone grün
+
+Der isolierte Qt6-Paketlauf [34584964888](https://github.com/Auda29/nulloy/actions/runs/34584964888) ist mit Prüfercommit `5cf2973242321053cd4c793e6518138828baead1` erfolgreich abgeschlossen: 53 Vertragsprüfungen bestanden. Geprüft wurde das exakt aus Lauf `34572047079` stammende Paket vom Buildcommit `9e1b3f060e649a64c698b2a5981dbfca1d741b84`, nicht ein neu gebautes oder kombiniertes Paket. Die Paketidentitäten bleiben Qt6-ZIP `5558a6ed786051224f7dcf3228a230fa45c95959f3e363e5b06b48d446ccb833` und EXE `d7d622c3a0afe88657fa108bebf72f7bfdc69777c9f1f626fe3fe26e589315f9`; das Laufzeitskript ist `36e527b210a783a45a66e29f0df74f4b3b76fabd2f81e1d2bddce16934e997ca`.
+
+Im Player wurden drei erzeugte WAV-Zeilen geladen. Nach genau einem guarded Right-Down/Right-Up-Paar blieb die Auswahl von exakt zwei der drei Zeilen erhalten (`input_count=2`). Das eigene Qt-`QMenu`-Pane lag bei PID 1788 mit Runtime-ID `[42, 197778]`; die beiden exakten Einträge waren `Remove From Playlist` / `QtSingleApplication.QMenu.RemoveFromPlaylistAction` mit Item-Runtime-ID `[42, 197778, 4, -2147483613]` und `Move To Trash` / `QtSingleApplication.QMenu.MoveToTrashAction` mit Item-Runtime-ID `[42, 197778, 4, -2147483612]`. Die Elternprüfung bestätigte das sichtbare Popup und beide Labels im Menü-Screenshot. Kein Menüeintrag wurde ausgelöst. Finale Fixture-Integrität, Prozessbereinigung, Entfernung des temporären Wurzelverzeichnisses und leere Fehlerliste sind bestätigt.
+
+Das ist ausschließlich die grüne isolierte Beobachtung: keine destruktive Papierkorbaktion und keine PR15-Matrix. Das Paket enthält Integration plus PR15, nicht die finale PR15/24/29-Kombination. PR15-Papierkorb-/Abbruch-/Duplikat-/Wiedergabeabnahme, PR24-Explorer, PR16-DPI/Fenster, macOS-Originalfall, die kombinierte Qt5/Qt6-Abnahme und Release bleiben offen. Die Härtungslücken fail-open visibility, per-call COM-Boundedness und Diagnostic-Error-Masking bleiben ausdrücklich unbestätigt.
+
+Die historischen Fehlläufe bleiben unverändert: `34582957766` (`ea10d51c2131af941c6e7d8eaaf082a6cca260cd`, Pane/QMenu erkannt, Recognition fehlgeschlagen) und `34584359190` (`679bb8915136d5f6db707f259a6950bb49b73d2c`, native Beobachtung bestanden, Gesamtworkflow bei stdout-Serialisierung fehlgeschlagen). Sie werden durch diesen Lauf nicht umetikettiert.
+
+Die genehmigte Speicherbereinigung ist separat verifiziert: 29 ersetzte Paketartefakte (`1,674,672,514` Bytes) und 31 MSYS2-Caches (`10,632,210,125` Bytes); 309 Artefakte blieben zum Prüfzeitpunkt erhalten, darunter die geschützten IDs `10188441880` und `10188259265`. Diese Bestandszahl ist ein Punkt-in-Zeit-Wert nach der Bereinigung, keine aktuelle Quotenbehauptung; neue kleine Artefakte seitdem sind möglich. Einzelheiten stehen außerhalb dieses Repositories unter `/home/hermes/workspace/nulloy-status-current/storage-cleanup/`.
+
+Belege: `/home/hermes/workspace/nulloy-status-current/player-context-final-verdict-5cf2973.md`, `/home/hermes/workspace/nulloy-status-current/player-inspection-34584964888/parent-verification.json` und `workflow.log`. Kein Native-/Build-/Push-Schritt wurde für diesen Dokumentationsnachtrag ausgeführt.

@@ -4916,5 +4916,107 @@
       }
     },
     "acceptance_baseline": "acceptance-baseline.json"
+  },
+  "package_context_menu_milestone": {
+    "snapshot_at": "2026-09-11T09:36:09Z",
+    "status": "verified_green_isolated_observation",
+    "run": 34584964888,
+    "run_url": "https://github.com/Auda29/nulloy/actions/runs/34584964888",
+    "inspector_commit": "5cf2973242321053cd4c793e6518138828baead1",
+    "package_build_run": 34572047079,
+    "package_build_commit": "9e1b3f060e649a64c698b2a5981dbfca1d741b84",
+    "scope": "isolated integration plus PR15; not the final combined PR15/24/29 package",
+    "qt6_zip_sha256": "5558a6ed786051224f7dcf3228a230fa45c95959f3e363e5b06b48d446ccb833",
+    "qt6_exe_sha256": "d7d622c3a0afe88657fa108bebf72f7bfdc69777c9f1f626fe3fe26e589315f9",
+    "runtime_script_sha256": "36e527b210a783a45a66e29f0df74f4b3b76fabd2f81e1d2bddce16934e997ca",
+    "contracts_passed": 53,
+    "selection": {
+      "rows_selected": 2,
+      "rows_total": 3,
+      "retained_after_guarded_right_click": true,
+      "input_count": 2
+    },
+    "context_menu": {
+      "owner_pid": 1788,
+      "runtime_id": [42, 197778],
+      "recognized_items": [
+        {
+          "label": "Remove From Playlist",
+          "automation_id": "QtSingleApplication.QMenu.RemoveFromPlaylistAction",
+          "pid": 1788,
+          "runtime_id": [42, 197778, 4, -2147483613]
+        },
+        {
+          "label": "Move To Trash",
+          "automation_id": "QtSingleApplication.QMenu.MoveToTrashAction",
+          "pid": 1788,
+          "runtime_id": [42, 197778, 4, -2147483612]
+        }
+      ],
+      "items": [
+        {
+          "label": "Remove From Playlist",
+          "automation_id": "QtSingleApplication.QMenu.RemoveFromPlaylistAction"
+        },
+        {
+          "label": "Move To Trash",
+          "automation_id": "QtSingleApplication.QMenu.MoveToTrashAction"
+        }
+      ],
+      "no_menu_invocation": true,
+      "visual_parent_confirmation": "player-context-menu.png showed the actual popup and both exact labels"
+    },
+    "preservation": {
+      "filesystem_unchanged_final": true,
+      "process_cleanup_verified": true,
+      "temp_root_removed": true,
+      "errors": []
+    },
+    "final_combined_acceptance": false,
+    "open_gates": {
+      "pr15_native_trash_matrix": "open",
+      "pr24_explorer": "open",
+      "pr16_dpi_window": "open",
+      "macos_original": "open",
+      "final_linux_windows_qt5_qt6_combined_package": "open",
+      "release": "not_authorized",
+      "unverified_hardening": [
+        "fail-open visibility exception",
+        "per-call COM boundedness",
+        "diagnostic error masking"
+      ]
+    },
+    "historical_failures": [
+      {
+        "run": 34582957766,
+        "inspector_commit": "ea10d51c2131af941c6e7d8eaaf082a6cca260cd",
+        "status": "FAIL",
+        "reason": "Pane/QMenu representation was discovered but recognition failed"
+      },
+      {
+        "run": 34584359190,
+        "inspector_commit": "679bb8915136d5f6db707f259a6950bb49b73d2c",
+        "status": "FAIL",
+        "reason": "native observation passed but stdout serialization failed"
+      }
+    ],
+    "evidence": [
+      "/home/hermes/workspace/nulloy-status-current/player-context-final-verdict-5cf2973.md",
+      "/home/hermes/workspace/nulloy-status-current/player-inspection-34584964888/parent-verification.json",
+      "/home/hermes/workspace/nulloy-status-current/player-inspection-34584964888/workflow.log"
+    ]
+  },
+  "storage_cleanup_followup": {
+    "approved": true,
+    "verification_source": "/home/hermes/workspace/nulloy-status-current/storage-cleanup/verification-summary.json",
+    "deleted_artifacts": 29,
+    "deleted_artifact_bytes": 1674672514,
+    "deleted_caches": 31,
+    "deleted_cache_bytes": 10632210125,
+    "remaining_artifacts_at_verification": 309,
+    "protected_artifact_ids": [10188441880, 10188259265],
+    "verification_passed": true,
+    "count_scope_note": "point-in-time after cleanup; new small artifacts created since then mean this is not a current total.",
+    "retained_scope_note": "Other retained artifacts, including critical package IDs and evidence, were not targeted."
   }
 }

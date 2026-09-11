@@ -114,3 +114,11 @@ prüfen: Linux-Komponenten, Windows Qt5/Qt6, entpacktes finales Paket ohne
 Toolchain-PATH, Formatmatrix und native Smoke-/Bedienabnahme. Anschließend
 Register und Übergabe aktualisieren. **Kein automatischer Release oder Merge nach
 master.** Das hier dokumentierte Alpha.3-Testpaket ist keine Veröffentlichung.
+
+## Nachtrag 11. September: grünes isoliertes Kontextmenü-Milestone
+
+Der aktuelle, separat verifizierte Nachweis ist [NATIVE_AUTOMATION_STATUS.md#nachtrag-2026-09-11-isoliertes-kontextmenü-milestone-grün](NATIVE_AUTOMATION_STATUS.md#nachtrag-2026-09-11-isoliertes-kontextmenü-milestone-grün). Lauf `34584964888` / Prüfercommit `5cf2973242321053cd4c793e6518138828baead1` bestand mit 53 Vertragsprüfungen gegen das exakt gebundene Qt6-Paket aus Lauf `34572047079`, Buildcommit `9e1b3f060e649a64c698b2a5981dbfca1d741b84`. Die ZIP-/EXE- und Laufzeitskript-Hashes, Auswahlretention von genau 2/3 Zeilen, einmalige guarded Pointer-Eingabe, eigenes Qt-Menu mit den beiden exakten Einträgen sowie finale Fixture-/Cleanup-Prüfung sind im Register festgehalten.
+
+Arbeitsgrenze: Dies war eine beobachtende, nichtdestruktive Aktion ohne Menüaufruf. Das Paket ist Integration plus PR15 und nicht die gemeinsame PR15/24/29-Endabnahme. PR15 native Trash-Matrix und macOS-Originalfall, PR24 Explorer, PR16 DPI/Fenster sowie der kombinierte Qt5/Qt6-Abschluss bleiben offen; Release ist nicht autorisiert. Fail-open visibility, per-call COM-Boundedness und Diagnostic-Error-Masking sind nicht als behoben zu behandeln. Die früheren Läufe `34582957766` (Recognition) und `34584359190` (stdout-Serialisierung) bleiben historische FAILs.
+
+Die separat genehmigte Speicherbereinigung löschte 29 veraltete Paketartefakte und 31 MSYS2-Caches; Verifikation bestätigte 309 verbliebene Artefakte zum Bereinigungszeitpunkt und schützte unter anderem IDs `10188441880` und `10188259265`. Das ist ein Punkt-in-Zeit-Bestand, keine Quoten- oder aktueller-Gesamtbestand-Aussage. Siehe externe Nachweise unter `/home/hermes/workspace/nulloy-status-current/player-inspection-34584964888/` und `/home/hermes/workspace/nulloy-status-current/storage-cleanup/`.

@@ -147,6 +147,104 @@ class IssueRegister(unittest.TestCase):
         self.assertEqual(followup.get('macos_original'), 'open')
         self.assertNotEqual(followup['build_commit'], followup['selection_inspector_commit'])
 
+    def _assert_context_menu_milestone_contract(self, milestone):
+        self.assertEqual(milestone['status'], 'verified_green_isolated_observation')
+        self.assertEqual(milestone['run'], 34584964888)
+        self.assertEqual(milestone['inspector_commit'],
+                         '5cf2973242321053cd4c793e6518138828baead1')
+        self.assertEqual(milestone['package_build_run'], 34572047079)
+        self.assertEqual(milestone['package_build_commit'],
+                         '9e1b3f060e649a64c698b2a5981dbfca1d741b84')
+        self.assertEqual(milestone['qt6_zip_sha256'],
+                         '5558a6ed786051224f7dcf3228a230fa45c95959f3e363e5b06b48d446ccb833')
+        self.assertEqual(milestone['qt6_exe_sha256'],
+                         'd7d622c3a0afe88657fa108bebf72f7bfdc69777c9f1f626fe3fe26e589315f9')
+        self.assertEqual(milestone['runtime_script_sha256'],
+                         '36e527b210a783a45a66e29f0df74f4b3b76fabd2f81e1d2bddce16934e997ca')
+        self.assertEqual(milestone['contracts_passed'], 53)
+        self.assertEqual(milestone['selection']['rows_selected'], 2)
+        self.assertEqual(milestone['selection']['rows_total'], 3)
+        self.assertTrue(milestone['selection']['retained_after_guarded_right_click'])
+        self.assertEqual(milestone['selection']['input_count'], 2)
+        self.assertEqual(
+            milestone['context_menu']['items'],
+            [
+                {
+                    'label': 'Remove From Playlist',
+                    'automation_id': 'QtSingleApplication.QMenu.RemoveFromPlaylistAction',
+                },
+                {
+                    'label': 'Move To Trash',
+                    'automation_id': 'QtSingleApplication.QMenu.MoveToTrashAction',
+                },
+            ])
+        self.assertEqual(milestone['context_menu']['owner_pid'], 1788)
+        self.assertEqual(milestone['context_menu']['runtime_id'], [42, 197778])
+        self.assertEqual(milestone['context_menu']['recognized_items'], [
+            {
+                'label': 'Remove From Playlist',
+                'automation_id': 'QtSingleApplication.QMenu.RemoveFromPlaylistAction',
+                'pid': 1788,
+                'runtime_id': [42, 197778, 4, -2147483613],
+            },
+            {
+                'label': 'Move To Trash',
+                'automation_id': 'QtSingleApplication.QMenu.MoveToTrashAction',
+                'pid': 1788,
+                'runtime_id': [42, 197778, 4, -2147483612],
+            },
+        ])
+        self.assertTrue(milestone['context_menu']['no_menu_invocation'])
+        self.assertTrue(milestone['preservation']['filesystem_unchanged_final'])
+        self.assertTrue(milestone['preservation']['process_cleanup_verified'])
+        self.assertTrue(milestone['preservation']['temp_root_removed'])
+        self.assertEqual(milestone['preservation']['errors'], [])
+        self.assertFalse(milestone['final_combined_acceptance'])
+        self.assertEqual(milestone['open_gates']['pr15_native_trash_matrix'], 'open')
+        self.assertEqual(milestone['open_gates']['pr24_explorer'], 'open')
+        self.assertEqual(milestone['open_gates']['pr16_dpi_window'], 'open')
+        self.assertEqual(milestone['open_gates']['macos_original'], 'open')
+        self.assertEqual(milestone['open_gates']['release'], 'not_authorized')
+
+    def test_context_menu_milestone_is_exact_and_keeps_final_gates_open(self):
+        milestone = self.data['package_context_menu_milestone']
+        self._assert_context_menu_milestone_contract(milestone)
+        self.assertEqual(milestone['historical_failures'], [
+            {'run': 34582957766, 'inspector_commit': 'ea10d51c2131af941c6e7d8eaaf082a6cca260cd',
+             'status': 'FAIL', 'reason': 'Pane/QMenu representation was discovered but recognition failed'},
+            {'run': 34584359190, 'inspector_commit': '679bb8915136d5f6db707f259a6950bb49b73d2c',
+             'status': 'FAIL', 'reason': 'native observation passed but stdout serialization failed'},
+        ])
+
+    def test_context_menu_milestone_negative_controls_are_sensitive(self):
+        import copy
+        milestone = self.data['package_context_menu_milestone']
+        mutations = [
+            ('run', lambda value: value.__setitem__('run', 1)),
+            ('inspector_commit', lambda value: value.__setitem__('inspector_commit', '0' * 40)),
+            ('menu_action', lambda value: value['context_menu'].__setitem__('no_menu_invocation', False)),
+            ('final_acceptance', lambda value: value.__setitem__('final_combined_acceptance', True)),
+            ('gate', lambda value: value['open_gates'].__setitem__('pr15_native_trash_matrix', 'closed')),
+        ]
+        for name, mutate in mutations:
+            with self.subTest(mutation=name):
+                mutated = copy.deepcopy(milestone)
+                mutate(mutated)
+                with self.assertRaises(AssertionError):
+                    self._assert_context_menu_milestone_contract(mutated)
+
+    def test_storage_cleanup_followup_is_bounded_and_protects_evidence(self):
+        cleanup = self.data['storage_cleanup_followup']
+        self.assertTrue(cleanup['approved'])
+        self.assertEqual(cleanup['deleted_artifacts'], 29)
+        self.assertEqual(cleanup['deleted_artifact_bytes'], 1674672514)
+        self.assertEqual(cleanup['deleted_caches'], 31)
+        self.assertEqual(cleanup['deleted_cache_bytes'], 10632210125)
+        self.assertEqual(cleanup['remaining_artifacts_at_verification'], 309)
+        self.assertEqual(cleanup['protected_artifact_ids'], [10188441880, 10188259265])
+        self.assertTrue(cleanup['verification_passed'])
+        self.assertIn('point-in-time', cleanup['count_scope_note'])
+
     def test_archived_snapshot_matches_audit_and_register(self):
         archive = ROOT / 'docs/upstream/handoff-evidence'
         raw = (archive / 'audit/snapshot.jsonl').read_bytes()
