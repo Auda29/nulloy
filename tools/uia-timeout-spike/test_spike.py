@@ -15,6 +15,7 @@ import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 HERE = Path(__file__).resolve().parent
@@ -40,7 +41,101 @@ class SupervisorSubprocessTests(unittest.TestCase):
             worker_args=kwargs.pop("worker_args", ()),
         )
 
-    def test_real_worker_happy_path_captures_files_and_json(self):
+    def test_postspawn_diagnostic_read_failure_is_recorded_and_child_is_cleaned(self):
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            worker = self._write_worker(
+                directory,
+                """
+                import json, time
+                print(json.dumps({'event': 'ready'}), flush=True)
+                time.sleep(3)
+                """,
+            )
+            output = directory / "run"
+            import supervisor
+
+            captured = {}
+            real_popen = supervisor.subprocess.Popen
+
+            def capture_popen(*args, **kwargs):
+                process = real_popen(*args, **kwargs)
+                captured["process"] = process
+                return process
+
+            def fail_once(path, cap):
+                raise OSError("injected diagnostic read failure")
+
+            with mock.patch.object(supervisor.subprocess, "Popen", side_effect=capture_popen):
+                with mock.patch.object(supervisor, "_read_bytes_capped", side_effect=fail_once):
+                    result = self._run(worker, output)
+
+            self.assertEqual(result.status, "FAIL")
+            self.assertEqual(result.failure_kind, "diagnostic_read")
+            self.assertTrue(result.cleanup_verified)
+            self.assertIn("injected diagnostic read failure", result.primary_error)
+            self.assertTrue((output / "result.json").is_file())
+            self.assertIsNotNone(captured["process"].poll())
+
+    def test_unexpected_wait_failure_still_reaches_kill_fallback(self):
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            worker = self._write_worker(
+                directory,
+                """
+                import signal, time
+                signal.signal(signal.SIGTERM, signal.SIG_IGN)
+                print('{\"event\": \"ready\"}', flush=True)
+                time.sleep(3)
+                """,
+            )
+            output = directory / "run"
+            import supervisor
+
+            real_wait = supervisor._wait_for_exit
+            calls = {"count": 0}
+
+            def fail_once(process, timeout):
+                calls["count"] += 1
+                if calls["count"] == 1:
+                    raise OSError("injected wait failure")
+                return real_wait(process, timeout)
+
+            with mock.patch.object(supervisor, "_wait_for_exit", side_effect=fail_once):
+                result = self._run(worker, output, execution_timeout=0.08)
+
+            self.assertEqual(result.status, "TIMEOUT")
+            self.assertTrue(result.cleanup_verified)
+            self.assertTrue(result.kill_sent)
+            self.assertIn("injected wait failure", result.secondary_errors[0])
+
+    def test_failed_result_write_returns_structured_failure_without_masking_child_error(self):
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            worker = self._write_worker(
+                directory,
+                """
+                import json, sys
+                print(json.dumps({'event': 'ready'}), flush=True)
+                print('primary child failure', file=sys.stderr, flush=True)
+                raise RuntimeError('primary child failure')
+                """,
+            )
+            output = directory / "run"
+            import supervisor
+
+            with mock.patch.object(
+                supervisor, "_write_result", side_effect=OSError("injected result write failure")
+            ):
+                result = self._run(worker, output)
+
+            self.assertEqual(result.status, "FAIL")
+            self.assertEqual(result.failure_kind, "child_exit")
+            self.assertIn("primary child failure", result.stderr)
+            self.assertTrue(any("injected result write failure" in error for error in result.secondary_errors))
+            self.assertIn("injected result write failure", result.result_write_error)
+            self.assertTrue(result.cleanup_verified)
+
         with tempfile.TemporaryDirectory() as raw:
             directory = Path(raw)
             worker = self._write_worker(

@@ -2,8 +2,9 @@
 
 The parent never imports UIA/COM. It starts the owned helper with the fixed
 interpreter, captures both streams in files, and bounds readiness, execution,
-and cleanup independently. ``worker_script`` is injectable only so Linux tests
-can exercise real child-process behavior; the CLI defaults to worker.py.
+and cleanup independently. ``worker_script`` is a trusted test-only API seam;
+the operational CLI always uses the owned worker and exposes no replacement
+script option.
 """
 
 from __future__ import annotations
@@ -26,12 +27,8 @@ DEFAULT_OUTPUT_CAP = 1_048_576
 OWNED_WORKER = Path(__file__).with_name("worker.py")
 
 
-def validate_deadline(value: float, name: str) -> float:
-    """Return a finite, strictly positive timeout or reject it."""
-    value = float(value)
-    if not math.isfinite(value) or value <= 0:
-        raise ValueError(f"{name} must be finite and positive")
-    return value
+class DiagnosticReadError(RuntimeError):
+    """A live diagnostic stream could not be read."""
 
 
 @dataclass
@@ -46,16 +43,30 @@ class SupervisionResult:
     kill_sent: bool = False
     returncode: int | None = None
     spawn_elapsed_s: float = 0.0
+    supervision_elapsed_s: float = 0.0
+    readiness_deadline_s: float = 0.0
+    execution_deadline_s: float = 0.0
     stdout_path: str = ""
     stderr_path: str = ""
     result_path: str = ""
     stdout: str = ""
     stderr: str = ""
     child_payload: dict[str, Any] = field(default_factory=dict)
+    primary_error: str = ""
+    secondary_errors: list[str] = field(default_factory=list)
+    result_write_error: str = ""
     detail: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+def validate_deadline(value: float, name: str) -> float:
+    """Return a finite, strictly positive timeout or reject it."""
+    value = float(value)
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError(f"{name} must be finite and positive")
+    return value
 
 
 def _read_bytes_capped(path: Path, cap: int) -> tuple[bytes, bool]:
@@ -98,25 +109,66 @@ def _cleanup(
     process: subprocess.Popen[bytes],
     terminate_timeout: float,
     kill_timeout: float,
-) -> tuple[bool, bool, bool]:
-    """Use finite terminate/kill/wait stages and report their observations."""
+) -> tuple[bool, bool, bool, list[str]]:
+    """Use finite terminate/kill/wait stages, even when a wait raises."""
     terminate_sent = False
     kill_sent = False
+    errors: list[str] = []
     if process.poll() is None:
         terminate_sent = True
         try:
             process.terminate()
-        except OSError:
-            pass
-        _wait_for_exit(process, terminate_timeout)
+        except Exception as exc:
+            errors.append(f"terminate failed: {type(exc).__name__}: {exc}")
+        try:
+            _wait_for_exit(process, terminate_timeout)
+        except Exception as exc:
+            errors.append(f"terminate wait failed: {type(exc).__name__}: {exc}")
     if process.poll() is None:
         kill_sent = True
         try:
             process.kill()
-        except OSError:
-            pass
-        _wait_for_exit(process, kill_timeout)
-    return process.poll() is not None, terminate_sent, kill_sent
+        except Exception as exc:
+            errors.append(f"kill failed: {type(exc).__name__}: {exc}")
+        try:
+            _wait_for_exit(process, kill_timeout)
+        except Exception as exc:
+            errors.append(f"kill wait failed: {type(exc).__name__}: {exc}")
+    return process.poll() is not None, terminate_sent, kill_sent, errors
+
+
+def _read_live_streams(stdout_path: Path, stderr_path: Path, cap: int) -> tuple[bytes, bool, bytes, bool]:
+    """Read both live files; a read error is a primary supervision failure."""
+    try:
+        stdout_data, stdout_capped = _read_bytes_capped(stdout_path, cap)
+    except Exception as exc:
+        raise DiagnosticReadError(f"stdout diagnostic read failed: {exc}") from exc
+    try:
+        stderr_data, stderr_capped = _read_bytes_capped(stderr_path, cap)
+    except Exception as exc:
+        raise DiagnosticReadError(f"stderr diagnostic read failed: {exc}") from exc
+    return stdout_data, stdout_capped, stderr_data, stderr_capped
+
+
+def _read_final_stream(path: Path, cap: int, label: str) -> tuple[bytes, bool, str | None]:
+    try:
+        data, capped = _read_bytes_capped(path, cap)
+    except Exception as exc:
+        return b"", False, f"{label} final diagnostic read failed: {type(exc).__name__}: {exc}"
+    return data, capped, None
+
+
+def _write_result_safely(path: Path, result: SupervisionResult) -> None:
+    try:
+        _write_result(path, result)
+    except Exception as exc:
+        error = f"result write failed: {type(exc).__name__}: {exc}"
+        result.result_write_error = error
+        result.secondary_errors.append(error)
+        result.status = "FAIL"
+        result.success = False
+        if result.failure_kind is None:
+            result.failure_kind = "result_write"
 
 
 def _write_result(path: Path, result: SupervisionResult) -> None:
@@ -136,8 +188,11 @@ def run_supervised(
 ) -> SupervisionResult:
     """Run one exact helper process and return a serializable verdict.
 
-    ``Popen`` creation is intentionally not claimed to be bounded: Python's
-    timeout starts after spawn. The measured spawn duration is recorded.
+    ``worker_script`` and ``worker_args`` are a trusted test-only seam for
+    real Linux child-process fixtures, not a security sandbox. The public CLI
+    calls this function only with ``OWNED_WORKER`` and fixed target arguments.
+    Popen creation is intentionally not claimed to be bounded: the measured
+    spawn duration is recorded and all post-spawn stages are finite.
     """
     readiness_timeout = validate_deadline(readiness_timeout, "readiness_timeout")
     execution_timeout = validate_deadline(execution_timeout, "execution_timeout")
@@ -168,55 +223,95 @@ def run_supervised(
                 close_fds=True,
             )
     except (OSError, ValueError) as exc:
-        result = SupervisionResult(status="FAIL", failure_kind="spawn", detail=str(exc), **base)
-        _write_result(result_path, result)
+        result = SupervisionResult(status="FAIL", failure_kind="spawn", primary_error=str(exc), **base)
+        _write_result_safely(result_path, result)
         return result
     spawn_elapsed = time.monotonic() - spawn_started
 
+    started = time.monotonic()
     timed_out = False
     timeout_phase: str | None = None
     failure_kind: str | None = None
-    deadline = time.monotonic() + readiness_timeout
+    primary_error = ""
+    secondary_errors: list[str] = []
     ready = False
-    while process.poll() is None and time.monotonic() < deadline:
-        data, capped = _read_bytes_capped(stdout_path, output_cap)
-        if capped:
-            failure_kind = "output_cap"
-            break
-        _, ready = _payload_from_stdout(data)
-        if ready:
-            break
-        time.sleep(min(0.01, max(0.001, deadline - time.monotonic())))
-    if failure_kind is None and not ready and process.poll() is None:
-        timed_out = True
-        timeout_phase = "readiness"
-    if failure_kind is None and not timed_out and ready and process.poll() is None:
-        deadline = time.monotonic() + execution_timeout
-        while process.poll() is None and time.monotonic() < deadline:
-            data, capped = _read_bytes_capped(stdout_path, output_cap)
-            if capped:
-                failure_kind = "output_cap"
-                break
-            time.sleep(min(0.01, max(0.001, deadline - time.monotonic())))
-        if failure_kind is None and process.poll() is None:
-            timed_out = True
-            timeout_phase = "execution"
-
+    stdout_data = b""
+    stderr_data = b""
+    stdout_capped = False
+    stderr_capped = False
     cleanup_verified = True
     terminate_sent = False
     kill_sent = False
-    if process.poll() is None:
-        cleanup_verified, terminate_sent, kill_sent = _cleanup(process, terminate_timeout, kill_timeout)
-    else:
-        cleanup_verified = process.poll() is not None
-    returncode = process.poll()
+    cleanup_errors: list[str] = []
 
-    stdout_data, stdout_capped = _read_bytes_capped(stdout_path, output_cap)
-    stderr_data, stderr_capped = _read_bytes_capped(stderr_path, output_cap)
+    try:
+        readiness_deadline = time.monotonic() + readiness_timeout
+        while process.poll() is None and time.monotonic() < readiness_deadline:
+            stdout_data, stdout_capped, stderr_data, stderr_capped = _read_live_streams(
+                stdout_path, stderr_path, output_cap
+            )
+            if stdout_capped or stderr_capped:
+                failure_kind = "output_cap"
+                break
+            _, ready = _payload_from_stdout(stdout_data)
+            if ready:
+                break
+            time.sleep(min(0.01, max(0.001, readiness_deadline - time.monotonic())))
+        if failure_kind is None and not ready and process.poll() is None:
+            timed_out = True
+            timeout_phase = "readiness"
+        if failure_kind is None and not timed_out and ready and process.poll() is None:
+            execution_deadline = time.monotonic() + execution_timeout
+            while process.poll() is None and time.monotonic() < execution_deadline:
+                stdout_data, stdout_capped, stderr_data, stderr_capped = _read_live_streams(
+                    stdout_path, stderr_path, output_cap
+                )
+                if stdout_capped or stderr_capped:
+                    failure_kind = "output_cap"
+                    break
+                time.sleep(min(0.01, max(0.001, execution_deadline - time.monotonic())))
+            if failure_kind is None and process.poll() is None:
+                timed_out = True
+                timeout_phase = "execution"
+    except DiagnosticReadError as exc:
+        failure_kind = "diagnostic_read"
+        primary_error = str(exc)
+    except Exception as exc:
+        failure_kind = "supervision"
+        primary_error = f"{type(exc).__name__}: {exc}"
+    finally:
+        try:
+            if process.poll() is None:
+                cleanup_verified, terminate_sent, kill_sent, cleanup_errors = _cleanup(
+                    process, terminate_timeout, kill_timeout
+                )
+            else:
+                cleanup_verified = process.poll() is not None
+        except Exception as exc:
+            cleanup_verified = False
+            cleanup_errors.append(f"cleanup inspection failed: {type(exc).__name__}: {exc}")
+
+    stdout_data, stdout_capped, stdout_error = _read_final_stream(stdout_path, output_cap, "stdout")
+    stderr_data, stderr_capped, stderr_error = _read_final_stream(stderr_path, output_cap, "stderr")
+    for error in (stdout_error, stderr_error):
+        if error:
+            if not primary_error and failure_kind is None:
+                failure_kind = "diagnostic_read"
+                primary_error = error
+            else:
+                secondary_errors.append(error)
+    secondary_errors.extend(cleanup_errors)
     payload, ready_at_end = _payload_from_stdout(stdout_data)
-    if stdout_capped or stderr_capped:
-        failure_kind = "output_cap"
-    if not timed_out and failure_kind is None:
+
+    if timed_out:
+        if stdout_capped or stderr_capped:
+            secondary_errors.append("output_cap observed after timeout primary")
+        failure_kind = "timeout"
+    elif stdout_capped or stderr_capped:
+        if failure_kind is None:
+            failure_kind = "output_cap"
+    elif not primary_error and failure_kind is None:
+        returncode = process.poll()
         if returncode != 0:
             failure_kind = "child_exit"
         elif not ready_at_end:
@@ -224,12 +319,12 @@ def run_supervised(
         elif payload.get("status") != "PASS":
             failure_kind = "child_result"
 
+    returncode = process.poll()
+    if not cleanup_verified and not timed_out:
+        failure_kind = failure_kind or "cleanup_uncertain"
     if timed_out:
         status = "TIMEOUT"
-    elif not cleanup_verified:
-        status = "FAIL"
-        failure_kind = failure_kind or "cleanup_uncertain"
-    elif failure_kind is not None:
+    elif failure_kind is not None or not cleanup_verified:
         status = "FAIL"
     else:
         status = "SUCCESS"
@@ -245,13 +340,18 @@ def run_supervised(
         kill_sent=kill_sent,
         returncode=returncode,
         spawn_elapsed_s=spawn_elapsed,
+        supervision_elapsed_s=time.monotonic() - started,
+        readiness_deadline_s=readiness_timeout,
+        execution_deadline_s=execution_timeout,
         stdout=_text(stdout_data),
         stderr=_text(stderr_data),
         child_payload=payload,
+        primary_error=primary_error,
+        secondary_errors=secondary_errors,
         detail=("cleanup uncertain" if not cleanup_verified else ""),
         **base,
     )
-    _write_result(result_path, result)
+    _write_result_safely(result_path, result)
     return result
 
 
@@ -267,29 +367,25 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--terminate-timeout", type=float, default=2.0)
     parser.add_argument("--kill-timeout", type=float, default=2.0)
     parser.add_argument("--output-cap", type=int, default=DEFAULT_OUTPUT_CAP)
-    parser.add_argument("--worker-script", help=argparse.SUPPRESS)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    injected = args.worker_script is not None
     target_values = (args.hwnd, args.pid, args.create_time, args.exe)
-    if not injected and any(value is None for value in target_values):
+    if any(value is None for value in target_values):
         print(json.dumps({"status": "FAIL", "failure_kind": "target_args"}))
         return 1
-    worker_args: list[str] = []
-    if not injected:
-        worker_args = [
-            "--hwnd", args.hwnd,
-            "--pid", args.pid,
-            "--create-time", args.create_time,
-            "--exe", args.exe,
-        ]
+    worker_args = [
+        "--hwnd", args.hwnd,
+        "--pid", args.pid,
+        "--create-time", args.create_time,
+        "--exe", args.exe,
+    ]
     try:
         result = run_supervised(
             output_dir=args.output_dir,
-            worker_script=args.worker_script or OWNED_WORKER,
+            worker_script=OWNED_WORKER,
             worker_args=worker_args,
             readiness_timeout=args.readiness_timeout,
             execution_timeout=args.execution_timeout,
