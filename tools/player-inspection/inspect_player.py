@@ -491,7 +491,7 @@ def _owned_main(desktop: Any, identity: dict[str, Any]) -> Any:
             getattr(info, "process_id", None) == identity["pid"]
             and getattr(info, "class_name", "") == "NMainWindow"
             and getattr(info, "control_type", "") == "Pane"
-            and getattr(window, "is_visible", lambda: True)()
+            and _is_visible(window)
         ):
             matches.append(window)
     if len(matches) != 1:
@@ -553,11 +553,24 @@ def _runtime_key(control: Any) -> str:
     return f"handle:{getattr(info, 'handle', None)!r}"
 
 
-def _is_visible(control: Any) -> bool:
+def _visibility_owner(control: Any) -> str:
     try:
-        return bool(control.is_visible())
+        info = control.element_info
+        return (
+            f"{getattr(info, 'control_type', '') or type(control).__name__} "
+            f"{getattr(info, 'name', '')!r} handle={getattr(info, 'handle', None)!r}"
+        )
     except Exception:
-        return True
+        return type(control).__name__
+
+
+def _is_visible(control: Any) -> bool:
+    owner = _visibility_owner(control)
+    try:
+        value = control.is_visible()
+    except Exception as exc:
+        raise ContractError(f"visibility check failed for {owner}: {exc!r}") from exc
+    return _canonical_bool(value, "visibility", owner)
 
 
 _CONTEXT_DIAGNOSTIC_MAX_SURFACES = 32

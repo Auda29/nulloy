@@ -165,12 +165,16 @@ class _FakeMenuItem:
         )
         self.element_info.runtime_id = runtime_id
         self._name = name
+        self._visible = True
 
     def window_text(self):
         return self._name
 
     def descendants(self):
         return []
+
+    def is_visible(self):
+        return self._visible
 
 
 class _FakeSurface:
@@ -212,6 +216,11 @@ class _FakeSurface:
 
     def window_text(self):
         return self.element_info.name
+
+
+class _RaisingVisibilitySurface(_FakeSurface):
+    def is_visible(self):
+        raise RuntimeError("visibility COM call failed")
 
 
 class _FakeDesktop:
@@ -592,6 +601,49 @@ class ContractTests(unittest.TestCase):
         main = _FakeSurface("main")
 
         self.assertEqual(MODULE._owned_context_menus(_FakeDesktop([main, menu]), main, 4242), [])
+
+    def test_visibility_contract_rejects_unknown_or_raising_state(self):
+        for value in (None, "false", "1", 0.0, 1.0, 2, object()):
+            control = _FakeSurface("unknown", visible=value)
+            with self.subTest(value=repr(value)):
+                with self.assertRaises(MODULE.ContractError):
+                    MODULE._is_visible(control)
+
+        with self.assertRaises(MODULE.ContractError) as raised:
+            MODULE._is_visible(_RaisingVisibilitySurface("raising"))
+        self.assertIn("visibility", str(raised.exception))
+        self.assertIn("visibility COM call failed", str(raised.exception))
+
+    def test_menu_root_visibility_failure_is_rejected_before_discovery(self):
+        main = _FakeSurface("main")
+        menu = _RaisingVisibilitySurface("context", control_type="Menu")
+
+        with self.assertRaises(MODULE.ContractError) as raised:
+            MODULE._owned_context_menus(_FakeDesktop([main, menu]), main, 4242)
+        self.assertIn("visibility", str(raised.exception))
+
+    def test_menu_item_visibility_failure_is_rejected_before_recognition(self):
+        menu = _observed_qmenu()
+        menu._children[1]._visible = "false"
+
+        with self.assertRaises(MODULE.ContractError) as raised:
+            MODULE._menu_items(menu, 4242)
+        self.assertIn("visibility", str(raised.exception))
+
+    def test_popup_visibility_failure_is_rejected_before_context_input(self):
+        main = _FakeSurface("main", control_type="Pane")
+        popup = _RaisingVisibilitySurface("popup", control_type="Pane", handle=123)
+
+        with self.assertRaises(MODULE.ContractError) as raised:
+            MODULE._owned_visible_popups(_FakeDesktop([main, popup]), main, 4242)
+        self.assertIn("visibility", str(raised.exception))
+
+    def test_main_window_visibility_failure_is_rejected_in_no_action_path(self):
+        main = _RaisingVisibilitySurface("main", control_type="Pane", class_name="NMainWindow")
+
+        with self.assertRaises(MODULE.ContractError) as raised:
+            MODULE._owned_main(_FakeDesktop([main]), {"pid": 4242})
+        self.assertIn("visibility", str(raised.exception))
 
     def test_qmenu_pane_deduplicates_same_runtime_id(self):
         runtime_id = [42, 328542]
