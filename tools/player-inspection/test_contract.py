@@ -55,6 +55,16 @@ class _FakeSelectionItem:
         self.row.selected = True
 
 
+class _FakeNativeElement:
+    def __init__(self, focused=False, actions=None):
+        self.CurrentHasKeyboardFocus = focused
+        self.actions = actions if actions is not None else []
+
+    def SetFocus(self):
+        self.actions.append("SetFocus")
+        self.CurrentHasKeyboardFocus = True
+
+
 class _FakeRow:
     def __init__(self, name, container, actions, pid=4242, rect=None):
         self.name = name
@@ -63,12 +73,16 @@ class _FakeRow:
         self.element_info = _FakeInfo(name, pid=pid)
         self.iface_selection_item = _FakeSelectionItem(self, actions)
         self._rect = rect or _FakeRect()
+        self.element_info.element = _FakeNativeElement(actions=actions)
 
     def window_text(self):
         return self.name
 
     def rectangle(self):
         return self._rect
+
+    def set_focus(self):
+        raise AssertionError("wrapper set_focus must not be used")
 
 
 class _FakeMenuItem:
@@ -149,6 +163,15 @@ class ContractTests(unittest.TestCase):
                 [f"{p.name} (0:30)" for p in paths],
             )
 
+    def test_fixture_hash_verification_detects_post_action_mutation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = Path(temporary) / "fixture.wav"
+            fixture.write_bytes(b"stable")
+            hashes = {fixture.name: {"size": fixture.stat().st_size, "sha256": hashlib.sha256(b"stable").hexdigest()}}
+            self.assertTrue(MODULE._fixtures_unchanged([fixture], hashes))
+            fixture.write_bytes(b"changed")
+            self.assertFalse(MODULE._fixtures_unchanged([fixture], hashes))
+
     def test_selection_state_accepts_native_bool_integers_not_truthy_objects(self):
         row = _FakeRow("one.wav (0:30)", [], [])
         for value, expected in ((0, False), (1, True), (False, False), (True, True)):
@@ -184,40 +207,69 @@ class ContractTests(unittest.TestCase):
             MODULE.select_exact_rows(rows, expected, 4242)
         self.assertEqual(actions, [])
 
-    def test_context_message_requires_owned_root_and_strictly_inside_row(self):
+    def test_direct_focus_requires_owned_row_identity_and_native_focus(self):
         row = _FakeRow("one.wav (0:30)", [], [])
+        evidence = MODULE.focus_owned_row(row, row.name, 4242)
+        self.assertEqual(evidence["name"], row.name)
+        self.assertEqual(evidence["pid"], 4242)
+        self.assertTrue(evidence["has_keyboard_focus"])
+        self.assertEqual(row.element_info.element.actions, ["SetFocus"])
+
+    def test_direct_focus_rejects_missing_or_wrong_focus_without_fallback(self):
+        row = _FakeRow("one.wav (0:30)", [], [])
+        row.element_info.element = None
+        with self.assertRaises(MODULE.BlockedError):
+            MODULE.focus_owned_row(row, row.name, 4242)
+
+        row = _FakeRow("one.wav (0:30)", [], [])
+        row.element_info.element.CurrentHasKeyboardFocus = False
+        row.element_info.element.SetFocus = lambda: None
+        with self.assertRaises(MODULE.ContractError):
+            MODULE.focus_owned_row(row, row.name, 4242)
+        self.assertEqual(row.element_info.element.actions, [])
+
+        for bad_value in (None, "true", "1", 0.0, 1.0, 2, object()):
+            row = _FakeRow("one.wav (0:30)", [], [])
+            row.element_info.element.CurrentHasKeyboardFocus = bad_value
+            row.element_info.element.SetFocus = lambda: None
+            with self.subTest(invalid=repr(bad_value)):
+                with self.assertRaises(MODULE.ContractError):
+                    MODULE.focus_owned_row(row, row.name, 4242)
+
+    def test_direct_focus_rejects_pid_or_fullname_before_native_action(self):
+        for pid, name in ((9999, "one.wav (0:30)"), (4242, "wrong.wav (0:30)")):
+            row = _FakeRow("one.wav (0:30)", [], [], pid=pid)
+            with self.subTest(pid=pid, name=name):
+                with self.assertRaises(MODULE.ContractError):
+                    MODULE.focus_owned_row(row, name, 4242)
+            self.assertEqual(row.element_info.element.actions, [])
+
+    def test_keyboard_context_message_requires_owned_root_and_uses_keyboard_lparam(self):
         main = mock.Mock()
         main.element_info = _FakeInfo("main", pid=4242, handle=0x1234, control_type="Pane")
         identity = {"pid": 4242, "create_time": 12.5, "executable": r"C:\Nulloy.exe"}
         root = {"pid": 4242, "create_time": 12.5, "executable": r"C:\Nulloy.exe"}
 
-        message = MODULE.context_message_args(main, row, identity, root, identity["executable"])
-        self.assertEqual(message[:2], (0x1234, 0x007B))
+        message = MODULE.keyboard_context_message_args(main, identity, root, identity["executable"])
+        self.assertEqual(message, (0x1234, 0x007B, 0x1234, -1))
 
         with self.assertRaises(MODULE.ContractError):
-            MODULE.context_message_args(
-                main, row, identity, root, identity["executable"], point=(row.rectangle().left, row.rectangle().top)
-            )
-        with self.assertRaises(MODULE.ContractError):
-            MODULE.context_message_args(
+            MODULE.keyboard_context_message_args(
                 main,
-                row,
                 identity,
                 {**root, "pid": 9999},
                 identity["executable"],
             )
 
-    def test_context_post_uses_one_exact_root_message_without_retry(self):
-        row = _FakeRow("one.wav (0:30)", [], [])
+    def test_keyboard_context_post_uses_one_exact_root_message_without_retry(self):
         main = mock.Mock()
         main.element_info = _FakeInfo("main", pid=4242, handle=0x1234, control_type="Pane")
         identity = {"pid": 4242, "create_time": 12.5, "executable": r"C:\Nulloy.exe"}
         root = {"pid": 4242, "create_time": 12.5, "executable": r"C:\Nulloy.exe"}
         posted = []
 
-        MODULE.post_context_menu(
+        MODULE.post_keyboard_context_menu(
             main,
-            row,
             identity,
             root,
             identity["executable"],
@@ -227,6 +279,7 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(len(posted), 1)
         self.assertEqual(posted[0][0], 0x1234)
         self.assertEqual(posted[0][1], 0x007B)
+        self.assertEqual(posted[0][2:], (0x1234, -1))
 
     def test_menu_recognition_accepts_exact_entries_with_narrow_shortcut_suffix(self):
         items = [

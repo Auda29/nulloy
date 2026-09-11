@@ -218,14 +218,73 @@ def _selection_state(row: Any) -> bool:
         value = getattr(pattern, "CurrentIsSelected")
     except Exception as exc:
         raise BlockedError(f"cannot read UIA SelectionItem state: {exc!r}") from exc
-    # UIAutomation exposes BOOL (an integer through comtypes), not VARIANT_BOOL.
-    # Accept canonical 0/1 only; never infer state from arbitrary Python truthiness.
+    return _canonical_bool(value, "SelectionItem.CurrentIsSelected", _row_fullname(row))
+
+
+def _canonical_bool(value: Any, field: str, owner: str) -> bool:
+    """Accept only the 0/1 values exposed by native BOOL properties."""
     if type(value) not in (bool, int) or value not in (0, 1):
         raise ContractError(
-            f"SelectionItem.CurrentIsSelected has unsupported value {value!r} "
-            f"({type(value).__name__}) for {_row_fullname(row)!r}"
+            f"{field} has unsupported value {value!r} ({type(value).__name__}) for {owner!r}"
         )
     return bool(value)
+
+
+def _validate_row_identity(row: Any, expected_name: str, process_pid: int) -> Any:
+    info = row.element_info
+    if getattr(info, "process_id", None) != process_pid:
+        raise ContractError(f"playlist row PID mismatch for {expected_name!r}")
+    fullname = _row_fullname(row)
+    text = _window_text(row)
+    if fullname != expected_name or text != expected_name:
+        raise ContractError(
+            f"playlist row fullname mismatch: expected={expected_name!r}, fullname={fullname!r}, text={text!r}"
+        )
+    try:
+        element = getattr(info, "element", None)
+    except Exception as exc:
+        raise BlockedError(f"native UIA row element is unavailable: {exc!r}") from exc
+    if element is None:
+        raise BlockedError(f"native UIA row element is unavailable for {expected_name!r}")
+    return element
+
+
+def _row_focus_evidence(row: Any, expected_name: str, process_pid: int, element: Any) -> dict[str, Any]:
+    try:
+        value = getattr(element, "CurrentHasKeyboardFocus")
+    except Exception as exc:
+        raise BlockedError(f"cannot read native UIA keyboard focus state: {exc!r}") from exc
+    focused = _canonical_bool(value, "CurrentHasKeyboardFocus", expected_name)
+    if not focused:
+        raise ContractError(f"owned playlist row does not have keyboard focus: {expected_name!r}")
+    return {
+        "name": expected_name,
+        "pid": process_pid,
+        "has_keyboard_focus": True,
+        "source": "row.element_info.element.CurrentHasKeyboardFocus",
+    }
+
+
+def focus_owned_row(row: Any, expected_name: str, process_pid: int) -> dict[str, Any]:
+    """Set focus through the direct native UIA element, never the wrapper fallback."""
+    element = _validate_row_identity(row, expected_name, process_pid)
+    try:
+        set_focus = getattr(element, "SetFocus", None)
+    except Exception as exc:
+        raise BlockedError(f"native UIA row SetFocus is unavailable: {exc!r}") from exc
+    if not callable(set_focus):
+        raise BlockedError(f"native UIA row SetFocus is unavailable for {expected_name!r}")
+    try:
+        set_focus()
+    except Exception as exc:
+        raise BlockedError(f"native UIA row SetFocus failed: {exc!r}") from exc
+    return _row_focus_evidence(row, expected_name, process_pid, element)
+
+
+def verify_owned_row_focus(row: Any, expected_name: str, process_pid: int) -> dict[str, Any]:
+    """Re-read direct native focus after selection, without changing focus again."""
+    element = _validate_row_identity(row, expected_name, process_pid)
+    return _row_focus_evidence(row, expected_name, process_pid, element)
 
 
 def select_exact_rows(rows: Sequence[Any], expected: Sequence[str], process_pid: int) -> list[str]:
@@ -270,28 +329,13 @@ def select_exact_rows(rows: Sequence[Any], expected: Sequence[str], process_pid:
     return selected
 
 
-def _row_center(row: Any) -> tuple[int, int]:
-    try:
-        rectangle = row.rectangle()
-        left, top = int(rectangle.left), int(rectangle.top)
-        right, bottom = int(rectangle.right), int(rectangle.bottom)
-    except Exception as exc:
-        raise BlockedError(f"cannot read selected row rectangle: {exc!r}") from exc
-    if right - left <= 2 or bottom - top <= 2:
-        raise ContractError("selected row rectangle is too small for a strict interior point")
-    return (left + right) // 2, (top + bottom) // 2
-
-
-def context_message_args(
+def keyboard_context_message_args(
     main_window: Any,
-    selected_row: Any,
     process_identity: dict[str, Any],
     root_identity: dict[str, Any],
     executable: str | Path,
-    *,
-    point: tuple[int, int] | None = None,
 ) -> tuple[int, int, int, int]:
-    """Validate the owned native root and produce one WM_CONTEXTMENU payload."""
+    """Validate the owned native root and produce the keyboard WM_CONTEXTMENU payload."""
     info = main_window.element_info
     hwnd = int(getattr(info, "handle", 0) or 0)
     if not hwnd:
@@ -300,18 +344,16 @@ def context_message_args(
         raise ContractError("owned main window PID does not match Popen identity")
     if root_identity.get("pid") != process_identity["pid"]:
         raise ContractError("WM_CONTEXTMENU root HWND PID does not match Popen identity")
-    if float(root_identity.get("create_time")) != float(process_identity["create_time"]):
+    try:
+        same_create_time = float(root_identity.get("create_time")) == float(process_identity["create_time"])
+    except (TypeError, ValueError) as exc:
+        raise ContractError("WM_CONTEXTMENU root HWND create-time is not valid") from exc
+    if not same_create_time:
         raise ContractError("WM_CONTEXTMENU root HWND create-time does not match Popen identity")
     if not _same_path(root_identity.get("executable", ""), executable):
         raise ContractError("WM_CONTEXTMENU root HWND executable does not match package executable")
-    x, y = point if point is not None else _row_center(selected_row)
-    rectangle = selected_row.rectangle()
-    if not (int(rectangle.left) < x < int(rectangle.right) and int(rectangle.top) < y < int(rectangle.bottom)):
-        raise ContractError("WM_CONTEXTMENU point is not strictly inside the selected row rectangle")
-    if not (-32768 <= x <= 32767 and -32768 <= y <= 32767):
-        raise ContractError("WM_CONTEXTMENU screen point cannot be represented by LPARAM coordinates")
-    lparam = ((y & 0xFFFF) << 16) | (x & 0xFFFF)
-    return hwnd, WM_CONTEXTMENU, hwnd, lparam
+    # Win32 documents -1 as the keyboard-originating LPARAM sentinel.
+    return hwnd, WM_CONTEXTMENU, hwnd, -1
 
 
 def _post_message_windows(hwnd: int, message: int, wparam: int, lparam: int) -> bool:
@@ -324,20 +366,15 @@ def _post_message_windows(hwnd: int, message: int, wparam: int, lparam: int) -> 
     return bool(post_message(hwnd, message, wparam, lparam))
 
 
-def post_context_menu(
+def post_keyboard_context_menu(
     main_window: Any,
-    selected_row: Any,
     process_identity: dict[str, Any],
     root_identity: dict[str, Any],
     executable: str | Path,
-    *,
     post_message: Any | None = None,
-    point: tuple[int, int] | None = None,
 ) -> None:
-    """Post exactly one bounded WM_CONTEXTMENU message to the owned root HWND."""
-    args = context_message_args(
-        main_window, selected_row, process_identity, root_identity, executable, point=point
-    )
+    """Post exactly one keyboard-reason WM_CONTEXTMENU to the owned root HWND."""
+    args = keyboard_context_message_args(main_window, process_identity, root_identity, executable)
     transport = post_message or _post_message_windows
     if not transport(*args):
         raise BlockedError("PostMessageW(WM_CONTEXTMENU) failed")
@@ -555,6 +592,15 @@ def _capture(main_window: Any, output: Path, filename: str) -> str | None:
         return None
 
 
+def _fixtures_unchanged(fixtures: Sequence[Path], fixture_hashes: dict[str, dict[str, Any]]) -> bool:
+    return all(
+        path.is_file()
+        and path.stat().st_size == fixture_hashes[path.name]["size"]
+        and _sha256(path) == fixture_hashes[path.name]["sha256"]
+        for path in fixtures
+    )
+
+
 def _cleanup(process: Any, temp_root: Path | None) -> tuple[bool, list[str]]:
     errors: list[str] = []
     stopped = process is None
@@ -608,12 +654,18 @@ def inspect_context_menu(
     fixture_hashes: dict[str, dict[str, Any]],
     report: dict[str, Any],
 ) -> None:
-    """Perform the opt-in SelectionItem/context-menu observation only."""
+    """Perform the opt-in SelectionItem/keyboard-context-menu observation only."""
+    focus_evidence = focus_owned_row(rows[0], expected_rows[0], process_identity["pid"])
     selected = select_exact_rows(rows, expected_rows, process_identity["pid"])
+    focus_after_selection = verify_owned_row_focus(rows[0], expected_rows[0], process_identity["pid"])
     report["context_menu"] = {
+        "focused_row": focus_evidence,
+        "focus_verified_before_post": focus_after_selection,
         "selected_rows": selected,
         "menu_items_invoked": False,
-        "transport": "PostMessageW(WM_CONTEXTMENU)",
+        "transport": "PostMessageW(WM_CONTEXTMENU) keyboard-reason LPARAM=-1",
+        "reason": "keyboard",
+        "message_lparam": -1,
     }
 
     baseline_menus = _owned_context_menus(desktop, main_window, process_identity["pid"])
@@ -625,7 +677,7 @@ def inspect_context_menu(
     hwnd = int(getattr(main_window.element_info, "handle", 0) or 0)
     root_identity = _window_process_identity(hwnd, psutil)
     _verify_process_identity(process, psutil, process_identity, executable)
-    post_context_menu(main_window, rows[0], process_identity, root_identity, executable)
+    post_keyboard_context_menu(main_window, process_identity, root_identity, executable)
     report["context_menu"]["root_identity"] = root_identity
     report["context_menu"]["message_posted_once"] = True
 
@@ -666,12 +718,7 @@ def inspect_context_menu(
         retained_states = [_selection_state(row) for row in after_rows]
     report["context_menu"]["selection_retained"] = retained_states == [True, True, False]
 
-    unchanged = all(
-        path.is_file()
-        and path.stat().st_size == fixture_hashes[path.name]["size"]
-        and _sha256(path) == fixture_hashes[path.name]["sha256"]
-        for path in fixtures
-    )
+    unchanged = _fixtures_unchanged(fixtures, fixture_hashes)
     if not unchanged:
         raise ContractError("fixture bytes changed during context-menu inspection")
     report["context_menu"]["filesystem_unchanged"] = True
@@ -684,6 +731,8 @@ def run_inspection(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
     process = None
     temp_root: Path | None = None
     main_window = None
+    fixtures: Sequence[Path] = ()
+    fixture_hashes: dict[str, dict[str, Any]] = {}
     try:
         if not is_windows_native():
             raise BlockedError("packaged UIA inspection requires native Windows")
@@ -757,10 +806,7 @@ def run_inspection(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
         rows = _wait_for(exact_rows_ready, 30, "exact owned playlist rows")
         actual = [_window_text(row) for row in rows]
         exact_playlist_rows(actual, expected)
-        unchanged = all(
-            path.is_file() and path.stat().st_size == fixture_hashes[path.name]["size"] and _sha256(path) == fixture_hashes[path.name]["sha256"]
-            for path in fixtures
-        )
+        unchanged = _fixtures_unchanged(fixtures, fixture_hashes)
         if not unchanged:
             raise ContractError("fixture bytes changed during read-only inspection")
         report["filesystem_unchanged"] = True
@@ -795,6 +841,23 @@ def run_inspection(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
             except Exception as capture_exc:
                 report["diagnostics_error"] = repr(capture_exc)
     finally:
+        if fixtures and fixture_hashes:
+            try:
+                final_unchanged = _fixtures_unchanged(fixtures, fixture_hashes)
+                report["filesystem_unchanged_final"] = final_unchanged
+                if not final_unchanged:
+                    if report["status"] == "PASS":
+                        report["status"] = "FAIL"
+                        report["error"] = "fixture bytes changed during final verification"
+                    else:
+                        report["final_verification_error"] = "fixture bytes changed during final verification"
+            except Exception as verification_exc:
+                report["filesystem_unchanged_final"] = False
+                if report["status"] == "PASS":
+                    report["status"] = "FAIL"
+                    report["error"] = f"final fixture verification failed: {verification_exc}"
+                else:
+                    report["final_verification_error"] = repr(verification_exc)
         cleanup_verified, cleanup_errors = _cleanup(process, temp_root)
         report["cleanup"] = {
             "process_cleanup_verified": cleanup_verified,
