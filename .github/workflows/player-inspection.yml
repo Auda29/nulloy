@@ -41,11 +41,20 @@ jobs:
           if ($packages.Count -ne 1) { throw "Expected exactly one package" }
           python tools/player-inspection/inspect_player.py --package $packages[0].FullName --output evidence --source-sha 9e1b3f060e649a64c698b2a5981dbfca1d741b84 --archive-sha256 5558a6ed786051224f7dcf3228a230fa45c95959f3e363e5b06b48d446ccb833
           exit $LASTEXITCODE
+      - name: Inspect selection and context menu without invoking actions
+        shell: pwsh
+        run: |
+          $packages = @(Get-ChildItem package -Filter '*.zip' -Recurse)
+          if ($packages.Count -ne 1) { throw "Expected exactly one package" }
+          python tools/player-inspection/inspect_player.py --package $packages[0].FullName --output evidence-context --source-sha 9e1b3f060e649a64c698b2a5981dbfca1d741b84 --archive-sha256 5558a6ed786051224f7dcf3228a230fa45c95959f3e363e5b06b48d446ccb833 --inspect-context-menu
+          exit $LASTEXITCODE
       - name: Preserve inspection evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: player-inspection-${{ github.sha }}
-          path: evidence/
+          path: |
+            evidence/
+            evidence-context/
           if-no-files-found: warn
           retention-days: 14
