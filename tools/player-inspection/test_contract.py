@@ -251,6 +251,33 @@ class _CleanupProcess:
 
 
 class ContractTests(unittest.TestCase):
+    def test_main_serializes_native_report_like_artifact_and_preserves_exit_status(self):
+        import io
+        from contextlib import redirect_stdout
+
+        for status, expected_code in (("PASS", 0), ("FAIL", 1), ("BLOCKED", 2)):
+            with self.subTest(status=status), tempfile.TemporaryDirectory() as temporary:
+                output = Path(temporary)
+                rect = MODULE.wintypes.RECT(359, 235, 775, 251)
+                report = {
+                    "status": status,
+                    "context_menu": {"preflight": {"row_rect": rect}},
+                    "cleanup": {"process_cleanup_verified": True},
+                }
+                # The real inspection writes its artifact before main emits stdout.
+                MODULE._write_json(output / "inspection-report.json", report)
+                args = ["--package", str(output / "package.zip"), "--output", str(output),
+                        "--source-sha", SOURCE_SHA, "--archive-sha256", ARCHIVE_SHA]
+                stream = io.StringIO()
+                with mock.patch.object(MODULE, "run_inspection", return_value=(expected_code, report)), \
+                     redirect_stdout(stream):
+                    code = MODULE.main(args)
+                self.assertEqual(code, expected_code)
+                emitted = json.loads(stream.getvalue())
+                persisted = json.loads((output / "inspection-report.json").read_text())
+                self.assertEqual(emitted, persisted)
+                self.assertEqual(emitted["status"], status)
+
     def test_archive_mismatch_blocks_before_launch(self):
         with tempfile.TemporaryDirectory() as temporary:
             package = Path(temporary) / "package.zip"

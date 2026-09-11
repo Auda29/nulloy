@@ -1252,7 +1252,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         report = {"status": "FAIL", "error": str(exc), "error_type": type(exc).__name__}
         _write_json(output / "inspection-report.json", report)
         code = 1
-    print(json.dumps(report, sort_keys=True))
+    print(json.dumps(report, sort_keys=True, default=str))
     return code
 
 
