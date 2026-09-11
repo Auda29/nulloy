@@ -627,7 +627,7 @@ class SupervisorSubprocessTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     validate_deadline(value, "deadline")
 
-    def test_cli_uses_owned_worker_and_serializes_linux_failure(self):
+    def test_cli_uses_owned_worker_and_serializes_invalid_hwnd_failure(self):
         with tempfile.TemporaryDirectory() as raw:
             directory = Path(raw)
             output = directory / "cli-run"
