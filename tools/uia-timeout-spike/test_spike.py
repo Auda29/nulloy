@@ -216,7 +216,54 @@ class SupervisorSubprocessTests(unittest.TestCase):
             self.assertTrue(result.cleanup_verified)
             self.assertTrue(result.terminate_sent or result.kill_sent)
 
-    def test_output_cap_is_distinct_from_timeout(self):
+    def test_live_stderr_output_cap_fails_before_execution_deadline(self):
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            worker = self._write_worker(
+                directory,
+                """
+                import json, sys, time
+                print(json.dumps({'event': 'ready'}), flush=True)
+                sys.stderr.write('e' * 5000)
+                sys.stderr.flush()
+                time.sleep(3)
+                """,
+            )
+            output = directory / "run"
+            result = self._run(worker, output, output_cap=128, execution_timeout=0.8)
+
+            self.assertEqual(result.status, "FAIL")
+            self.assertEqual(result.failure_kind, "output_cap")
+            self.assertFalse(result.timed_out)
+            self.assertTrue(result.cleanup_verified)
+            self.assertLess(result.supervision_elapsed_s, 0.6)
+            self.assertLessEqual(len(result.stderr.encode("utf-8")), 128)
+
+    def test_timeout_remains_primary_when_final_stderr_capture_exceeds_cap(self):
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            worker = self._write_worker(
+                directory,
+                """
+                import json, signal, sys, time
+                def on_term(signum, frame):
+                    sys.stderr.write('late stderr' * 1000)
+                    sys.stderr.flush()
+                signal.signal(signal.SIGTERM, on_term)
+                print(json.dumps({'event': 'ready'}), flush=True)
+                time.sleep(3)
+                """,
+            )
+            output = directory / "run"
+            result = self._run(worker, output, output_cap=128, execution_timeout=0.05)
+
+            self.assertEqual(result.status, "TIMEOUT")
+            self.assertEqual(result.failure_kind, "timeout")
+            self.assertEqual(result.timeout_phase, "execution")
+            self.assertTrue(result.timed_out)
+            self.assertTrue(any("after timeout primary" in error for error in result.secondary_errors))
+            self.assertTrue(result.cleanup_verified)
+
         with tempfile.TemporaryDirectory() as raw:
             directory = Path(raw)
             worker = self._write_worker(
