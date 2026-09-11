@@ -211,7 +211,25 @@ class SupervisorSubprocessTests(unittest.TestCase):
             saved = json.loads((output / "result.json").read_text(encoding="utf-8"))
             self.assertEqual(saved["status"], "SUCCESS")
 
-    def test_child_exception_is_fail_and_stderr_is_captured(self):
+    def test_ready_without_result_is_fail_and_result_artifact_is_written(self):
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            worker = self._write_worker(
+                directory,
+                """
+                import json
+                print(json.dumps({'event': 'ready'}), flush=True)
+                """,
+            )
+            output = directory / "run"
+            result = self._run(worker, output)
+
+            self.assertEqual(result.status, "FAIL")
+            self.assertEqual(result.failure_kind, "child_result")
+            self.assertTrue(result.cleanup_verified)
+            saved = json.loads((output / "result.json").read_text(encoding="utf-8"))
+            self.assertEqual(saved["failure_kind"], "child_result")
+
         with tempfile.TemporaryDirectory() as raw:
             directory = Path(raw)
             worker = self._write_worker(

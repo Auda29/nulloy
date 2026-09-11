@@ -9,13 +9,25 @@ player acceptance.
 - `supervisor.py` starts the exact owned `worker.py` with the current
   `sys.executable`, `shell=False`, `stdin=DEVNULL`, and no inherited output
   pipes. It records stdout and stderr in `stdout.txt` and `stderr.txt`.
+  `run_supervised(worker_script=...)` remains a trusted test-only API seam for
+  real child-process fixtures; it is not a security sandbox. The operational
+  CLI has no worker replacement option and always launches the owned helper.
 - Readiness, execution, terminate, and kill/wait stages all have finite,
   independently validated deadlines. `TIMEOUT` and `FAIL` remain distinct;
-  success is impossible when cleanup cannot be verified.
+  success is impossible when cleanup cannot be verified. Post-spawn diagnostic,
+  wait, final-capture, and result-write failures are serialized as structured
+  failures when possible; the primary error is retained separately from
+  secondary cleanup/evidence errors.
+- Both stdout and stderr are polled while the child is live. Crossing
+  `output_cap` fails promptly and retained diagnostics are capped. This is a
+  polling containment limit, not a hard disk quota: a child can overshoot
+  between polls, and it does not bound a synchronous UIA/COM call.
 - The worker accepts one positive exact `HWND`, `PID`, process `create_time`,
   and executable path. It validates the native HWND owner PID using typed,
-  pointer-sized Win64 API declarations, then validates the exact psutil
-  identity before and after the UIA query.
+  pointer-sized Win64 API declarations both before and after the UIA
+  traversal, then validates the exact psutil identity before and after the
+  UIA query. The post-query HWND check is a race detector, not atomic HWND
+  ownership proof.
 - The worker sets `sys.coinit_flags = 0` before importing pywinauto/comtypes,
   as recommended for a windowless MTA UIA client. COM wrappers never leave the
   worker; the result is JSON primitives only.
@@ -29,9 +41,6 @@ player acceptance.
 - The parent timeout begins after `Popen` returns. Python subprocess timeout
   arguments do not bound OS process creation; `spawn_elapsed_s` is recorded
   explicitly instead of claiming an absolute wall-clock bound.
-- `--worker-script` exists only as a hidden test injection seam. The normal
-  CLI always uses the owned worker. The deliberately stalled workers in the
-  Linux tests are injected fixtures, not COM-hang evidence.
 
 ## Linux test result (partial by design)
 
@@ -44,16 +53,18 @@ python -m unittest -v test_spike.py
 Observed on the Linux development environment:
 
 ```text
-Ran 7 tests in 0.382s
+Ran 12 tests in 1.2s
 OK
 ```
 
-These are real subprocess tests covering a successful worker protocol, child
-exception/nonzero exit, stall before readiness, stall after readiness and
-finite cleanup, output-cap failure distinct from timeout, deadline validation,
-and CLI JSON serialization. They do not validate Windows APIs, COM apartment
-behavior, pywinauto 0.6.9, a native Qt fixture, the Nulloy player, or player
-acceptance.
+These are real subprocess tests covering a successful worker protocol, missing
+child result, child exception/nonzero exit, stall before readiness, stall after
+readiness and finite cleanup, live stdout/stderr output-cap failure distinct
+from timeout, timeout-primary preservation, diagnostic/wait/result-write
+failure containment, deadline validation, owned-worker CLI JSON serialization,
+and rejection of script replacement. The worker identity regression uses a
+synthetic native-PID change around a fake traversal: it validates the race
+detector, not Windows ABI or native HWND behavior.
 
 For the later disposable Windows experiment, install the pinned compatible
 runtime (`pywinauto==0.6.9` and `psutil`), start a harmless owned Qt fixture,
