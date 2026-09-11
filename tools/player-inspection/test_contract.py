@@ -17,16 +17,68 @@ SPEC.loader.exec_module(MODULE)
 
 SOURCE_SHA = "9e1b3f060e649a64c698b2a5981dbfca1d741b84"
 ARCHIVE_SHA = "5" * 64
+QMENU_AUTOMATION_ID = "QtSingleApplication.QMenu"
+QMENU_ITEMS = {
+    "Remove From Playlist": "QtSingleApplication.QMenu.RemoveFromPlaylistAction",
+    "Move To Trash": "QtSingleApplication.QMenu.MoveToTrashAction",
+}
+
+
+def _observed_qmenu(pid=4242, *, visible=True, handle=328542, runtime_id=None, children=None):
+    if runtime_id is None:
+        runtime_id = [42, handle]
+    if children is None:
+        children = [
+            _FakeMenuItem(
+                "Reveal in File Manager...",
+                [42, handle, 4, -2147483614],
+                "QtSingleApplication.QMenu.RevealInFileManagerAction",
+            ),
+            _FakeMenuItem(
+                "Remove From Playlist",
+                [42, handle, 4, -2147483613],
+                QMENU_ITEMS["Remove From Playlist"],
+            ),
+            _FakeMenuItem(
+                "Move To Trash",
+                [42, handle, 4, -2147483612],
+                QMENU_ITEMS["Move To Trash"],
+            ),
+            _FakeMenuItem(
+                "Tag Editor",
+                [42, handle, 4, -2147483611],
+                "QtSingleApplication.QMenu.TagEditorAction",
+            ),
+        ]
+    return _FakeSurface(
+        "NulloyFork",
+        pid=pid,
+        control_type="Pane",
+        visible=visible,
+        children=children,
+        runtime_id=runtime_id,
+        handle=handle,
+        class_name="QMenu",
+        automation_id=QMENU_AUTOMATION_ID,
+    )
 
 
 class _FakeInfo:
-    def __init__(self, name, pid=4242, handle=None, control_type="ListItem"):
+    def __init__(
+        self,
+        name,
+        pid=4242,
+        handle=None,
+        control_type="ListItem",
+        class_name="",
+        automation_id="",
+    ):
         self.name = name
         self.process_id = pid
         self.handle = handle
         self.control_type = control_type
-        self.class_name = ""
-        self.automation_id = ""
+        self.class_name = class_name
+        self.automation_id = automation_id
         self.runtime_id = [pid, id(self)]
 
 
@@ -103,13 +155,22 @@ class _FakeMainWindow:
 
 
 class _FakeMenuItem:
-    def __init__(self, name, runtime_id):
-        self.element_info = _FakeInfo(name, pid=4242, control_type="MenuItem")
+    def __init__(self, name, runtime_id, automation_id=""):
+        self.element_info = _FakeInfo(
+            name,
+            pid=4242,
+            control_type="MenuItem",
+            class_name="NAction",
+            automation_id=automation_id,
+        )
         self.element_info.runtime_id = runtime_id
         self._name = name
 
     def window_text(self):
         return self._name
+
+    def descendants(self):
+        return []
 
 
 class _FakeSurface:
@@ -122,8 +183,18 @@ class _FakeSurface:
         visible=True,
         children=(),
         runtime_id=None,
+        handle=None,
+        class_name="",
+        automation_id="",
     ):
-        self.element_info = _FakeInfo(name, pid=pid, control_type=control_type)
+        self.element_info = _FakeInfo(
+            name,
+            pid=pid,
+            handle=handle,
+            control_type=control_type,
+            class_name=class_name,
+            automation_id=automation_id,
+        )
         if runtime_id is not None:
             self.element_info.runtime_id = runtime_id
         self._visible = visible
@@ -398,8 +469,8 @@ class ContractTests(unittest.TestCase):
 
     def test_menu_recognition_accepts_exact_entries_with_narrow_shortcut_suffix(self):
         items = [
-            _FakeMenuItem("Move To Trash\tShift+Del", [1]),
-            _FakeMenuItem("Remove From Playlist", [2]),
+            _FakeMenuItem("Move To Trash\tShift+Del", [1], QMENU_ITEMS["Move To Trash"]),
+            _FakeMenuItem("Remove From Playlist", [2], QMENU_ITEMS["Remove From Playlist"]),
         ]
 
         recognized = MODULE.recognize_context_menu_items(items)
@@ -414,11 +485,147 @@ class ContractTests(unittest.TestCase):
         with self.assertRaises(MODULE.ContractError):
             MODULE.recognize_context_menu_items(
                 [
-                    _FakeMenuItem("Move To Trash", [1]),
-                    _FakeMenuItem("Move To Trash", [2]),
-                    _FakeMenuItem("Remove From Playlist", [3]),
+                    _FakeMenuItem("Move To Trash", [1], QMENU_ITEMS["Move To Trash"]),
+                    _FakeMenuItem("Move To Trash", [2], QMENU_ITEMS["Move To Trash"]),
+                    _FakeMenuItem("Remove From Playlist", [3], QMENU_ITEMS["Remove From Playlist"]),
                 ]
             )
+
+    def test_observed_qmenu_pane_root_is_discovered_with_four_owned_direct_items(self):
+        menu = _observed_qmenu()
+        main = _FakeSurface("main")
+
+        roots = MODULE._owned_context_menus(_FakeDesktop([main, menu]), main, 4242)
+
+        self.assertEqual(roots, [menu])
+        items = MODULE._menu_items(menu, 4242)
+        self.assertEqual(len(items), 4)
+        recognized = MODULE.recognize_context_menu_items(items)
+        self.assertEqual(
+            {item["label"]: item["record"]["automation_id"] for item in recognized},
+            QMENU_ITEMS,
+        )
+
+    def test_observed_qmenu_pane_validates_native_hwnd_identity(self):
+        menu = _observed_qmenu()
+        main = _FakeSurface("main")
+        identity = {"pid": 4242, "create_time": 12.5, "executable": r"C:\\Nulloy.exe"}
+
+        with mock.patch.object(MODULE, "_window_process_identity", return_value=identity) as validator:
+            roots = MODULE._owned_context_menus(
+                _FakeDesktop([main, menu]),
+                main,
+                4242,
+                process_identity=identity,
+                psutil=object(),
+                executable=Path(identity["executable"]),
+            )
+
+        self.assertEqual(roots, [menu])
+        validator.assert_called_once_with(328542, mock.ANY)
+
+    def test_observed_qmenu_pane_rejects_native_hwnd_identity_mismatch(self):
+        menu = _observed_qmenu()
+        main = _FakeSurface("main")
+        identity = {"pid": 4242, "create_time": 12.5, "executable": r"C:\\Nulloy.exe"}
+        foreign_identity = {"pid": 9999, "create_time": 12.5, "executable": r"C:\\Other.exe"}
+
+        with mock.patch.object(MODULE, "_window_process_identity", return_value=foreign_identity):
+            with self.assertRaises(MODULE.ContractError):
+                MODULE._owned_context_menus(
+                    _FakeDesktop([main, menu]),
+                    main,
+                    4242,
+                    process_identity=identity,
+                    psutil=object(),
+                    executable=Path(identity["executable"]),
+                )
+
+    def test_qmenu_pane_rejects_foreign_pid(self):
+        menu = _observed_qmenu(pid=9999)
+        main = _FakeSurface("main")
+
+        self.assertEqual(MODULE._owned_context_menus(_FakeDesktop([main, menu]), main, 4242), [])
+
+    def test_qmenu_pane_rejects_generic_or_wrong_identity_or_handle(self):
+        main = _FakeSurface("main")
+        variants = (
+            _FakeSurface("generic", handle=328542),
+            _FakeSurface("wrong-class", handle=328542, class_name="QWidget", automation_id=QMENU_AUTOMATION_ID),
+            _FakeSurface("wrong-automation", handle=328542, class_name="QMenu", automation_id="other"),
+            _FakeSurface("missing-handle", class_name="QMenu", automation_id=QMENU_AUTOMATION_ID),
+        )
+
+        for root in variants:
+            with self.subTest(root=root.element_info.name):
+                self.assertEqual(MODULE._owned_context_menus(_FakeDesktop([main, root]), main, 4242), [])
+
+    def test_qmenu_pane_rejects_hidden_root(self):
+        menu = _observed_qmenu(visible=False)
+        main = _FakeSurface("main")
+
+        self.assertEqual(MODULE._owned_context_menus(_FakeDesktop([main, menu]), main, 4242), [])
+
+    def test_qmenu_pane_deduplicates_same_runtime_id(self):
+        runtime_id = [42, 328542]
+        first = _observed_qmenu(runtime_id=runtime_id)
+        duplicate = _observed_qmenu(runtime_id=runtime_id)
+        popup = _FakeSurface("popup", children=[first, duplicate])
+        main = _FakeSurface("main")
+
+        self.assertEqual(MODULE._owned_context_menus(_FakeDesktop([main, popup]), main, 4242), [first])
+
+    def test_qmenu_pane_rejects_multiple_distinct_roots(self):
+        first = _observed_qmenu(runtime_id=[42, 328542])
+        second = _observed_qmenu(handle=328543, runtime_id=[42, 328543])
+        popup = _FakeSurface("popup", children=[first, second])
+        main = _FakeSurface("main")
+
+        with self.assertRaises(MODULE.ContractError):
+            MODULE._owned_context_menus(_FakeDesktop([main, popup]), main, 4242)
+
+    def test_qmenu_items_require_exact_automation_ids(self):
+        menu = _observed_qmenu(
+            children=[
+                _FakeMenuItem("Move To Trash", [1], "wrong.MoveToTrashAction"),
+                _FakeMenuItem("Remove From Playlist", [2], QMENU_ITEMS["Remove From Playlist"]),
+            ]
+        )
+
+        with self.assertRaises(MODULE.ContractError):
+            MODULE.recognize_context_menu_items(MODULE._menu_items(menu, 4242))
+
+    def test_qmenu_items_reject_duplicate_exact_entries(self):
+        menu = _observed_qmenu(
+            children=[
+                _FakeMenuItem("Move To Trash", [1], QMENU_ITEMS["Move To Trash"]),
+                _FakeMenuItem("Move To Trash", [2], QMENU_ITEMS["Move To Trash"]),
+                _FakeMenuItem("Remove From Playlist", [3], QMENU_ITEMS["Remove From Playlist"]),
+            ]
+        )
+
+        with self.assertRaises(MODULE.ContractError):
+            MODULE.recognize_context_menu_items(MODULE._menu_items(menu, 4242))
+
+    def test_qmenu_wait_rejects_stale_baseline_root(self):
+        menu = _observed_qmenu()
+        main = _FakeSurface("main")
+        identity = {"pid": 4242}
+
+        with mock.patch.object(MODULE, "_verify_process_identity"), mock.patch.object(
+            MODULE.time, "monotonic", side_effect=[0, 0, 1]
+        ), mock.patch.object(MODULE.time, "sleep"):
+            with self.assertRaises(RuntimeError):
+                MODULE._wait_for_context_menu(
+                    _FakeDesktop([main, menu]),
+                    main,
+                    process=None,
+                    psutil=None,
+                    identity=identity,
+                    executable=Path("Nulloy.exe"),
+                    baseline_keys={MODULE._runtime_key(menu)},
+                    timeout=0.1,
+                )
 
     def test_owned_menu_discovery_reaches_menu_below_owned_popup_pane(self):
         menu = _FakeSurface("context", control_type="Menu")

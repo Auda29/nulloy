@@ -45,6 +45,12 @@ PLAYLIST_CLASS = "NPlaylistWidget"
 PLAYLIST_AUTOMATION_ID = "QtSingleApplication.mainWindow.borderWidget.splitter.playlistWidget"
 WM_CONTEXTMENU = 0x007B
 _MENU_LABELS = ("Move To Trash", "Remove From Playlist")
+_MENU_AUTOMATION_IDS = {
+    "Move To Trash": "QtSingleApplication.QMenu.MoveToTrashAction",
+    "Remove From Playlist": "QtSingleApplication.QMenu.RemoveFromPlaylistAction",
+}
+_CONTEXT_QMENU_CLASS = "QMenu"
+_CONTEXT_QMENU_AUTOMATION_ID = "QtSingleApplication.QMenu"
 _SHORTCUT_KEY = r"(?:Del|Delete|Backspace|Ins|Insert|Home|End|PageUp|PageDown|Left|Right|Up|Down|F(?:[1-9]|1[0-2])|[A-Za-z0-9])"
 _SHORTCUT_RE = re.compile(
     rf"(?:(?:Ctrl|Alt|Shift|Meta|Win)\+)*{_SHORTCUT_KEY}$"
@@ -526,8 +532,9 @@ def recognize_context_menu_items(items: Sequence[Any]) -> list[dict[str, Any]]:
     """Recognize two distinct exact menu entries without invoking either one."""
     recognized: list[dict[str, Any]] = []
     for item in items:
+        info = item.element_info
         label = _menu_label(item)
-        if label:
+        if label and getattr(info, "automation_id", "") == _MENU_AUTOMATION_IDS[label]:
             recognized.append({"label": label, "record": _control_record(item)})
     counts = {label: sum(entry["label"] == label for entry in recognized) for label in _MENU_LABELS}
     if any(count != 1 for count in counts.values()):
@@ -593,23 +600,72 @@ def _owned_context_menu_candidates(desktop: Any, main_window: Any, process_pid: 
     return candidates
 
 
-def _owned_context_menus(desktop: Any, main_window: Any, process_pid: int) -> list[Any]:
+def _is_observed_qmenu_pane(control: Any) -> bool:
+    info = control.element_info
+    if (
+        getattr(info, "control_type", "") != "Pane"
+        or getattr(info, "class_name", "") != _CONTEXT_QMENU_CLASS
+        or getattr(info, "automation_id", "") != _CONTEXT_QMENU_AUTOMATION_ID
+    ):
+        return False
+    handle = getattr(info, "handle", None)
+    return isinstance(handle, int) and not isinstance(handle, bool) and handle > 0
+
+
+def _validate_observed_qmenu_hwnd(
+    control: Any,
+    process_pid: int,
+    process_identity: dict[str, Any] | None,
+    psutil: Any | None,
+    executable: Path | None,
+) -> None:
+    """Validate the alternate QMenu root's native HWND when identity is available."""
+    if process_identity is None or psutil is None or executable is None:
+        return
+    handle = int(control.element_info.handle)
+    native = _window_process_identity(handle, psutil)
+    if (
+        native.get("pid") != process_pid
+        or float(native.get("create_time")) != float(process_identity["create_time"])
+        or not _same_path(native.get("executable", ""), executable)
+    ):
+        raise ContractError("observed QMenu HWND identity does not match the owned player")
+
+
+def _owned_context_menus(
+    desktop: Any,
+    main_window: Any,
+    process_pid: int,
+    *,
+    process_identity: dict[str, Any] | None = None,
+    psutil: Any | None = None,
+    executable: Path | None = None,
+) -> list[Any]:
     candidates = _owned_context_menu_candidates(desktop, main_window, process_pid)
     menus: list[Any] = []
     seen: set[str] = set()
     for control in candidates:
         info = control.element_info
-        if (
+        is_menu = (
             getattr(info, "process_id", None) == process_pid
             and getattr(info, "control_type", "") == "Menu"
             and _is_visible(control)
-        ):
-            key = _runtime_key(control)
-            if key not in seen:
-                seen.add(key)
-                menus.append(control)
+        )
+        is_qmenu = (
+            getattr(info, "process_id", None) == process_pid
+            and _is_observed_qmenu_pane(control)
+            and _is_visible(control)
+        )
+        if not (is_menu or is_qmenu):
+            continue
+        if is_qmenu:
+            _validate_observed_qmenu_hwnd(control, process_pid, process_identity, psutil, executable)
+        key = _runtime_key(control)
+        if key not in seen:
+            seen.add(key)
+            menus.append(control)
     if len(menus) > 1:
-        raise ContractError(f"unexpected count of owned visible Menu roots: {len(menus)}")
+        raise ContractError(f"unexpected count of owned visible context-menu roots: {len(menus)}")
     return menus
 
 
@@ -710,7 +766,14 @@ def _wait_for_context_menu(
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         _verify_process_identity(process, psutil, identity, executable)
-        menus = _owned_context_menus(desktop, main_window, identity["pid"])
+        menus = _owned_context_menus(
+            desktop,
+            main_window,
+            identity["pid"],
+            process_identity=identity,
+            psutil=psutil,
+            executable=executable,
+        )
         fresh = [menu for menu in menus if _runtime_key(menu) not in baseline_keys]
         if fresh:
             if len(fresh) != 1:
@@ -858,7 +921,14 @@ def inspect_context_menu(
     if not allow_owned_pointer_input:
         report["context_menu"]["message_lparam"] = -1
 
-    baseline_menus = _owned_context_menus(desktop, main_window, process_identity["pid"])
+    baseline_menus = _owned_context_menus(
+        desktop,
+        main_window,
+        process_identity["pid"],
+        process_identity=process_identity,
+        psutil=psutil,
+        executable=executable,
+    )
     baseline_popups = _owned_visible_popups(desktop, main_window, process_identity["pid"])
     if baseline_menus or baseline_popups:
         raise ContractError("an owned Menu or popup was already visible before the context request")
