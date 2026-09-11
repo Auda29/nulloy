@@ -42,7 +42,7 @@ player acceptance.
   arguments do not bound OS process creation; `spawn_elapsed_s` is recorded
   explicitly instead of claiming an absolute wall-clock bound.
 
-## Linux test result (partial by design)
+## Test result (partial by design)
 
 Run from this directory:
 
@@ -53,7 +53,7 @@ python -m unittest -v test_spike.py
 Observed on the Linux development environment:
 
 ```text
-Ran 12 tests in 1.2s
+Ran 18 tests in 1.3s
 OK
 ```
 
@@ -61,10 +61,22 @@ These are real subprocess tests covering a successful worker protocol, missing
 child result, child exception/nonzero exit, stall before readiness, stall after
 readiness and finite cleanup, live stdout/stderr output-cap failure distinct
 from timeout, timeout-primary preservation, diagnostic/wait/result-write
-failure containment, deadline validation, owned-worker CLI JSON serialization,
-and rejection of script replacement. The worker identity regression uses a
-synthetic native-PID change around a fake traversal: it validates the race
-detector, not Windows ABI or native HWND behavior.
+failure containment, persistent and one-shot `Popen.poll()` failures, bounded
+cleanup transport failure, and injected terminate-to-kill fallback on a real
+child, deadline validation, owned-worker CLI JSON
+serialization, and rejection of script replacement. The final stderr cap test
+has both a real POSIX signal-handler fixture and a portable synthetic
+final-read seam; the signal-handler test is skipped on Windows. The owned CLI
+test uses `HWND=0`, so validation fails before any native query and returns 1
+on every OS; its diagnostic is platform-specific (the Linux worker guard or
+the Windows positive-integer validation).
+
+The supervisor never leaves a `Popen.poll()` exception unhandled. Cleanup
+assumes a live child when inspection fails, makes finite terminate/wait and
+kill/wait attempts, and uses a cached return code only as post-wait evidence.
+An unverified cleanup is serialized as `FAIL` with `cleanup_verified=false`,
+including when the primary failure was a timeout. A timeout remains the
+failure kind and primary error when cleanup evidence is only secondary.
 
 For the later disposable Windows experiment, install the pinned compatible
 runtime (`pywinauto==0.6.9` and `psutil`), start a harmless owned Qt fixture,
