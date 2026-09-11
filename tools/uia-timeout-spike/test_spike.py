@@ -241,6 +241,68 @@ class SupervisorSubprocessTests(unittest.TestCase):
             self.assertTrue(any("one-shot injected poll failure" in error for error in result.secondary_errors))
             self.assertIsNotNone(captured["process"].poll())
 
+    def test_cleanup_transport_failure_is_structured_fail_not_timeout_success(self):
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            worker = self._write_worker(
+                directory,
+                """
+                import json, time
+                print(json.dumps({'event': 'ready'}), flush=True)
+                time.sleep(3)
+                """,
+            )
+            output = directory / "run"
+            import supervisor
+
+            captured = {}
+            real_popen = supervisor.subprocess.Popen
+
+            class CleanupTransportFailure:
+                def __init__(self, process):
+                    self.process = process
+
+                def poll(self):
+                    return self.process.poll()
+
+                def terminate(self):
+                    raise OSError("injected terminate transport failure")
+
+                def kill(self):
+                    raise OSError("injected kill transport failure")
+
+                def wait(self, *args, **kwargs):
+                    raise OSError("injected wait transport failure")
+
+                def __getattr__(self, name):
+                    return getattr(self.process, name)
+
+            def capture_popen(*args, **kwargs):
+                process = real_popen(*args, **kwargs)
+                captured["process"] = process
+                return CleanupTransportFailure(process)
+
+            try:
+                with mock.patch.object(supervisor.subprocess, "Popen", side_effect=capture_popen):
+                    result = self._run(worker, output, execution_timeout=0.05)
+            finally:
+                process = captured.get("process")
+                if process is not None and process.poll() is None:
+                    process.terminate()
+                    try:
+                        process.wait(timeout=1.0)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait(timeout=1.0)
+
+            self.assertEqual(result.status, "FAIL")
+            self.assertEqual(result.failure_kind, "timeout")
+            self.assertFalse(result.cleanup_verified)
+            self.assertTrue(any("terminate transport failure" in error for error in result.secondary_errors))
+            self.assertTrue(any("kill transport failure" in error for error in result.secondary_errors))
+            self.assertTrue(any("wait transport failure" in error for error in result.secondary_errors))
+            self.assertTrue((output / "result.json").is_file())
+
     @unittest.skipUnless(os.name != "nt", "SIGTERM-resistant cleanup fallback is POSIX-specific")
     def test_unexpected_wait_failure_still_reaches_kill_fallback(self):
         with tempfile.TemporaryDirectory() as raw:
@@ -422,7 +484,8 @@ class SupervisorSubprocessTests(unittest.TestCase):
             self.assertLess(result.supervision_elapsed_s, 0.6)
             self.assertLessEqual(len(result.stderr.encode("utf-8")), 128)
 
-    def test_timeout_remains_primary_when_final_stderr_capture_exceeds_cap(self):
+    @unittest.skipUnless(os.name != "nt", "signal-handler late stderr fixture is POSIX-specific")
+    def test_timeout_remains_primary_when_posix_final_stderr_capture_exceeds_cap(self):
         with tempfile.TemporaryDirectory() as raw:
             directory = Path(raw)
             worker = self._write_worker(
@@ -447,6 +510,40 @@ class SupervisorSubprocessTests(unittest.TestCase):
             self.assertTrue(any("after timeout primary" in error for error in result.secondary_errors))
             self.assertTrue(result.cleanup_verified)
 
+    def test_timeout_primary_preserved_when_synthetic_final_stderr_capture_exceeds_cap(self):
+        """Synthetic final-read seam keeps timeout precedence portable."""
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            worker = self._write_worker(
+                directory,
+                """
+                import json, time
+                print(json.dumps({'event': 'ready'}), flush=True)
+                time.sleep(3)
+                """,
+            )
+            output = directory / "run"
+            import supervisor
+
+            real_final_read = supervisor._read_final_stream
+
+            def synthetic_final_read(path, cap, label):
+                data, capped, error = real_final_read(path, cap, label)
+                if label == "stderr":
+                    return data + (b"late synthetic stderr" * 1000), True, error
+                return data, capped, error
+
+            with mock.patch.object(supervisor, "_read_final_stream", side_effect=synthetic_final_read):
+                result = self._run(worker, output, output_cap=128, execution_timeout=0.05)
+
+            self.assertEqual(result.status, "TIMEOUT")
+            self.assertEqual(result.failure_kind, "timeout")
+            self.assertEqual(result.timeout_phase, "execution")
+            self.assertTrue(result.timed_out)
+            self.assertTrue(any("after timeout primary" in error for error in result.secondary_errors))
+            self.assertTrue(result.cleanup_verified)
+
+    def test_live_stdout_output_cap_remains_cross_platform(self):
         with tempfile.TemporaryDirectory() as raw:
             directory = Path(raw)
             worker = self._write_worker(
@@ -483,7 +580,7 @@ class SupervisorSubprocessTests(unittest.TestCase):
                     "--output-dir",
                     str(output),
                     "--hwnd",
-                    "0x10",
+                    "0",
                     "--pid",
                     "1234",
                     "--create-time",
@@ -503,11 +600,16 @@ class SupervisorSubprocessTests(unittest.TestCase):
                 check=False,
             )
 
-            self.assertEqual(completed.returncode, 1 if os.name != "nt" else 0)
+            self.assertEqual(completed.returncode, 1)
             cli_result = json.loads(completed.stdout)
-            if os.name != "nt":
-                self.assertEqual(cli_result["status"], "FAIL")
-                self.assertEqual(cli_result["failure_kind"], "child_exit")
+            self.assertEqual(cli_result["status"], "FAIL")
+            self.assertEqual(cli_result["failure_kind"], "child_exit")
+            expected_diagnostic = (
+                "hwnd must be a positive integer"
+                if os.name == "nt"
+                else "native UIA worker requires Windows"
+            )
+            self.assertIn(expected_diagnostic, cli_result["stderr"])
             self.assertTrue((output / "result.json").is_file())
 
     def test_cli_rejects_worker_script_replacement_option(self):
