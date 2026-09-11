@@ -5018,5 +5018,132 @@
     "verification_passed": true,
     "count_scope_note": "point-in-time after cleanup; new small artifacts created since then mean this is not a current total.",
     "retained_scope_note": "Other retained artifacts, including critical package IDs and evidence, were not targeted."
+  },
+  "native_windows_timeout_contract_milestone": {
+    "status": "verified_windows_supervisor_qt_fixture_contracts",
+    "run": 34595596113,
+    "run_url": "https://github.com/Auda29/nulloy/actions/runs/34595596113",
+    "workflow_head_sha": "ca49815db8db16b8704cc82f89336e09f8ed2d70",
+    "branch": "test/windows-uia-timeout-native",
+    "reviewed_commits": {
+      "supervisor": "68cdc90f369d6c5f507c81cf757befb509dbfeb9",
+      "qt_fixture": "b7d228e885841cb796ed9d31fa79526864dba031",
+      "assembled_native": "ca49815db8db16b8704cc82f89336e09f8ed2d70"
+    },
+    "platform": {
+      "runner": "Windows-2022",
+      "reported_os": "Windows-10-10.0.20348-SP0",
+      "python": "3.11.9",
+      "pyside": "6.8.2",
+      "qt": "6.8.2",
+      "psutil": "7.0.0"
+    },
+    "supervisor": {
+      "tests_run": 18,
+      "passed": 16,
+      "posix_only_skipped": 2,
+      "unexpected_skipped": 0
+    },
+    "qt_fixture": {
+      "tests_run": 4,
+      "passed": 4,
+      "skipped": 0
+    },
+    "script_sha256": {
+      "tools\\uia-timeout-spike\\supervisor.py": "6f62c97553a6e513a597bf6a53680a36c9dec9852a8cccb5ab1100744a6737d3",
+      "tools\\uia-timeout-spike\\test_spike.py": "09c51e8abd8d0e9e9e7c48d7f4bd84fd18c84adf1c292ffda2066a6b20ce3360",
+      "tools\\uia-timeout-spike\\worker.py": "0b70bfc373904dee5bf96d86da1e6aeb8f55d1f62980c75b2657bdb6ec83d3c0",
+      "tools\\uia-timeout-fixture\\fixture.py": "50109c32c39bd7863e0273e197e1170299b0f8bdb720251a1b462e251d187da0",
+      "tools\\uia-timeout-fixture\\test_fixture.py": "f4c6a39fb04771b2d35112c9562c08ea997cfc1e51f8c9523351676761905090"
+    },
+    "hashes_verified": true,
+    "native_uia_query_executed": false,
+    "player_started": false,
+    "hwnd_zero_guard_rejected_before_query": true,
+    "synthetic_pid_is_not_native_query": true,
+    "player_package_present": false,
+    "final_combined_acceptance": false,
+    "open_gates": {
+      "com_query": "not_executed",
+      "release": "not_authorized"
+    },
+    "evidence": [
+      "/home/hermes/workspace/nulloy-status-current/uia-timeout-contracts-34595596113/parent-verification.json",
+      "/home/hermes/workspace/nulloy-status-current/uia-timeout-spike/native-contracts-verdict-ca49815.md"
+    ]
+  },
+  "player_observation_hardening_milestone": {
+    "status": "verified_green_isolated_observation",
+    "run": 34589940677,
+    "run_url": "https://github.com/Auda29/nulloy/actions/runs/34589940677",
+    "inspector_commit": "4ab11fa4eb11ebd6844fc8290b8d362085da1b6d",
+    "contracts_passed": 60,
+    "reports": 2,
+    "package_build_run": 34572047079,
+    "package_build_commit": "9e1b3f060e649a64c698b2a5981dbfca1d741b84",
+    "scope": "isolated integration plus PR15; not the final combined PR15/24/29 package",
+    "qt6_zip_sha256": "5558a6ed786051224f7dcf3228a230fa45c95959f3e363e5b06b48d446ccb833",
+    "qt6_exe_sha256": "d7d622c3a0afe88657fa108bebf72f7bfdc69777c9f1f626fe3fe26e589315f9",
+    "runtime_script_sha256": "fdab3f890ee1c56af0f57868310779b57bd4f6640970e10298c78741aab0ee05",
+    "stdout_matches_artifacts": true,
+    "provenance_verified": true,
+    "no_menu_invocation": true,
+    "final_fixture_preservation": true,
+    "cleanup_verified": true,
+    "selection": {
+      "rows_selected": 2,
+      "rows_total": 3,
+      "retained_after_guarded_right_click": true,
+      "input_count": 2
+    },
+    "prior_53_contract_milestone": {
+      "run": 34584964888,
+      "inspector_commit": "5cf2973242321053cd4c793e6518138828baead1",
+      "contracts_passed": 53
+    },
+    "final_combined_acceptance": false,
+    "open_gates": {
+      "pr15_native_trash_matrix": "open",
+      "pr24_explorer": "open",
+      "pr16_dpi_window": "open",
+      "macos_original": "open",
+      "release": "not_authorized"
+    },
+    "evidence": [
+      "/home/hermes/workspace/nulloy-status-current/player-observation-hardening-verdict-4ab11fa.md",
+      "/home/hermes/workspace/nulloy-status-current/player-inspection-34589940677/parent-verification.json"
+    ]
+  },
+  "pr30_timeout_contracts_followup": {
+    "source_fetched_at": "2026-09-11T11:50:53.817380+00:00",
+    "pr30": {
+      "state": "OPEN",
+      "isDraft": true,
+      "headRefOid": "c2405a0375b23dfdc3561a5bdd7a1eb56a812902"
+    },
+    "runs": {
+      "windows_qt5_qt6": {
+        "id": 34588893748,
+        "conclusion": "success",
+        "headSha": "c2405a0375b23dfdc3561a5bdd7a1eb56a812902"
+      },
+      "linux": {
+        "id": 34588893721,
+        "conclusion": "success",
+        "headSha": "c2405a0375b23dfdc3561a5bdd7a1eb56a812902"
+      }
+    },
+    "refs": {
+      "integration_upstream_issues": "919468efc32f4d038c96d7276a799794dab2e86e",
+      "master": "027d81a583b07457a4fa5f18b3e7dcca50b05b58"
+    },
+    "scope": "PR30 CI branch only; not combined end-package acceptance",
+    "windows_matrix_serialization_unchanged": true,
+    "new_pr30_package_hash_acceptance": false,
+    "final_combined_acceptance": false,
+    "open_gates": {
+      "release": "not_authorized"
+    },
+    "evidence": "/home/hermes/workspace/nulloy-status-current/native-timeout-register-live.json"
   }
 }

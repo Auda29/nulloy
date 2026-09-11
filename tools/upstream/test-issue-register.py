@@ -233,6 +233,151 @@ class IssueRegister(unittest.TestCase):
                 with self.assertRaises(AssertionError):
                     self._assert_context_menu_milestone_contract(mutated)
 
+    def test_reviewed_windows_timeout_contract_milestone_is_exact_and_bounded(self):
+        milestone = self.data['native_windows_timeout_contract_milestone']
+        self.assertEqual(milestone['status'], 'verified_windows_supervisor_qt_fixture_contracts')
+        self.assertEqual(milestone['run'], 34595596113)
+        self.assertEqual(milestone['workflow_head_sha'],
+                         'ca49815db8db16b8704cc82f89336e09f8ed2d70')
+        self.assertEqual(milestone['branch'], 'test/windows-uia-timeout-native')
+        self.assertEqual(milestone['reviewed_commits'], {
+            'supervisor': '68cdc90f369d6c5f507c81cf757befb509dbfeb9',
+            'qt_fixture': 'b7d228e885841cb796ed9d31fa79526864dba031',
+            'assembled_native': 'ca49815db8db16b8704cc82f89336e09f8ed2d70',
+        })
+        self.assertEqual(milestone['platform'], {
+            'runner': 'Windows-2022',
+            'reported_os': 'Windows-10-10.0.20348-SP0',
+            'python': '3.11.9',
+            'pyside': '6.8.2',
+            'qt': '6.8.2',
+            'psutil': '7.0.0',
+        })
+        self.assertEqual(milestone['supervisor'], {
+            'tests_run': 18,
+            'passed': 16,
+            'posix_only_skipped': 2,
+            'unexpected_skipped': 0,
+        })
+        self.assertEqual(milestone['qt_fixture'], {
+            'tests_run': 4,
+            'passed': 4,
+            'skipped': 0,
+        })
+        self.assertEqual(milestone['script_sha256'], {
+            'tools\\uia-timeout-spike\\supervisor.py':
+                '6f62c97553a6e513a597bf6a53680a36c9dec9852a8cccb5ab1100744a6737d3',
+            'tools\\uia-timeout-spike\\test_spike.py':
+                '09c51e8abd8d0e9e9e7c48d7f4bd84fd18c84adf1c292ffda2066a6b20ce3360',
+            'tools\\uia-timeout-spike\\worker.py':
+                '0b70bfc373904dee5bf96d86da1e6aeb8f55d1f62980c75b2657bdb6ec83d3c0',
+            'tools\\uia-timeout-fixture\\fixture.py':
+                '50109c32c39bd7863e0273e197e1170299b0f8bdb720251a1b462e251d187da0',
+            'tools\\uia-timeout-fixture\\test_fixture.py':
+                'f4c6a39fb04771b2d35112c9562c08ea997cfc1e51f8c9523351676761905090',
+        })
+        self.assertTrue(milestone['hashes_verified'])
+        self.assertFalse(milestone['native_uia_query_executed'])
+        self.assertFalse(milestone['player_started'])
+        self.assertTrue(milestone['hwnd_zero_guard_rejected_before_query'])
+        self.assertTrue(milestone['synthetic_pid_is_not_native_query'])
+        self.assertFalse(milestone['player_package_present'])
+        self.assertFalse(milestone['final_combined_acceptance'])
+        self.assertEqual(milestone['open_gates']['com_query'], 'not_executed')
+        self.assertEqual(milestone['open_gates']['release'], 'not_authorized')
+
+    def test_player_observation_sixty_contract_milestone_is_exact_and_keeps_prior_53(self):
+        milestone = self.data['player_observation_hardening_milestone']
+        self.assertEqual(milestone['status'], 'verified_green_isolated_observation')
+        self.assertEqual(milestone['run'], 34589940677)
+        self.assertEqual(milestone['inspector_commit'],
+                         '4ab11fa4eb11ebd6844fc8290b8d362085da1b6d')
+        self.assertEqual(milestone['contracts_passed'], 60)
+        self.assertEqual(milestone['reports'], 2)
+        self.assertEqual(milestone['package_build_run'], 34572047079)
+        self.assertEqual(milestone['package_build_commit'],
+                         '9e1b3f060e649a64c698b2a5981dbfca1d741b84')
+        self.assertEqual(milestone['qt6_zip_sha256'],
+                         '5558a6ed786051224f7dcf3228a230fa45c95959f3e363e5b06b48d446ccb833')
+        self.assertEqual(milestone['qt6_exe_sha256'],
+                         'd7d622c3a0afe88657fa108bebf72f7bfdc69777c9f1f626fe3fe26e589315f9')
+        self.assertEqual(milestone['runtime_script_sha256'],
+                         'fdab3f890ee1c56af0f57868310779b57bd4f6640970e10298c78741aab0ee05')
+        self.assertTrue(milestone['stdout_matches_artifacts'])
+        self.assertTrue(milestone['provenance_verified'])
+        self.assertTrue(milestone['no_menu_invocation'])
+        self.assertTrue(milestone['final_fixture_preservation'])
+        self.assertTrue(milestone['cleanup_verified'])
+        self.assertEqual(milestone['selection'], {
+            'rows_selected': 2,
+            'rows_total': 3,
+            'retained_after_guarded_right_click': True,
+            'input_count': 2,
+        })
+        self.assertEqual(milestone['prior_53_contract_milestone'], {
+            'run': 34584964888,
+            'inspector_commit': '5cf2973242321053cd4c793e6518138828baead1',
+            'contracts_passed': 53,
+        })
+        self.assertFalse(milestone['final_combined_acceptance'])
+        self.assertEqual(milestone['open_gates']['pr15_native_trash_matrix'], 'open')
+        self.assertEqual(milestone['open_gates']['pr24_explorer'], 'open')
+        self.assertEqual(milestone['open_gates']['pr16_dpi_window'], 'open')
+        self.assertEqual(milestone['open_gates']['macos_original'], 'open')
+        self.assertEqual(milestone['open_gates']['release'], 'not_authorized')
+
+    def test_pr30_ci_snapshot_is_not_new_package_acceptance(self):
+        snapshot = self.data['pr30_timeout_contracts_followup']
+        self.assertEqual(snapshot['source_fetched_at'], '2026-09-11T11:50:53.817380+00:00')
+        self.assertEqual(snapshot['pr30'], {
+            'state': 'OPEN',
+            'isDraft': True,
+            'headRefOid': 'c2405a0375b23dfdc3561a5bdd7a1eb56a812902',
+        })
+        self.assertEqual(snapshot['runs'], {
+            'windows_qt5_qt6': {
+                'id': 34588893748,
+                'conclusion': 'success',
+                'headSha': 'c2405a0375b23dfdc3561a5bdd7a1eb56a812902',
+            },
+            'linux': {
+                'id': 34588893721,
+                'conclusion': 'success',
+                'headSha': 'c2405a0375b23dfdc3561a5bdd7a1eb56a812902',
+            },
+        })
+        self.assertEqual(snapshot['refs'], {
+            'integration_upstream_issues': '919468efc32f4d038c96d7276a799794dab2e86e',
+            'master': '027d81a583b07457a4fa5f18b3e7dcca50b05b58',
+        })
+        self.assertTrue(snapshot['windows_matrix_serialization_unchanged'])
+        self.assertFalse(snapshot['new_pr30_package_hash_acceptance'])
+        self.assertFalse(snapshot['final_combined_acceptance'])
+        self.assertEqual(snapshot['open_gates']['release'], 'not_authorized')
+
+    def test_new_milestone_negative_controls_reject_uia_player_and_release_claims(self):
+        import copy
+
+        def assert_no_unearned_claims(data):
+            self.assertFalse(data['native_windows_timeout_contract_milestone']['native_uia_query_executed'])
+            self.assertFalse(data['native_windows_timeout_contract_milestone']['player_package_present'])
+            self.assertTrue(data['player_observation_hardening_milestone']['no_menu_invocation'])
+            self.assertFalse(data['player_observation_hardening_milestone']['final_combined_acceptance'])
+            self.assertFalse(data['pr30_timeout_contracts_followup']['new_pr30_package_hash_acceptance'])
+
+        for key, field, bad in [
+            ('native_windows_timeout_contract_milestone', 'native_uia_query_executed', True),
+            ('native_windows_timeout_contract_milestone', 'player_package_present', True),
+            ('player_observation_hardening_milestone', 'no_menu_invocation', False),
+            ('player_observation_hardening_milestone', 'final_combined_acceptance', True),
+            ('pr30_timeout_contracts_followup', 'new_pr30_package_hash_acceptance', True),
+        ]:
+            with self.subTest(key=key, field=field):
+                mutated = copy.deepcopy(self.data)
+                mutated[key][field] = bad
+                with self.assertRaises(AssertionError):
+                    assert_no_unearned_claims(mutated)
+
     def test_storage_cleanup_followup_is_bounded_and_protects_evidence(self):
         cleanup = self.data['storage_cleanup_followup']
         self.assertTrue(cleanup['approved'])
