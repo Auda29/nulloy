@@ -4,8 +4,9 @@
 This runner launches one validated portable package with three generated WAV files,
 reads only its owned Qt UIA tree, and cleans up only the Popen-owned process and
 its own temporary files.  Default mode never invokes a UI control or changes the
-playlist; the explicit context-menu mode uses only UIA SelectionItem selection and
-one root-HWND WM_CONTEXTMENU post, and never invokes a menu item.
+playlist; the explicit context-menu mode uses UIA SelectionItem selection and
+one guarded keyboard or real-pointer context request, and never invokes a menu
+item.  Real-pointer input requires the separate explicit allow flag.
 """
 from __future__ import annotations
 
@@ -26,6 +27,15 @@ import uuid
 import wave
 from ctypes import wintypes
 from typing import Any, Sequence
+
+
+_POINTER_SPEC = importlib.util.spec_from_file_location(
+    "nulloy_owned_pointer", Path(__file__).with_name("owned_pointer.py")
+)
+if _POINTER_SPEC is None or _POINTER_SPEC.loader is None:
+    raise RuntimeError("cannot load owned pointer transport")
+owned_pointer = importlib.util.module_from_spec(_POINTER_SPEC)
+_POINTER_SPEC.loader.exec_module(owned_pointer)
 
 SOURCE_SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
@@ -529,6 +539,23 @@ def _owned_context_menus(desktop: Any, main_window: Any, process_pid: int) -> li
     return menus
 
 
+def _owned_visible_popups(desktop: Any, main_window: Any, process_pid: int) -> list[Any]:
+    """Reject any additional visible owned top-level window before input."""
+    main_handle = int(getattr(main_window.element_info, "handle", 0) or 0)
+    popups: list[Any] = []
+    for control in desktop.windows():
+        info = control.element_info
+        handle = int(getattr(info, "handle", 0) or 0)
+        if (
+            getattr(info, "process_id", None) == process_pid
+            and handle
+            and handle != main_handle
+            and _is_visible(control)
+        ):
+            popups.append(control)
+    return popups
+
+
 def _menu_items(menu: Any, process_pid: int) -> list[Any]:
     items = []
     for control in menu.descendants():
@@ -635,7 +662,15 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="opt in to SelectionItem/context-menu observation; never invokes a menu item",
     )
-    return parser.parse_args(argv)
+    parser.add_argument(
+        "--allow-owned-pointer-input",
+        action="store_true",
+        help="allow one guarded real right-click; requires --inspect-context-menu",
+    )
+    args = parser.parse_args(argv)
+    if args.allow_owned_pointer_input and not args.inspect_context_menu:
+        parser.error("--allow-owned-pointer-input requires --inspect-context-menu")
+    return args
 
 
 def inspect_context_menu(
@@ -653,33 +688,114 @@ def inspect_context_menu(
     fixtures: Sequence[Path],
     fixture_hashes: dict[str, dict[str, Any]],
     report: dict[str, Any],
+    allow_owned_pointer_input: bool = False,
 ) -> None:
-    """Perform the opt-in SelectionItem/keyboard-context-menu observation only."""
-    focus_evidence = focus_owned_row(rows[0], expected_rows[0], process_identity["pid"])
+    """Perform the opt-in context-menu observation, never a menu action."""
+    pointer_desktop: dict[str, Any] | None = None
+    if allow_owned_pointer_input:
+        try:
+            owned_pointer.validate_runner_environment()
+            pointer_desktop = owned_pointer.inspect_interactive_desktop(
+                process_identity["pid"]
+            )
+        except owned_pointer.BlockedError as exc:
+            raise BlockedError(str(exc)) from exc
+
+    focus_evidence = None
+    focus_after_selection = None
+    if not allow_owned_pointer_input:
+        focus_evidence = focus_owned_row(rows[0], expected_rows[0], process_identity["pid"])
     selected = select_exact_rows(rows, expected_rows, process_identity["pid"])
-    focus_after_selection = verify_owned_row_focus(rows[0], expected_rows[0], process_identity["pid"])
+    if not allow_owned_pointer_input:
+        focus_after_selection = verify_owned_row_focus(rows[0], expected_rows[0], process_identity["pid"])
     report["context_menu"] = {
         "focused_row": focus_evidence,
         "focus_verified_before_post": focus_after_selection,
         "selected_rows": selected,
         "menu_items_invoked": False,
-        "transport": "PostMessageW(WM_CONTEXTMENU) keyboard-reason LPARAM=-1",
-        "reason": "keyboard",
-        "message_lparam": -1,
+        "transport": "SendInput(right-down,right-up)" if allow_owned_pointer_input else "PostMessageW(WM_CONTEXTMENU) keyboard-reason LPARAM=-1",
+        "reason": "pointer" if allow_owned_pointer_input else "keyboard",
     }
+    if not allow_owned_pointer_input:
+        report["context_menu"]["message_lparam"] = -1
 
     baseline_menus = _owned_context_menus(desktop, main_window, process_identity["pid"])
-    if baseline_menus:
-        raise ContractError("an owned Menu was already visible before the context request")
+    baseline_popups = _owned_visible_popups(desktop, main_window, process_identity["pid"])
+    if baseline_menus or baseline_popups:
+        raise ContractError("an owned Menu or popup was already visible before the context request")
     baseline_keys: set[str] = set()
 
     _verify_process_identity(process, psutil, process_identity, executable)
     hwnd = int(getattr(main_window.element_info, "handle", 0) or 0)
-    root_identity = _window_process_identity(hwnd, psutil)
-    _verify_process_identity(process, psutil, process_identity, executable)
-    post_keyboard_context_menu(main_window, process_identity, root_identity, executable)
+    if not hwnd:
+        raise BlockedError("owned main window has no native HWND for context-menu input")
+
+    def revalidate_pointer_ownership() -> dict[str, Any]:
+        _verify_process_identity(process, psutil, process_identity, executable)
+        if int(getattr(main_window.element_info, "handle", 0) or 0) != hwnd:
+            raise ContractError("owned main root HWND changed before pointer input")
+        root = _window_process_identity(hwnd, psutil)
+        if (
+            root.get("pid") != process_identity["pid"]
+            or float(root.get("create_time")) != float(process_identity["create_time"])
+            or not _same_path(root.get("executable", ""), executable)
+        ):
+            raise ContractError("owned main root HWND identity no longer matches Popen identity")
+        return root
+
+    root_identity = revalidate_pointer_ownership()
+    if allow_owned_pointer_input:
+        try:
+            api = owned_pointer._load_user32()
+            row_rect = rows[0].rectangle()
+            main_rect = main_window.rectangle()
+            point = owned_pointer.choose_target_point(row_rect, main_rect)
+            preflight = owned_pointer.validate_pointer_target(
+                api,
+                root_hwnd=hwnd,
+                point=point,
+                row_rect=row_rect,
+                main_rect=main_rect,
+            )
+            report["context_menu"].update(
+                {
+                    "desktop_preflight": pointer_desktop,
+                    "root_identity": root_identity,
+                    "target_point": preflight["point"],
+                    "preflight": preflight,
+                    "preflight_check_time": time.time(),
+                }
+            )
+            positioned = owned_pointer.move_cursor_checked(
+                api,
+                root_hwnd=hwnd,
+                point=point,
+                row_rect=row_rect,
+                main_rect=main_rect,
+                revalidate=revalidate_pointer_ownership,
+            )
+            report["context_menu"]["positioning"] = positioned
+            try:
+                input_result = owned_pointer.click_right_checked(
+                    api,
+                    root_hwnd=hwnd,
+                    point=point,
+                    revalidate=revalidate_pointer_ownership,
+                )
+            except owned_pointer.PointerInputError as exc:
+                report["context_menu"]["input_diagnostics"] = exc.diagnostics
+                raise BlockedError(str(exc)) from exc
+            report["context_menu"]["input_diagnostics"] = input_result
+        except owned_pointer.BlockedError as exc:
+            if hasattr(exc, "diagnostics"):
+                report["context_menu"]["input_diagnostics"] = exc.diagnostics
+            raise BlockedError(str(exc)) from exc
+    else:
+        _verify_process_identity(process, psutil, process_identity, executable)
+        post_keyboard_context_menu(main_window, process_identity, root_identity, executable)
     report["context_menu"]["root_identity"] = root_identity
-    report["context_menu"]["message_posted_once"] = True
+    if not allow_owned_pointer_input:
+        report["context_menu"]["message_posted_once"] = True
 
     menu = _wait_for_context_menu(
         desktop,
@@ -736,6 +852,11 @@ def run_inspection(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
     try:
         if not is_windows_native():
             raise BlockedError("packaged UIA inspection requires native Windows")
+        if args.allow_owned_pointer_input:
+            try:
+                owned_pointer.validate_runner_environment()
+            except owned_pointer.BlockedError as exc:
+                raise BlockedError(str(exc)) from exc
         source_sha = parse_source_sha(args.source_sha)
         expected_archive_sha = parse_archive_sha(args.archive_sha256)
         report["provenance"] = {
@@ -825,6 +946,7 @@ def run_inspection(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
                 fixtures=fixtures,
                 fixture_hashes=fixture_hashes,
                 report=report,
+                allow_owned_pointer_input=args.allow_owned_pointer_input,
             )
         report["status"] = "PASS"
     except BlockedError as exc:

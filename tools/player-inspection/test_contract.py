@@ -315,6 +315,30 @@ class ContractTests(unittest.TestCase):
             ]
         )
         self.assertFalse(args.inspect_context_menu)
+        self.assertFalse(args.allow_owned_pointer_input)
+
+    def test_owned_pointer_flag_requires_context_menu_flag(self):
+        with self.assertRaises(SystemExit):
+            MODULE.parse_args(
+                [
+                    "--package", "package.zip",
+                    "--output", "evidence",
+                    "--source-sha", SOURCE_SHA,
+                    "--archive-sha256", ARCHIVE_SHA,
+                    "--allow-owned-pointer-input",
+                ]
+            )
+        args = MODULE.parse_args(
+            [
+                "--package", "package.zip",
+                "--output", "evidence",
+                "--source-sha", SOURCE_SHA,
+                "--archive-sha256", ARCHIVE_SHA,
+                "--inspect-context-menu",
+                "--allow-owned-pointer-input",
+            ]
+        )
+        self.assertTrue(args.allow_owned_pointer_input)
 
 
 if __name__ == "__main__":
