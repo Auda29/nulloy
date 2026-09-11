@@ -1,0 +1,51 @@
+name: Read-only packaged player inspection
+
+on:
+  push:
+    branches: ['test/windows-player-inspection']
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: player-inspection-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  inspect-player:
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned inspection dependencies
+        run: python -m pip install pywinauto==0.6.9 psutil==7.0.0 Pillow==11.1.0
+      - name: Run inspector contract tests
+        run: python -m unittest discover -s tools/player-inspection -p 'test_*.py' -v
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: Auda29/nulloy
+          run-id: 34572047079
+          name: Nulloy-Qt6-windows-x64
+          path: package
+      - name: Inspect exact packaged player with generated WAVs
+        shell: pwsh
+        run: |
+          $packages = @(Get-ChildItem package -Filter '*.zip' -Recurse)
+          if ($packages.Count -ne 1) { throw "Expected exactly one package" }
+          python tools/player-inspection/inspect_player.py --package $packages[0].FullName --output evidence --source-sha 9e1b3f060e649a64c698b2a5981dbfca1d741b84 --archive-sha256 5558a6ed786051224f7dcf3228a230fa45c95959f3e363e5b06b48d446ccb833
+          exit $LASTEXITCODE
+      - name: Preserve inspection evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: player-inspection-${{ github.sha }}
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 14
