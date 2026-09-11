@@ -297,6 +297,40 @@ def verify_owned_row_focus(row: Any, expected_name: str, process_pid: int) -> di
     return _row_focus_evidence(row, expected_name, process_pid, element)
 
 
+def fresh_pointer_target_context(
+    playlist: Any,
+    main_window: Any,
+    expected_rows: Sequence[str],
+    process_pid: int,
+    point: Any,
+) -> dict[str, Any]:
+    """Re-read the exact playlist target without changing selection or retargeting."""
+    rows = list(playlist.descendants(control_type="ListItem"))
+    if len(rows) != FIXTURE_COUNT or len(expected_rows) != FIXTURE_COUNT:
+        raise ContractError("pointer boundary requires exactly three playlist rows")
+    exact_playlist_rows([_window_text(row) for row in rows], expected_rows)
+    for row, expected_name in zip(rows, expected_rows):
+        _validate_row_identity(row, expected_name, process_pid)
+    selected = [
+        _row_fullname(row)
+        for row in rows
+        if _selection_state(row)
+    ]
+    if selected != list(expected_rows[:2]):
+        raise ContractError(f"pointer boundary selection changed: {selected!r}")
+    row_rect = rows[0].rectangle()
+    main_rect = main_window.rectangle()
+    if not owned_pointer._point_inside(point, row_rect) or not owned_pointer._point_inside(point, main_rect):
+        raise BlockedError("original pointer point is outside freshly-read target geometry")
+    return {
+        "rows": rows,
+        "row": rows[0],
+        "row_rect": row_rect,
+        "main_rect": main_rect,
+        "selected": selected,
+    }
+
+
 def select_exact_rows(rows: Sequence[Any], expected: Sequence[str], process_pid: int) -> list[str]:
     """Select exactly the first two already-recognized rows through SelectionItem only."""
     if len(rows) != len(expected) or len(expected) != FIXTURE_COUNT:
@@ -628,21 +662,48 @@ def _fixtures_unchanged(fixtures: Sequence[Path], fixture_hashes: dict[str, dict
     )
 
 
-def _cleanup(process: Any, temp_root: Path | None) -> tuple[bool, list[str]]:
+def _cleanup(
+    process: Any,
+    temp_root: Path | None,
+    *,
+    owner_check: Any | None = None,
+) -> tuple[bool, list[str]]:
     errors: list[str] = []
     stopped = process is None
     if process is not None:
-        try:
-            if process.poll() is None:
-                process.terminate()
-            process.wait(timeout=10)
-            stopped = process.poll() is not None
-            if not stopped:
-                process.kill()
-                process.wait(timeout=10)
+        if process.poll() is not None:
+            stopped = True
+        elif owner_check is None:
+            errors.append("live child ownership was not established")
+        else:
+            try:
+                owner_check()
+            except Exception as exc:
+                errors.append(f"initial cleanup ownership check failed: {exc!r}")
+            else:
+                try:
+                    process.terminate()
+                except Exception as exc:
+                    errors.append(f"terminate failed: {exc!r}")
+                if process.poll() is None:
+                    try:
+                        process.wait(timeout=10)
+                    except Exception as wait_exc:
+                        first_wait_error = wait_exc
+                    else:
+                        first_wait_error = None
+                else:
+                    first_wait_error = None
+                if process.poll() is None:
+                    try:
+                        owner_check()
+                        process.kill()
+                        process.wait(timeout=10)
+                    except Exception as exc:
+                        errors.append(f"kill/wait failed: {exc!r}")
                 stopped = process.poll() is not None
-        except Exception as exc:
-            errors.append(repr(exc))
+                if not stopped and first_wait_error is not None and not errors:
+                    errors.append(f"terminate/wait failed: {first_wait_error!r}")
     if stopped and temp_root is not None:
         try:
             shutil.rmtree(temp_root)
@@ -695,9 +756,6 @@ def inspect_context_menu(
     if allow_owned_pointer_input:
         try:
             owned_pointer.validate_runner_environment()
-            pointer_desktop = owned_pointer.inspect_interactive_desktop(
-                process_identity["pid"]
-            )
         except owned_pointer.BlockedError as exc:
             raise BlockedError(str(exc)) from exc
 
@@ -747,16 +805,46 @@ def inspect_context_menu(
     if allow_owned_pointer_input:
         try:
             api = owned_pointer._load_user32()
+            kernel32 = owned_pointer._load_kernel32()
             row_rect = rows[0].rectangle()
             main_rect = main_window.rectangle()
             point = owned_pointer.choose_target_point(row_rect, main_rect)
-            preflight = owned_pointer.validate_pointer_target(
-                api,
-                root_hwnd=hwnd,
-                point=point,
-                row_rect=row_rect,
-                main_rect=main_rect,
-            )
+
+            def revalidate_pointer_boundary(
+                allow_owned_pending_rightdown: bool = False,
+                require_cursor_at_point: bool = False,
+            ) -> dict[str, Any]:
+                desktop_check = owned_pointer.inspect_interactive_desktop(
+                    process_identity["pid"], api=api, kernel32=kernel32
+                )
+                boundary_root = revalidate_pointer_ownership()
+                if int(api.GetForegroundWindow() or 0) != hwnd:
+                    raise BlockedError("owned main window lost foreground at pointer boundary")
+                actual = owned_pointer._cursor(api) if require_cursor_at_point else point
+                if require_cursor_at_point and not owned_pointer._same_point(actual, point):
+                    raise BlockedError("cursor moved from originally chosen point at pointer boundary")
+                fresh = fresh_pointer_target_context(
+                    playlist, main_window, expected_rows, process_identity["pid"], point
+                )
+                target = owned_pointer.validate_pointer_target(
+                    api,
+                    root_hwnd=hwnd,
+                    point=actual,
+                    row_rect=fresh["row_rect"],
+                    main_rect=fresh["main_rect"],
+                    request_foreground=False,
+                    allow_owned_pending_rightdown=allow_owned_pending_rightdown,
+                )
+                return {
+                    "desktop_preflight": desktop_check,
+                    "root_identity": boundary_root,
+                    **fresh,
+                    **target,
+                }
+
+            preflight = revalidate_pointer_boundary()
+            pointer_desktop = preflight["desktop_preflight"]
+            root_identity = preflight["root_identity"]
             report["context_menu"].update(
                 {
                     "desktop_preflight": pointer_desktop,
@@ -772,7 +860,7 @@ def inspect_context_menu(
                 point=point,
                 row_rect=row_rect,
                 main_rect=main_rect,
-                revalidate=revalidate_pointer_ownership,
+                revalidate=revalidate_pointer_boundary,
             )
             report["context_menu"]["positioning"] = positioned
             try:
@@ -780,7 +868,11 @@ def inspect_context_menu(
                     api,
                     root_hwnd=hwnd,
                     point=point,
-                    revalidate=revalidate_pointer_ownership,
+                    revalidate=lambda: revalidate_pointer_boundary(require_cursor_at_point=True),
+                    release_revalidate=lambda: revalidate_pointer_boundary(
+                        allow_owned_pending_rightdown=True,
+                        require_cursor_at_point=True,
+                    ),
                 )
             except owned_pointer.PointerInputError as exc:
                 report["context_menu"]["input_diagnostics"] = exc.diagnostics
@@ -849,6 +941,7 @@ def run_inspection(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
     main_window = None
     fixtures: Sequence[Path] = ()
     fixture_hashes: dict[str, dict[str, Any]] = {}
+    cleanup_owner_check: Any | None = None
     try:
         if not is_windows_native():
             raise BlockedError("packaged UIA inspection requires native Windows")
@@ -897,6 +990,9 @@ def run_inspection(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
 
         process = subprocess.Popen(command, cwd=package_info.root, env=environment)
         identity = _process_identity(process, psutil, package_info.executable)
+        cleanup_owner_check = lambda: _verify_process_identity(
+            process, psutil, identity, package_info.executable
+        )
         report["process_identity"] = identity
         desktop = Desktop(backend="uia", allow_magic_lookup=False)
         main_window = _wait_for(
@@ -980,7 +1076,9 @@ def run_inspection(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
                     report["error"] = f"final fixture verification failed: {verification_exc}"
                 else:
                     report["final_verification_error"] = repr(verification_exc)
-        cleanup_verified, cleanup_errors = _cleanup(process, temp_root)
+        cleanup_verified, cleanup_errors = _cleanup(
+            process, temp_root, owner_check=cleanup_owner_check
+        )
         report["cleanup"] = {
             "process_cleanup_verified": cleanup_verified,
             "errors": cleanup_errors,

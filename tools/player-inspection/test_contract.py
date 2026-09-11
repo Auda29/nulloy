@@ -85,6 +85,23 @@ class _FakeRow:
         raise AssertionError("wrapper set_focus must not be used")
 
 
+class _FakePlaylist:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def descendants(self, control_type=None):
+        self.calls = getattr(self, "calls", 0) + 1
+        return list(self.rows)
+
+
+class _FakeMainWindow:
+    def __init__(self, rect=None):
+        self._rect = rect or _FakeRect(left=0, top=0, right=200, bottom=100)
+
+    def rectangle(self):
+        return self._rect
+
+
 class _FakeMenuItem:
     def __init__(self, name, runtime_id):
         self.element_info = _FakeInfo(name, pid=4242, control_type="MenuItem")
@@ -93,6 +110,34 @@ class _FakeMenuItem:
 
     def window_text(self):
         return self._name
+
+
+class _CleanupProcess:
+    def __init__(self, wait_results):
+        self.wait_results = iter(wait_results)
+        self.live = True
+        self.terminate_calls = 0
+        self.kill_calls = 0
+        self.wait_calls = 0
+        self.returncode = None
+
+    def poll(self):
+        return None if self.live else self.returncode
+
+    def terminate(self):
+        self.terminate_calls += 1
+
+    def kill(self):
+        self.kill_calls += 1
+
+    def wait(self, timeout):
+        self.wait_calls += 1
+        result = next(self.wait_results)
+        if result == "timeout":
+            raise subprocess.TimeoutExpired("owned-player", timeout)
+        self.live = False
+        self.returncode = 0
+        return self.returncode
 
 
 class ContractTests(unittest.TestCase):
@@ -195,6 +240,37 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(selected, expected[:2])
         self.assertEqual(actions, [("select", expected[0]), ("add", expected[1])])
         self.assertEqual([row.name for row in rows if row.selected], expected[:2])
+
+    def test_pointer_boundary_reenumerates_rows_selection_and_geometry_without_retargeting(self):
+        expected = ["one.wav (0:30)", "two.wav (0:30)", "three.wav (0:30)"]
+        actions = []
+        rows = []
+        rows.extend(_FakeRow(name, rows, actions) for name in expected)
+        rows[0].selected = True
+        rows[1].selected = True
+        playlist = _FakePlaylist(rows)
+        main = _FakeMainWindow()
+        point = MODULE.owned_pointer.POINT(50, 30)
+
+        context = MODULE.fresh_pointer_target_context(
+            playlist, main, expected, 4242, point
+        )
+        self.assertEqual(context["selected"], expected[:2])
+        self.assertEqual(context["row"], rows[0])
+        self.assertEqual(playlist.calls, 1)
+        self.assertEqual(actions, [])
+
+        rows[0]._rect = _FakeRect(left=60, top=20, right=110, bottom=60)
+        with self.assertRaises(MODULE.BlockedError):
+            MODULE.fresh_pointer_target_context(playlist, main, expected, 4242, point)
+        rows[0]._rect = _FakeRect()
+        rows[2].selected = True
+        with self.assertRaises(MODULE.ContractError):
+            MODULE.fresh_pointer_target_context(playlist, main, expected, 4242, point)
+        rows[2].selected = False
+        rows[1].name = "changed.wav (0:30)"
+        with self.assertRaises(MODULE.ContractError):
+            MODULE.fresh_pointer_target_context(playlist, main, expected, 4242, point)
 
     def test_selection_rejects_pid_or_fullname_mismatch_before_action(self):
         expected = ["one.wav (0:30)", "two.wav (0:30)", "three.wav (0:30)"]
@@ -339,6 +415,56 @@ class ContractTests(unittest.TestCase):
             ]
         )
         self.assertTrue(args.allow_owned_pointer_input)
+
+    def test_cleanup_kills_after_terminate_timeout_and_removes_temp(self):
+        process = _CleanupProcess(["timeout", "exit"])
+        with tempfile.TemporaryDirectory() as temporary:
+            temp_root = Path(temporary) / "owned"
+            temp_root.mkdir()
+            owner_checks = []
+            verified, errors = MODULE._cleanup(
+                process,
+                temp_root,
+                owner_check=lambda: owner_checks.append("checked"),
+            )
+            self.assertTrue(verified)
+            self.assertEqual(errors, [])
+            self.assertEqual(process.terminate_calls, 1)
+            self.assertEqual(process.kill_calls, 1)
+            self.assertEqual(process.wait_calls, 2)
+            self.assertEqual(owner_checks, ["checked", "checked"])
+            self.assertFalse(temp_root.exists())
+
+    def test_cleanup_retains_temp_when_process_stays_live_after_kill(self):
+        process = _CleanupProcess(["timeout", "timeout"])
+        with tempfile.TemporaryDirectory() as temporary:
+            temp_root = Path(temporary) / "owned"
+            temp_root.mkdir()
+            verified, errors = MODULE._cleanup(
+                process,
+                temp_root,
+                owner_check=lambda: None,
+            )
+            self.assertFalse(verified)
+            self.assertTrue(errors)
+            self.assertEqual(process.kill_calls, 1)
+            self.assertTrue(temp_root.exists())
+
+    def test_cleanup_does_not_terminate_live_process_without_ownership(self):
+        process = _CleanupProcess(["exit"])
+        with tempfile.TemporaryDirectory() as temporary:
+            temp_root = Path(temporary) / "owned"
+            temp_root.mkdir()
+            verified, errors = MODULE._cleanup(
+                process,
+                temp_root,
+                owner_check=lambda: (_ for _ in ()).throw(MODULE.ContractError("identity lost")),
+            )
+            self.assertFalse(verified)
+            self.assertTrue(errors)
+            self.assertEqual(process.terminate_calls, 0)
+            self.assertEqual(process.kill_calls, 0)
+            self.assertTrue(temp_root.exists())
 
 
 if __name__ == "__main__":

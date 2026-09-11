@@ -4,6 +4,9 @@
 This module deliberately has no UIA, pywinauto, keyboard, or menu-selection
 logic.  It only validates the disposable GitHub-hosted Windows environment,
 checks an owned target, moves the cursor, and emits one right-button batch.
+Boundary checks reduce but cannot eliminate external desktop races; this transport is
+therefore restricted to the isolated disposable runner and makes no generic desktop
+safety guarantee.
 """
 from __future__ import annotations
 
@@ -85,6 +88,14 @@ class RECT(ctypes.Structure):
     ]
 
 
+class USEROBJECTFLAGS(ctypes.Structure):
+    _fields_ = [
+        ("fInherit", BOOL),
+        ("fReserved", BOOL),
+        ("dwFlags", DWORD),
+    ]
+
+
 class _NativeCallError(BlockedError):
     pass
 
@@ -140,7 +151,6 @@ def configure_user32(api: Any) -> Any:
     _set_signature(api, "GetAsyncKeyState", [ctypes.c_int], SHORT)
     _set_signature(api, "GetWindowRect", [HWND, ctypes.POINTER(RECT)], BOOL)
     _set_signature(api, "GetProcessWindowStation", [], HWINSTA)
-    _set_signature(api, "GetCurrentThreadId", [], DWORD)
     _set_signature(api, "GetThreadDesktop", [DWORD], HDESK)
     _set_signature(api, "OpenInputDesktop", [DWORD, BOOL, DWORD], HDESK)
     _set_signature(api, "CloseDesktop", [HDESK], BOOL)
@@ -155,6 +165,7 @@ def configure_user32(api: Any) -> Any:
 
 def configure_kernel32(api: Any) -> Any:
     """Apply explicit signatures to the process/session APIs from kernel32."""
+    _set_signature(api, "GetCurrentThreadId", [], DWORD)
     _set_signature(api, "ProcessIdToSessionId", [DWORD, ctypes.POINTER(DWORD)], BOOL)
     _set_signature(api, "GetCurrentProcessId", [], DWORD)
     return api
@@ -173,7 +184,8 @@ def _load_kernel32() -> Any:
 
 
 def _last_error(name: str) -> _NativeCallError:
-    return _NativeCallError(f"{name} failed (Win32 error {ctypes.get_last_error()})")
+    get_last_error = getattr(ctypes, "get_last_error", lambda: 0)
+    return _NativeCallError(f"{name} failed (Win32 error {get_last_error()})")
 
 
 def _get_user_object_name(api: Any, handle: Any) -> str:
@@ -190,38 +202,40 @@ def _get_user_object_name(api: Any, handle: Any) -> str:
 
 
 def _get_user_object_flags(api: Any, handle: Any) -> int:
-    flags = DWORD(0)
+    flags = USEROBJECTFLAGS()
     needed = DWORD(0)
     if not api.GetUserObjectInformationW(
         handle, UOI_FLAGS, ctypes.byref(flags), ctypes.sizeof(flags), ctypes.byref(needed)
     ):
         raise _last_error("GetUserObjectInformationW(UOI_FLAGS)")
-    return int(flags.value)
+    return int(flags.dwFlags)
 
 
-def _session_id(api: Any, pid: int) -> int:
+def _session_id(kernel32: Any, pid: int) -> int:
     session = DWORD(0)
-    if not api.ProcessIdToSessionId(DWORD(pid), ctypes.byref(session)):
+    if not kernel32.ProcessIdToSessionId(DWORD(pid), ctypes.byref(session)):
         raise _last_error("ProcessIdToSessionId")
     return int(session.value)
 
 
-def inspect_interactive_desktop(player_pid: int, *, api: Any | None = None) -> dict[str, Any]:
+def inspect_interactive_desktop(
+    player_pid: int, *, api: Any | None = None, kernel32: Any | None = None
+) -> dict[str, Any]:
     """Verify WinSta0/input/thread/player desktop state and close only input handle."""
     validate_runner_environment()
     if api is None:
         api = _load_user32()
+    if kernel32 is None:
         kernel32 = _load_kernel32()
-        api.ProcessIdToSessionId = kernel32.ProcessIdToSessionId
-        api.GetCurrentProcessId = kernel32.GetCurrentProcessId
     configure_user32(api)
-    configure_kernel32(api)
+    configure_kernel32(kernel32)
     input_desktop = None
+    primary_error: BaseException | None = None
     try:
         winsta = api.GetProcessWindowStation()
         if not winsta:
             raise _last_error("GetProcessWindowStation")
-        thread_id = api.GetCurrentThreadId()
+        thread_id = kernel32.GetCurrentThreadId()
         thread_desktop = api.GetThreadDesktop(thread_id)
         if not thread_desktop:
             raise _last_error("GetThreadDesktop")
@@ -234,9 +248,9 @@ def inspect_interactive_desktop(player_pid: int, *, api: Any | None = None) -> d
         thread_name = _get_user_object_name(api, thread_desktop)
         input_name = _get_user_object_name(api, input_desktop)
         winsta_flags = _get_user_object_flags(api, winsta)
-        current_pid = int(api.GetCurrentProcessId())
-        current_session = _session_id(api, current_pid)
-        player_session = _session_id(api, int(player_pid))
+        current_pid = int(kernel32.GetCurrentProcessId())
+        current_session = _session_id(kernel32, current_pid)
+        player_session = _session_id(kernel32, int(player_pid))
         result = {
             "window_station": winsta_name,
             "window_station_visible": bool(winsta_flags & WSF_VISIBLE),
@@ -257,10 +271,22 @@ def inspect_interactive_desktop(player_pid: int, *, api: Any | None = None) -> d
         ):
             raise BlockedError(f"interactive desktop preflight rejected: {result!r}")
         return result
+    except BaseException as exc:
+        primary_error = exc
+        raise
     finally:
-        if input_desktop:
-            if not api.CloseDesktop(input_desktop):
-                raise _last_error("CloseDesktop(input desktop)")
+        if input_desktop is not None:
+            cleanup_error: BaseException | None = None
+            try:
+                if not api.CloseDesktop(input_desktop):
+                    cleanup_error = _last_error("CloseDesktop(input desktop)")
+            except BaseException as exc:
+                cleanup_error = exc
+            if cleanup_error is not None:
+                if primary_error is not None:
+                    setattr(primary_error, "cleanup_error", cleanup_error)
+                else:
+                    raise cleanup_error
 
 
 def _rect_value(rect: Any, name: str) -> int:
@@ -296,8 +322,11 @@ def _target_window(api: Any, point: POINT) -> tuple[int, int]:
     return hit, root
 
 
-def _reject_held_input(api: Any) -> None:
-    keys = (VK_SHIFT, VK_CONTROL, VK_MENU, VK_LWIN, VK_RWIN, VK_LBUTTON, VK_RBUTTON, VK_MBUTTON, VK_XBUTTON1, VK_XBUTTON2)
+def _reject_held_input(api: Any, *, allow_owned_pending_rightdown: bool = False) -> None:
+    mouse_buttons = (VK_LBUTTON, VK_MBUTTON, VK_XBUTTON1, VK_XBUTTON2)
+    if not allow_owned_pending_rightdown:
+        mouse_buttons = (VK_LBUTTON, VK_RBUTTON, VK_MBUTTON, VK_XBUTTON1, VK_XBUTTON2)
+    keys = (VK_SHIFT, VK_CONTROL, VK_MENU, VK_LWIN, VK_RWIN, *mouse_buttons)
     held = [hex(key) for key in keys if int(api.GetAsyncKeyState(key)) & 0x8000]
     if held:
         raise BlockedError(f"physical modifier or mouse button is held: {held}")
@@ -322,6 +351,7 @@ def validate_pointer_target(
     row_rect: Any,
     main_rect: Any,
     request_foreground: bool = True,
+    allow_owned_pending_rightdown: bool = False,
 ) -> dict[str, Any]:
     if not api.IsWindowVisible(root_hwnd):
         raise BlockedError("owned main window is not visible")
@@ -335,7 +365,7 @@ def validate_pointer_target(
     hit, root = _target_window(api, point)
     if hit == 0 or root != root_hwnd:
         raise BlockedError(f"WindowFromPoint/GetAncestor target mismatch: hit={hit:#x}, root={root:#x}")
-    _reject_held_input(api)
+    _reject_held_input(api, allow_owned_pending_rightdown=allow_owned_pending_rightdown)
     return {
         "root_hwnd": root_hwnd,
         "point": {"x": int(point.x), "y": int(point.y)},
@@ -366,7 +396,9 @@ def move_cursor_checked(
     main_rect: Any,
     revalidate: Callable[[], Any],
 ) -> dict[str, Any]:
-    revalidate()
+    boundary = revalidate()
+    boundary_row_rect = getattr(boundary, "get", lambda key, default: default)("row_rect", row_rect)
+    boundary_main_rect = getattr(boundary, "get", lambda key, default: default)("main_rect", main_rect)
     if not api.SetCursorPos(point.x, point.y):
         raise _last_error("SetCursorPos")
     actual = _cursor(api)
@@ -376,8 +408,8 @@ def move_cursor_checked(
         api,
         root_hwnd=root_hwnd,
         point=actual,
-        row_rect=row_rect,
-        main_rect=main_rect,
+        row_rect=boundary_row_rect,
+        main_rect=boundary_main_rect,
         request_foreground=False,
     )
     return {"positioned": True, "cursor": {"x": int(actual.x), "y": int(actual.y)}}
@@ -392,7 +424,9 @@ def make_right_click_batch() -> Any:
     return batch
 
 
-def send_right_click(*, api: Any | None = None) -> dict[str, Any]:
+def send_right_click(
+    *, api: Any | None = None, release_revalidate: Callable[[], Any] | None = None
+) -> dict[str, Any]:
     api = api or _load_user32()
     configure_user32(api)
     batch = make_right_click_batch()
@@ -403,15 +437,38 @@ def send_right_click(*, api: Any | None = None) -> dict[str, Any]:
         "input_size": ctypes.sizeof(INPUT),
         "partial_release_attempted": False,
         "partial_release_count": None,
+        "release_validation": None,
+        "cleanup_blocked": False,
+        "outstanding_injected_input": False,
     }
     if count == 2:
         return diagnostics
     if count == 1:
         diagnostics["partial_release_attempted"] = True
+        diagnostics["outstanding_injected_input"] = True
+        if release_revalidate is None:
+            diagnostics["cleanup_blocked"] = True
+            diagnostics["cleanup_block_reason"] = "missing fresh release boundary validator"
+            raise PointerInputError("partial SendInput cleanup was blocked", diagnostics)
+        try:
+            diagnostics["release_validation"] = release_revalidate()
+        except Exception as exc:
+            diagnostics["cleanup_blocked"] = True
+            diagnostics["cleanup_block_reason"] = repr(exc)
+            raise PointerInputError("partial SendInput cleanup was blocked", diagnostics) from exc
         release = (INPUT * 1)()
         release[0].type = INPUT_MOUSE
         release[0].mi = MOUSEINPUT(0, 0, 0, MOUSEEVENTF_RIGHTUP, 0, 0)
-        diagnostics["partial_release_count"] = int(api.SendInput(1, release, ctypes.sizeof(INPUT)))
+        try:
+            diagnostics["partial_release_count"] = int(api.SendInput(1, release, ctypes.sizeof(INPUT)))
+        except Exception as exc:
+            diagnostics["partial_release_failure"] = repr(exc)
+            raise PointerInputError("partial SendInput cleanup failed", diagnostics) from exc
+        if diagnostics["partial_release_count"] != 1:
+            diagnostics["partial_release_failure"] = (
+                f"release returned {diagnostics['partial_release_count']}, expected 1"
+            )
+            raise PointerInputError("partial SendInput cleanup failed", diagnostics)
     raise PointerInputError("SendInput did not deliver exactly one right-click batch", diagnostics)
 
 
@@ -421,6 +478,7 @@ def click_right_checked(
     root_hwnd: int,
     point: POINT,
     revalidate: Callable[[], Any],
+    release_revalidate: Callable[[], Any] | None = None,
 ) -> dict[str, Any]:
     revalidate()
     actual = _cursor(api)
@@ -432,4 +490,4 @@ def click_right_checked(
     if hit == 0 or root != root_hwnd:
         raise BlockedError("target window changed before right-click boundary")
     _reject_held_input(api)
-    return send_right_click(api=api)
+    return send_right_click(api=api, release_revalidate=release_revalidate)
