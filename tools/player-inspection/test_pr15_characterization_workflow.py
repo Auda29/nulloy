@@ -40,13 +40,28 @@ def powershell_blocks(text):
 
 
 class PR15CharacterizationWorkflowContract(unittest.TestCase):
+    def test_registration_push_can_only_run_contract_tests(self):
+        text = workflow_text()
+        self.assertIn("  push:\n    branches: ['test/windows-player-inspection']", text)
+        self.assertIn("'.github/workflows/pr15-player-characterize.yml'", text)
+        self.assertIn("'tools/player-inspection/test_pr15_characterization_workflow.py'", text)
+        jobs = text.split('jobs:\n', 1)[1]
+        self.assertEqual(re.findall(r'(?m)^  ([a-z_-]+):', jobs), ['contract', 'characterize'])
+        contract, characterize = jobs.split('  characterize:', 1)
+        self.assertIn('runs-on: ubuntu-latest', contract)
+        self.assertIn('test_pr15_characterization_workflow.py', contract)
+        for forbidden in ('windows-', 'download-artifact', 'upload-artifact', 'inspect_player.py', 'secrets.'):
+            self.assertNotIn(forbidden, contract)
+        self.assertIn("if: github.event_name == 'workflow_dispatch' && inputs.characterize_package == true", characterize)
+        self.assertIn('needs: contract', characterize)
+
     def test_is_manual_opt_in_and_has_no_build_or_publication_route(self):
         text = workflow_text()
         self.assertIn("name: PR15 bounded player characterization", text)
         self.assertIn("on:\n  workflow_dispatch:\n    inputs:\n      characterize_package:", text)
         self.assertIn("type: boolean", text)
         self.assertIn("default: false", text)
-        self.assertNotRegex(text, r"(?m)^\s+(push|pull_request|schedule|workflow_call):")
+        self.assertNotRegex(text, r"(?m)^\s+(pull_request|schedule|workflow_call):")
         self.assertNotIn("package-windows", text)
         self.assertNotIn("actions/upload-artifact@v4\n        with:\n          name: Nulloy", text)
         self.assertNotRegex(text, r"(?i)create-release|gh\s+(release|api)\s+upload|Invoke-WebRequest.*zip")

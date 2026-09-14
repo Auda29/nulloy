@@ -8,6 +8,11 @@ on:
         required: true
         type: boolean
         default: false
+  push:
+    branches: ['test/windows-player-inspection']
+    paths:
+      - '.github/workflows/pr15-player-characterize.yml'
+      - 'tools/player-inspection/test_pr15_characterization_workflow.py'
 
 permissions:
   contents: read
@@ -18,7 +23,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check characterization workflow contract without native actions
+        run: python tools/player-inspection/test_pr15_characterization_workflow.py -v
+
   characterize:
+    needs: contract
     if: github.event_name == 'workflow_dispatch' && inputs.characterize_package == true
     runs-on: windows-2022
     timeout-minutes: 20
