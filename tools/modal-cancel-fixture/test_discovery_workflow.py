@@ -4,6 +4,12 @@ import unittest
 
 
 class DiscoveryWorkflowTests(unittest.TestCase):
+    def test_linux_qt_runtime_is_installed_before_fixture_tests(self):
+        path = Path(__file__).resolve().parents[2] / '.github/workflows/modal-fixture-observe.yml'
+        text = path.read_text()
+        self.assertIn('sudo apt-get install -y --no-install-recommends libegl1', text)
+        self.assertLess(text.index('sudo apt-get install'), text.index('unittest discover'))
+
     def test_isolated_discovery_keeps_blocked_exit_and_always_uploads(self):
         path = Path(__file__).resolve().parents[2] / '.github/workflows/modal-fixture-observe.yml'
         self.assertTrue(path.exists(), 'missing isolated discovery workflow')
