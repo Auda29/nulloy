@@ -114,13 +114,15 @@ class _SelectionPattern:
 
 
 class _NativeElement:
-    def __init__(self, actions):
+    def __init__(self, actions, *, focus_after_set=True, focus_value=True):
         self.actions = actions
         self.CurrentHasKeyboardFocus = False
+        self.focus_after_set = focus_after_set
+        self.focus_value = focus_value
 
     def SetFocus(self):
         self.actions.append("SetFocus")
-        self.CurrentHasKeyboardFocus = True
+        self.CurrentHasKeyboardFocus = self.focus_value if self.focus_after_set else False
 
 
 class _Row:
@@ -129,7 +131,6 @@ class _Row:
         self.container = container
         self.selected = False
         self.element_info = _Info(name, pid=pid, control_type="ListItem")
-        self.element_info.element = _NativeElement(actions)
         self.iface_selection_item = _SelectionPattern(self, actions)
 
     def window_text(self):
@@ -141,7 +142,9 @@ class BoundedContextSelectionTests(unittest.TestCase):
         actions = []
         rows = []
         rows.extend(_Row(name, rows, actions) for name in EXPECTED)
-        self.assertEqual(worker._select_context_rows(rows, EXPECTED, 4242), [True, True, False])
+        playlist = _Playlist(rows)
+        playlist.element_info.element = _NativeElement(actions)
+        self.assertEqual(worker._select_context_rows(playlist, rows, EXPECTED, 4242), [True, True, False])
         self.assertEqual(actions, ["SetFocus", ("select", EXPECTED[0]), ("add", EXPECTED[1])])
 
     def test_worker_selection_rejects_foreign_row_before_any_selection_call(self):
@@ -149,9 +152,104 @@ class BoundedContextSelectionTests(unittest.TestCase):
         rows = []
         rows.extend(_Row(name, rows, actions) for name in EXPECTED)
         rows[1].element_info.process_id = 9999
+        playlist = _Playlist(rows)
+        playlist.element_info.element = _NativeElement(actions)
         with self.assertRaises(worker._OwnershipError):
-            worker._select_context_rows(rows, EXPECTED, 4242)
+            worker._select_context_rows(playlist, rows, EXPECTED, 4242)
         self.assertEqual(actions, [])
+
+    def test_qt_faithful_row_setfocus_is_not_required(self):
+        actions = []
+        rows = []
+        rows.extend(_Row(name, rows, actions) for name in EXPECTED)
+        playlist = _Playlist(rows)
+        playlist.element_info.element = _NativeElement(actions)
+        self.assertEqual(worker._select_context_rows(playlist, rows, EXPECTED, 4242), [True, True, False])
+
+    def test_playlist_setfocus_noop_is_rejected_before_selection(self):
+        actions = []
+        rows = []
+        rows.extend(_Row(name, rows, actions) for name in EXPECTED)
+        playlist = _Playlist(rows)
+        playlist.element_info.element = _NativeElement(actions, focus_after_set=False)
+        with self.assertRaises(worker._OwnershipError):
+            worker._select_context_rows(playlist, rows, EXPECTED, 4242)
+        self.assertEqual(actions, ["SetFocus"])
+
+    def test_playlist_focus_loss_after_selection_is_rejected(self):
+        actions = []
+        playlist_element = _NativeElement(actions)
+        rows = []
+        rows.extend(_Row(name, rows, actions) for name in EXPECTED)
+        playlist = _Playlist(rows)
+        playlist.element_info.element = playlist_element
+
+        original_select = worker._context_helpers().select_exact_rows
+
+        def select_and_lose_focus(*args, **kwargs):
+            result = original_select(*args, **kwargs)
+            playlist_element.CurrentHasKeyboardFocus = False
+            return result
+
+        with mock.patch.object(worker._context_helpers(), "select_exact_rows", side_effect=select_and_lose_focus):
+            with self.assertRaises(worker._OwnershipError):
+                worker._select_context_rows(playlist, rows, EXPECTED, 4242)
+        self.assertEqual(actions, ["SetFocus", ("select", EXPECTED[0]), ("add", EXPECTED[1])])
+
+    def test_malformed_playlist_is_rejected_before_any_ui_action(self):
+        for process_pid in (9999, True):
+            with self.subTest(process_pid=process_pid):
+                actions = []
+                rows = []
+                rows.extend(_Row(name, rows, actions) for name in EXPECTED)
+                playlist = _Playlist(rows)
+                playlist.element_info.process_id = process_pid
+                playlist.element_info.element = _NativeElement(actions)
+                with self.assertRaises(worker._OwnershipError):
+                    worker._select_context_rows(playlist, rows, EXPECTED, 4242)
+                self.assertEqual(actions, [])
+
+    def test_playlist_identity_and_direct_focus_are_strict_before_action(self):
+        for field, value in (
+            ("class_name", "QListWidget"),
+            ("control_type", "Pane"),
+            ("automation_id", "wrong-playlist"),
+        ):
+            with self.subTest(field=field):
+                actions = []
+                rows = []
+                rows.extend(_Row(name, rows, actions) for name in EXPECTED)
+                playlist = _Playlist(rows)
+                setattr(playlist.element_info, field, value)
+                playlist.element_info.element = _NativeElement(actions)
+                with self.assertRaises(worker._OwnershipError):
+                    worker._select_context_rows(playlist, rows, EXPECTED, 4242)
+                self.assertEqual(actions, [])
+
+        actions = []
+        rows = []
+        rows.extend(_Row(name, rows, actions) for name in EXPECTED)
+        playlist = _Playlist(rows)
+        playlist.element_info.element = object()
+        with self.assertRaises(worker._OwnershipError):
+            worker._select_context_rows(playlist, rows, EXPECTED, 4242)
+        self.assertEqual(actions, [])
+
+    def test_playlist_focus_accepts_native_bool_representations_only(self):
+        actions = []
+        rows = []
+        rows.extend(_Row(name, rows, actions) for name in EXPECTED)
+        playlist = _Playlist(rows)
+        element = _NativeElement(actions)
+        playlist.element_info.element = element
+        for value in (0, 1, False, True):
+            with self.subTest(value=value):
+                element.CurrentHasKeyboardFocus = value
+                self.assertEqual(worker._focus_bool(playlist, "playlist"), bool(value))
+
+        element.CurrentHasKeyboardFocus = "truthy"
+        with self.assertRaises(worker._OwnershipError):
+            worker._focus_bool(playlist, "playlist")
 
 
 class BoundedContextContractTests(unittest.TestCase):
@@ -340,6 +438,7 @@ class BoundedContextEndToEndContractTests(unittest.TestCase):
         rows = []
         rows.extend(_Row(name, rows, actions) for name in EXPECTED)
         playlist = _Playlist(rows)
+        playlist.element_info.element = _NativeElement(actions)
         root = _Root(playlist)
         desktop = _Desktop(root)
         menu = _valid_menu()
@@ -377,8 +476,10 @@ class BoundedContextEndToEndContractTests(unittest.TestCase):
         rows = []
         rows.extend(_Row(name, rows, actions) for name in EXPECTED)
         rows[0].selected = "truthy"
+        playlist = _Playlist(rows)
+        playlist.element_info.element = _NativeElement(actions)
         with self.assertRaises(worker._OwnershipError):
-            worker._select_context_rows(rows, EXPECTED, 4242)
+            worker._select_context_rows(playlist, rows, EXPECTED, 4242)
     def test_context_timeout_runs_independent_parent_postcheck_and_preserves_timeout(self):
         target = {
             "pid": 4242, "create_time": 12.5, "executable": "C:/Nulloy/Nulloy.exe",

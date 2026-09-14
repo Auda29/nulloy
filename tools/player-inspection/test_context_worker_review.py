@@ -90,6 +90,7 @@ class ContextStageReviewTests(unittest.TestCase):
         rows = []
         rows.extend(fixtures._Row(name, rows, actions) for name in EXPECTED)
         playlist = fixtures._Playlist(rows)
+        playlist.element_info.element = fixtures._NativeElement(actions)
         root = fixtures._Root(playlist)
         desktop = fixtures._Desktop(root)
         menu = fixtures._valid_menu()
@@ -148,6 +149,7 @@ class ContextStageReviewTests(unittest.TestCase):
                 rows = []
                 rows.extend(fixtures._Row(name, rows, actions) for name in fixtures.EXPECTED)
                 playlist = fixtures._Playlist(rows)
+                playlist.element_info.element = fixtures._NativeElement(actions)
                 main = fixtures._Root(playlist)
                 desktop = fixtures._Desktop(main)
                 def hang_at_menu_wait(*args, **kwargs):

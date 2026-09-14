@@ -556,13 +556,44 @@ def _validate_context_rows(rows: Sequence[Any], expected_rows: Sequence[str], pi
     return [_selected_state(row, name) for row, name in zip(rows, expected_rows)]
 
 
-def _select_context_rows(rows: Sequence[Any], expected_rows: Sequence[str], pid: int) -> list[bool]:
+def _validate_context_playlist(playlist: Any, pid: int) -> Any:
+    expected_pid = _positive_pid(pid, "expected playlist")
+    try:
+        info = playlist.element_info
+        playlist_pid = _positive_pid(getattr(info, "process_id"), "playlist")
+        class_name = getattr(info, "class_name")
+        control_type = getattr(info, "control_type")
+        automation_id = getattr(info, "automation_id")
+        element = getattr(info, "element")
+        set_focus = getattr(element, "SetFocus", None)
+    except Exception as exc:
+        raise _OwnershipError("owned playlist identity or native element is unavailable") from exc
+    if (
+        playlist_pid != expected_pid
+        or class_name != "NPlaylistWidget"
+        or control_type != "List"
+        or automation_id
+        != "QtSingleApplication.mainWindow.borderWidget.splitter.playlistWidget"
+        or not callable(set_focus)
+    ):
+        raise _OwnershipError("playlist is not the exact owned NPlaylistWidget")
+    return element
+
+
+def _select_context_rows(
+    playlist: Any, rows: Sequence[Any], expected_rows: Sequence[str], pid: int
+) -> list[bool]:
     _validate_context_rows(rows, expected_rows, pid)
+    playlist_element = _validate_context_playlist(playlist, pid)
     try:
         helpers = _context_helpers()
-        helpers.focus_owned_row(rows[0], expected_rows[0], pid)
+        playlist_element.SetFocus()
+        if not _focus_bool(playlist, "playlist"):
+            raise _OwnershipError("owned playlist did not acquire keyboard focus")
         helpers.select_exact_rows(rows, expected_rows, pid)
-        helpers.verify_owned_row_focus(rows[0], expected_rows[0], pid)
+        _validate_context_playlist(playlist, pid)
+        if not _focus_bool(playlist, "playlist"):
+            raise _OwnershipError("owned playlist lost keyboard focus after selection")
     except Exception as exc:
         raise _OwnershipError("strict UIA focus/SelectionItem context selection failed") from exc
     states = _validate_context_rows(rows, expected_rows, pid)
@@ -619,7 +650,7 @@ def _context_inspect_once(
     }
     emit_target(target)
     _emit_stage("focus-selection", "started")
-    selected_states = _select_context_rows(rows, expected_rows, expected["pid"])
+    selected_states = _select_context_rows(playlists[0], rows, expected_rows, expected["pid"])
     _emit_stage("focus-selection", "completed")
     _validate_identity(process, expected, executable)
     _emit_stage("ownership", "started")
