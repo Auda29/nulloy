@@ -1,0 +1,196 @@
+name: PR15 exact Qt6 Windows package
+
+on:
+  push:
+    paths:
+      - .github/workflows/pr15-exact-package.yml
+      - tools/player-inspection/test_pr15_package_workflow.py
+  workflow_dispatch:
+    inputs:
+      build_package:
+        description: Build the exact-source Qt6 Windows package
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  config:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate workflow contract
+        run: python tools/player-inspection/test_pr15_package_workflow.py
+
+  windows-package:
+    needs: config
+    if: github.event_name == 'workflow_dispatch' && inputs.build_package == true && needs.config.result == 'success'
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 774894c4eba7b646beafb38313fe0dc73cfb4671
+          persist-credentials: false
+      - name: Capture checkout Git for package provenance
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $git = (Get-Command git -ErrorAction Stop).Source
+          "NULLOY_GIT_EXECUTABLE=$git" >> $env:GITHUB_ENV
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-python
+            mingw-w64-x86_64-imagemagick
+            mingw-w64-x86_64-librsvg
+            mingw-w64-x86_64-qt6-base
+            mingw-w64-x86_64-qt6-declarative
+            mingw-w64-x86_64-qt6-svg
+            mingw-w64-x86_64-qt6-tools
+            mingw-w64-x86_64-qt6-5compat
+            mingw-w64-x86_64-gstreamer
+            mingw-w64-x86_64-gst-plugins-base
+            mingw-w64-x86_64-gst-plugins-good
+            mingw-w64-x86_64-taglib
+            mingw-w64-x86_64-zlib
+      - name: Assert exact source before build
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $headLines = @(git rev-parse HEAD)
+          if ($LASTEXITCODE -ne 0) { throw "Git HEAD lookup failed" }
+          $head = [string]::Join("`n", $headLines).Trim()
+          if ($head -ne "774894c4eba7b646beafb38313fe0dc73cfb4671") { throw "Unexpected product HEAD: $head" }
+          $statusLines = @(git status --porcelain --untracked-files=no)
+          if ($LASTEXITCODE -ne 0) { throw "Git tracked-status lookup failed" }
+          if ([string]::Join("`n", $statusLines).Trim()) { throw "Tracked source tree is dirty" }
+      - name: Configure, build and preserve Qt6 test gates
+        shell: msys2 {0}
+        run: |
+          mkdir -p .phase4/build
+          pacman -Q > .phase4/build/toolchain.txt
+          cmake --preset windows-portable-x64 -DCMAKE_PREFIX_PATH="$(cygpath -m /mingw64)"
+          cmake --build --preset windows-portable-x64
+          ctest --preset windows-portable-x64
+          python tools/phase4/test-import-profile.py
+          python tools/release/test-alpha.py
+      - name: Package and verify exact-source package
+        shell: msys2 {0}
+        run: |
+          python tools/phase2/package-windows.py --prefix "$(cygpath -m /mingw64)" --build .phase4/build --source .
+          python tools/phase2/verify-package.py --prefix "$(cygpath -m /mingw64)" --build .phase4/build --headless-audio
+      - name: Verify portable startup and registry recovery
+        shell: msys2 {0}
+        run: |
+          python tools/phase2/verify-package.py --prefix "$(cygpath -m /mingw64)" --build .phase4/build --headless-audio --trace-startup --repeat 3
+          for mode in missing corrupt changed-plugin; do
+            python tools/phase2/verify-package.py --prefix "$(cygpath -m /mingw64)" --build .phase4/build --headless-audio --trace-startup --registry-fallback "$mode"
+          done
+      - name: Verify audio formats and Unicode tag roundtrips
+        shell: msys2 {0}
+        run: |
+          python tools/phase3/build-format-fixtures.py --prefix "$(cygpath -m /mingw64)" --build .phase4/build
+          python tools/phase2/verify-package.py --prefix "$(cygpath -m /mingw64)" --build .phase4/build --format-fixtures .phase4/build/format-fixtures --headless-audio
+      - name: Test shared Qt6 skin adapters
+        shell: msys2 {0}
+        run: |
+          cmake -S experiments/qt6-skins -B .phase3/skin-probe -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$(cygpath -m /mingw64)"
+          cmake --build .phase3/skin-probe -j 4
+          ctest --test-dir .phase3/skin-probe --output-on-failure
+      - name: Assert package provenance and write independent binding
+        id: provenance
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $build = (Resolve-Path ".phase4/build").Path
+          $archives = @(Get-ChildItem $build -Filter "*-windows-x64.zip" -File)
+          if ($archives.Count -ne 1) { throw "Expected one Qt6 package ZIP, found $($archives.Count)" }
+          $archive = $archives[0]
+          $sidecar = "$($archive.FullName).sha256"
+          $actual = (Get-FileHash $archive.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $declared = (Get-Content $sidecar -Raw).Trim().Split()[0].ToLowerInvariant()
+          if ($actual -ne $declared) { throw "Package SHA-256 sidecar mismatch" }
+          $extract = Join-Path $env:RUNNER_TEMP ("pr15-package-" + $env:GITHUB_RUN_ID)
+          New-Item -ItemType Directory -Path $extract -Force | Out-Null
+          Expand-Archive -LiteralPath $archive.FullName -DestinationPath $extract -Force
+          $buildInfos = @(Get-ChildItem $extract -Recurse -Filter "build-info.json" -File)
+          $manifests = @(Get-ChildItem $extract -Recurse -Filter "package-manifest.json" -File)
+          if ($buildInfos.Count -ne 1 -or $manifests.Count -ne 1) { throw "Embedded package metadata is incomplete" }
+          $buildInfo = Get-Content $buildInfos[0].FullName -Raw | ConvertFrom-Json
+          $manifest = Get-Content $manifests[0].FullName -Raw | ConvertFrom-Json
+          foreach ($metadata in @($buildInfo, $manifest)) {
+            if ($metadata.source_commit -cne "774894c4eba7b646beafb38313fe0dc73cfb4671") { throw "Embedded source_commit is not exact PR15" }
+            if ($metadata.tracked_changes -isnot [bool] -or $metadata.tracked_changes -ne $false) { throw "Embedded tracked_changes is not Boolean false" }
+          }
+          $bindingDir = Join-Path $env:RUNNER_TEMP ("pr15-exact-package-" + $env:GITHUB_RUN_ID)
+          New-Item -ItemType Directory -Path $bindingDir -Force | Out-Null
+          $binding = [ordered]@{
+            schema = "pr15-exact-package-binding-v1"
+            workflow_source_sha = "${{ github.sha }}"
+            product_source_sha = "774894c4eba7b646beafb38313fe0dc73cfb4671"
+            run_id = $env:GITHUB_RUN_ID
+            run_attempt = $env:GITHUB_RUN_ATTEMPT
+            source_assertion = "PASS"
+            package_sha256 = $actual
+            embedded_build_info_source_commit = $buildInfo.source_commit
+            embedded_manifest_source_commit = $manifest.source_commit
+            embedded_tracked_changes = $buildInfo.tracked_changes
+            package_archive = $archive.Name
+          }
+          $bindingPath = Join-Path $bindingDir "acceptance-binding.json"
+          $binding | ConvertTo-Json -Depth 5 | Set-Content $bindingPath -Encoding utf8
+          "source_assertion: PASS" | Set-Content (Join-Path $build "source-assertion.txt") -Encoding ascii
+          "source_assertion=PASS" >> $env:GITHUB_OUTPUT
+
+      - name: Assert exact source after verification
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $headLines = @(git rev-parse HEAD)
+          if ($LASTEXITCODE -ne 0) { throw "Git HEAD lookup failed" }
+          $head = [string]::Join("`n", $headLines).Trim()
+          if ($head -ne "774894c4eba7b646beafb38313fe0dc73cfb4671") { throw "Product HEAD changed: $head" }
+          $statusLines = @(git status --porcelain --untracked-files=no)
+          if ($LASTEXITCODE -ne 0) { throw "Git tracked-status lookup failed" }
+          if ([string]::Join("`n", $statusLines).Trim()) { throw "Tracked source tree became dirty" }
+      - name: Upload exact Qt6 package
+        if: success() && steps.provenance.outputs.source_assertion == 'PASS' && needs.config.result == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nulloy-Qt6-windows-x64-pr15-${{ github.run_id }}
+          path: |
+            .phase4/build/*-windows-x64.zip
+            .phase4/build/*-windows-x64.zip.sha256
+            ${{ runner.temp }}/pr15-exact-package-${{ github.run_id }}/acceptance-binding.json
+          if-no-files-found: error
+          retention-days: 3
+      - name: Upload package evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nulloy-Qt6-pr15-evidence-${{ github.run_id }}
+          path: |
+            .phase4/build/toolchain.txt
+            .phase4/build/package-check/
+            .phase4/build/format-check/
+            .phase4/build/startup-check*/
+            .phase4/build/package-info.json
+            .phase4/build/source-assertion.txt
+            .phase4/build/Testing/Temporary/LastTest.log
+            .phase3/skin-probe/*-results.txt
+          if-no-files-found: warn
+          retention-days: 7
