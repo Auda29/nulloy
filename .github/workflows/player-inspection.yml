@@ -41,6 +41,13 @@ jobs:
           if ($packages.Count -ne 1) { throw "Expected exactly one package" }
           python tools/player-inspection/inspect_player.py --package $packages[0].FullName --output evidence --source-sha 9e1b3f060e649a64c698b2a5981dbfca1d741b84 --archive-sha256 5558a6ed786051224f7dcf3228a230fa45c95959f3e363e5b06b48d446ccb833
           exit $LASTEXITCODE
+      - name: Inspect exact packaged player with bounded read-only UIA worker
+        shell: pwsh
+        run: |
+          $packages = @(Get-ChildItem package -Filter '*.zip' -Recurse)
+          if ($packages.Count -ne 1) { throw "Expected exactly one package" }
+          python tools/player-inspection/inspect_player.py --package $packages[0].FullName --output evidence-bounded --source-sha 9e1b3f060e649a64c698b2a5981dbfca1d741b84 --archive-sha256 5558a6ed786051224f7dcf3228a230fa45c95959f3e363e5b06b48d446ccb833 --bounded-read-only
+          exit $LASTEXITCODE
       - name: Inspect owned right-click context menu without invoking entries
         shell: pwsh
         run: |
@@ -55,6 +62,7 @@ jobs:
           name: player-inspection-${{ github.sha }}
           path: |
             evidence/
+            evidence-bounded/
             evidence-context/
           if-no-files-found: warn
           retention-days: 14

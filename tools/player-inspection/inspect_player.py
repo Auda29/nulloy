@@ -15,6 +15,7 @@ import ctypes
 import hashlib
 import importlib.util
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -36,6 +37,15 @@ if _POINTER_SPEC is None or _POINTER_SPEC.loader is None:
     raise RuntimeError("cannot load owned pointer transport")
 owned_pointer = importlib.util.module_from_spec(_POINTER_SPEC)
 _POINTER_SPEC.loader.exec_module(owned_pointer)
+
+_SUPERVISOR_SPEC = importlib.util.spec_from_file_location(
+    "nulloy_uia_supervisor", Path(__file__).with_name("uia_supervisor.py")
+)
+if _SUPERVISOR_SPEC is None or _SUPERVISOR_SPEC.loader is None:
+    raise RuntimeError("cannot load bounded UIA supervisor")
+uia_supervisor = importlib.util.module_from_spec(_SUPERVISOR_SPEC)
+sys.modules[_SUPERVISOR_SPEC.name] = uia_supervisor
+_SUPERVISOR_SPEC.loader.exec_module(uia_supervisor)
 
 SOURCE_SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
@@ -91,6 +101,12 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _runtime_source_hashes() -> dict[str, str]:
+    """Hash every runtime helper before package/temp allocation begins."""
+    names = ("inspect_player.py", "uia_supervisor.py", "uia_worker.py", "owned_pointer.py")
+    return {name: _sha256(Path(__file__).with_name(name)) for name in names}
 
 
 def parse_source_sha(value: str) -> str:
@@ -720,6 +736,9 @@ def _owned_surface_diagnostics(desktop: Any, process_pid: int) -> dict[str, Any]
 def _record_exception(report: dict[str, Any], exc: Exception) -> None:
     report["error"] = str(exc)
     report["error_type"] = type(exc).__name__
+    supervisor_result = getattr(exc, "supervisor_result", None)
+    if supervisor_result is not None:
+        report["uia_supervisor"] = supervisor_result
     diagnostics = getattr(exc, "diagnostics", None)
     if diagnostics and diagnostics.get("write_errors"):
         report["diagnostics_error"] = diagnostics
@@ -771,6 +790,145 @@ def _window_process_identity(hwnd: int, psutil: Any) -> dict[str, Any]:
         "create_time": float(native.create_time()),
         "executable": str(native.exe()),
     }
+
+
+def _native_window_snapshot(hwnd: int) -> dict[str, Any]:
+    """Read only typed Win32 ownership/visibility data; never enters COM."""
+    if not is_windows_native():
+        raise BlockedError("native HWND discovery requires Windows")
+    if not isinstance(hwnd, int) or isinstance(hwnd, bool) or hwnd <= 0:
+        raise ContractError("native window handle must be a positive integer")
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    is_window = user32.IsWindow
+    is_window.argtypes = [wintypes.HWND]
+    is_window.restype = wintypes.BOOL
+    is_visible = user32.IsWindowVisible
+    is_visible.argtypes = [wintypes.HWND]
+    is_visible.restype = wintypes.BOOL
+    get_pid = user32.GetWindowThreadProcessId
+    get_pid.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+    get_pid.restype = wintypes.DWORD
+    get_class = user32.GetClassNameW
+    get_class.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+    get_class.restype = ctypes.c_int
+    native = wintypes.HWND(hwnd)
+    if not is_window(native):
+        return {"hwnd": hwnd, "live": False, "visible": False, "pid": 0, "class_name": ""}
+    owner_pid = wintypes.DWORD(0)
+    if not get_pid(native, ctypes.byref(owner_pid)) or not owner_pid.value:
+        return {"hwnd": hwnd, "live": True, "visible": False, "pid": 0, "class_name": ""}
+    class_name = ctypes.create_unicode_buffer(256)
+    if not get_class(native, class_name, len(class_name)):
+        class_value = ""
+    else:
+        class_value = class_name.value
+    return {
+        "hwnd": hwnd,
+        "live": True,
+        "visible": bool(is_visible(native)),
+        "pid": int(owner_pid.value),
+        "class_name": class_value,
+    }
+
+
+def _validate_bounded_target(
+    target: dict[str, Any],
+    identity: dict[str, Any],
+    executable: Path,
+    *,
+    expected_hwnd: int | None = None,
+    require_uia_main: bool = False,
+) -> dict[str, Any]:
+    """Reject malformed or swapped identity before accepting worker evidence."""
+    if not isinstance(target, dict):
+        raise ContractError("bounded target identity is not an object")
+    try:
+        pid = target["pid"]
+        create_time = target["create_time"]
+        target_hwnd = target["hwnd"]
+        target_exe = target["executable"]
+        visible = target["visible"]
+        class_name = target["class_name"]
+    except (KeyError, TypeError) as exc:
+        raise ContractError("bounded target identity is malformed") from exc
+    if not isinstance(pid, int) or isinstance(pid, bool):
+        raise ContractError("bounded target PID is malformed")
+    if not isinstance(target_hwnd, int) or isinstance(target_hwnd, bool) or target_hwnd <= 0:
+        raise ContractError("bounded target HWND is malformed")
+    if not isinstance(create_time, (int, float)) or isinstance(create_time, bool) or not math.isfinite(float(create_time)):
+        raise ContractError("bounded target create-time is malformed")
+    if visible is not True or not isinstance(class_name, str) or not class_name:
+        raise ContractError("bounded target window visibility/class is invalid")
+    if require_uia_main and class_name != "NMainWindow":
+        raise ContractError("bounded UIA target is not NMainWindow")
+    if pid != int(identity["pid"]) or float(create_time) != float(identity["create_time"]):
+        raise ContractError("bounded target PID/create-time identity changed")
+    if not _same_path(target_exe, executable):
+        raise ContractError("bounded target executable identity changed")
+    if expected_hwnd is not None and target_hwnd != expected_hwnd:
+        raise ContractError("bounded target HWND changed")
+    return target
+
+
+def _discover_owned_main_hwnd(
+    process: Any,
+    psutil: Any,
+    identity: dict[str, Any],
+    executable: Path,
+    *,
+    timeout: float = 30.0,
+    poll_interval: float = 0.25,
+) -> dict[str, Any]:
+    """Pin the sole visible owned top-level HWND; the worker checks its UIA role.
+
+    Win32 GetClassNameW returns Qt's registered QWindow class, not the
+    NMainWindow class exposed through UIA. Do not conflate the two namespaces.
+    """
+    if not math.isfinite(float(timeout)) or timeout <= 0:
+        raise ValueError("HWND discovery timeout must be finite and positive")
+    deadline = time.monotonic() + timeout
+    while True:
+        _verify_process_identity(process, psutil, identity, executable)
+        candidates: list[dict[str, Any]] = []
+        callback_errors: list[Exception] = []
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        enum_windows = user32.EnumWindows
+        callback_type = getattr(ctypes, "WINFUNCTYPE", ctypes.CFUNCTYPE)
+        callback = callback_type(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)(
+            lambda hwnd, _lparam: _collect(hwnd, identity, candidates, callback_errors)
+        )
+        enum_windows.argtypes = [callback_type(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM), wintypes.LPARAM]
+        enum_windows.restype = wintypes.BOOL
+        if not enum_windows(callback, 0):
+            raise ContractError("EnumWindows failed")
+        if callback_errors:
+            raise callback_errors[0]
+        if len(candidates) > 1:
+            raise ContractError(f"owned visible native window count is {len(candidates)}, expected one")
+        if candidates:
+            target = candidates[0]
+            owner = psutil.Process(target["pid"])
+            target.update({"create_time": float(owner.create_time()), "executable": str(owner.exe())})
+            target["visible"] = True
+            _validate_bounded_target(target, identity, executable)
+            return target
+        if time.monotonic() >= deadline:
+            raise TimeoutError("timed out waiting for one owned visible native window")
+        time.sleep(min(max(0.0, poll_interval), max(0.0, deadline - time.monotonic())))
+
+
+def _collect(hwnd: int, identity: dict[str, Any], candidates: list[dict[str, Any]], errors: list[Exception]) -> int:
+    try:
+        snapshot = _native_window_snapshot(int(hwnd))
+        if (
+            snapshot["live"]
+            and snapshot["visible"]
+            and snapshot["pid"] == int(identity["pid"])
+        ):
+            candidates.append(snapshot)
+    except Exception as exc:
+        errors.append(exc)
+    return 1
 
 
 def _wait_for_context_menu(
@@ -832,6 +990,95 @@ def _capture(main_window: Any, output: Path, filename: str) -> str | None:
         return None
 
 
+def _bounded_read_only_snapshot(
+    *,
+    output: Path,
+    process: Any,
+    psutil: Any,
+    identity: dict[str, Any],
+    executable: Path,
+    expected_rows: Sequence[str],
+) -> dict[str, Any]:
+    """Run read-only UIA outside this controller with independent HWND checks."""
+    parent_before = _discover_owned_main_hwnd(process, psutil, identity, executable)
+    _validate_bounded_target(parent_before, identity, executable)
+    expected_hwnd = parent_before["hwnd"]
+    result: Any | None = None
+    primary_exception: Exception | None = None
+    try:
+        result = uia_supervisor.run_supervised(
+            output_dir=output / "uia-supervisor",
+            worker_args=(
+                "--hwnd", str(expected_hwnd),
+                "--pid", str(identity["pid"]),
+                "--create-time", str(identity["create_time"]),
+                "--exe", str(executable),
+                "--expected-rows", json.dumps(list(expected_rows), separators=(",", ":")),
+            ),
+            readiness_timeout=5.0,
+            execution_timeout=30.0,
+            terminate_timeout=2.0,
+            kill_timeout=2.0,
+        )
+    except Exception as exc:
+        primary_exception = exc
+
+    postcheck_error: Exception | None = None
+    parent_after: dict[str, Any] | None = None
+    try:
+        parent_after = _discover_owned_main_hwnd(process, psutil, identity, executable, timeout=5.0)
+        _validate_bounded_target(parent_after, identity, executable, expected_hwnd=expected_hwnd)
+    except Exception as exc:
+        postcheck_error = exc
+
+    if primary_exception is not None:
+        result_dict = dict(getattr(primary_exception, "supervisor_result", {}) or {})
+        result_dict.setdefault("status", "FAIL")
+        result_dict.setdefault("primary_error", f"{type(primary_exception).__name__}: {primary_exception}")
+        if postcheck_error is not None:
+            result_dict.setdefault("secondary_errors", []).append(
+                f"parent HWND postcheck failed: {type(postcheck_error).__name__}: {postcheck_error}"
+            )
+        primary_exception.supervisor_result = result_dict
+        raise primary_exception
+
+    assert result is not None
+    result_dict = result.to_dict()
+    result_dict["parent_target_before"] = parent_before
+    if parent_after is not None:
+        result_dict["parent_target_after"] = parent_after
+    if postcheck_error is not None:
+        result_dict.setdefault("secondary_errors", []).append(
+            f"parent HWND postcheck failed: {type(postcheck_error).__name__}: {postcheck_error}"
+        )
+    if result.status != "SUCCESS" or not result.success or not result.cleanup_verified:
+        failure = result.failure_kind or ("cleanup_uncertain" if not result.cleanup_verified else "worker_result")
+        error = RuntimeError(f"bounded UIA worker ended with {result.status}: {failure}")
+        error.supervisor_result = result_dict
+        raise error
+    if postcheck_error is not None:
+        error = RuntimeError(f"bounded UIA parent HWND postcheck failed: {postcheck_error}")
+        error.supervisor_result = result_dict
+        raise error
+
+    for label, target in (("worker before", result.target_before), ("worker after", result.target_after)):
+        try:
+            _validate_bounded_target(target, identity, executable, expected_hwnd=expected_hwnd, require_uia_main=True)
+        except Exception as exc:
+            error = RuntimeError(f"bounded UIA {label} identity did not match the owned player: {exc}")
+            error.supervisor_result = result_dict
+            raise error from exc
+
+    payload = result.child_payload
+    snapshot = payload.get("snapshot")
+    rows = payload.get("playlist_rows")
+    if not isinstance(snapshot, list) or not isinstance(rows, list):
+        error = RuntimeError("bounded UIA worker returned no primitive snapshot or playlist rows")
+        error.supervisor_result = result_dict
+        raise error
+    return {"result": result_dict, "snapshot": snapshot, "playlist_rows": rows, "target": parent_after}
+
+
 def _fixtures_unchanged(fixtures: Sequence[Path], fixture_hashes: dict[str, dict[str, Any]]) -> bool:
     return all(
         path.is_file()
@@ -846,6 +1093,7 @@ def _cleanup(
     temp_root: Path | None,
     *,
     owner_check: Any | None = None,
+    retain_temp_root: bool = False,
 ) -> tuple[bool, list[str]]:
     errors: list[str] = []
     stopped = process is None
@@ -884,10 +1132,13 @@ def _cleanup(
                 if not stopped and first_wait_error is not None and not errors:
                     errors.append(f"terminate/wait failed: {first_wait_error!r}")
     if stopped and temp_root is not None:
-        try:
-            shutil.rmtree(temp_root)
-        except Exception as exc:
-            errors.append(repr(exc))
+        if retain_temp_root:
+            errors.append("temporary evidence retained because worker cleanup is uncertain")
+        else:
+            try:
+                shutil.rmtree(temp_root)
+            except Exception as exc:
+                errors.append(repr(exc))
     return stopped and not errors, errors
 
 
@@ -907,7 +1158,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="allow one guarded real right-click; requires --inspect-context-menu",
     )
+    parser.add_argument(
+        "--bounded-read-only",
+        action="store_true",
+        help="run read-only UIA traversal in a finite supervised worker; context mode remains separate",
+    )
     args = parser.parse_args(argv)
+    if args.bounded_read_only and args.inspect_context_menu:
+        parser.error("--bounded-read-only cannot be combined with --inspect-context-menu")
     if args.allow_owned_pointer_input and not args.inspect_context_menu:
         parser.error("--allow-owned-pointer-input requires --inspect-context-menu")
     return args
@@ -1142,6 +1400,7 @@ def run_inspection(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
         report["provenance"] = {
             "package_source_sha": source_sha,
             "automation_script_sha": _sha256(Path(__file__).resolve()),
+            "automation_runtime_source_hashes": _runtime_source_hashes(),
             "git_github_sha": os.environ.get("GITHUB_SHA"),
         }
         package = args.package.resolve()
@@ -1172,8 +1431,6 @@ def run_inspection(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
         environment = _safe_environment()
         command = [str(package_info.executable), *(str(path) for path in fixtures)]
         import psutil
-        import PIL.Image  # noqa: F401 - validates capture dependency
-        from pywinauto import Desktop
 
         process = subprocess.Popen(command, cwd=package_info.root, env=environment)
         identity = _process_identity(process, psutil, package_info.executable)
@@ -1181,56 +1438,86 @@ def run_inspection(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
             process, psutil, identity, package_info.executable
         )
         report["process_identity"] = identity
-        desktop = Desktop(backend="uia", allow_magic_lookup=False)
-        main_window = _wait_for(
-            lambda: (_verify_process_identity(process, psutil, identity, package_info.executable), _owned_main(desktop, identity))[1],
-            30,
-            "owned NMainWindow Pane",
-        )
-        tree = _tree(main_window)
-        _write_json(output / "player-uia.json", tree)
-        report["uia_tree_records"] = len(tree)
-        report["screenshot"] = _capture(main_window, output, "player.png")
-        if report["screenshot"] is None:
-            raise ContractError("main UI screenshot could not be captured")
-        playlist = _playlist(main_window)
         durations = [fixture_seconds(path) for path in fixtures]
         expected = expected_playlist_rows(fixtures, durations)
-        def exact_rows_ready() -> list[Any] | None:
-            _verify_process_identity(process, psutil, identity, package_info.executable)
-            rows = list(playlist.descendants(control_type="ListItem"))
-            actual_rows = [_window_text(row) for row in rows]
-            report["playlist"] = {
-                "expected_rows": expected,
-                "observed_rows": actual_rows,
-                "row_count": len(actual_rows),
-            }
-            return rows if actual_rows == expected else None
 
-        rows = _wait_for(exact_rows_ready, 30, "exact owned playlist rows")
-        actual = [_window_text(row) for row in rows]
-        exact_playlist_rows(actual, expected)
-        unchanged = _fixtures_unchanged(fixtures, fixture_hashes)
-        if not unchanged:
-            raise ContractError("fixture bytes changed during read-only inspection")
-        report["filesystem_unchanged"] = True
-        if args.inspect_context_menu:
-            inspect_context_menu(
-                main_window=main_window,
-                playlist=playlist,
-                rows=rows,
-                expected_rows=expected,
+        if args.bounded_read_only:
+            bounded = _bounded_read_only_snapshot(
+                output=output,
                 process=process,
                 psutil=psutil,
-                process_identity=identity,
+                identity=identity,
                 executable=package_info.executable,
-                desktop=desktop,
-                output=output,
-                fixtures=fixtures,
-                fixture_hashes=fixture_hashes,
-                report=report,
-                allow_owned_pointer_input=args.allow_owned_pointer_input,
+                expected_rows=expected,
             )
+            report["read_only_mode"] = "bounded-supervised-worker"
+            report["uia_supervisor"] = bounded["result"]
+            report["uia_target"] = bounded["target"]
+            _write_json(output / "player-uia.json", bounded["snapshot"])
+            report["uia_tree_records"] = len(bounded["snapshot"])
+            report["screenshot"] = None
+            report["screenshot_note"] = "bounded read-only mode serializes primitives; capture remains in the legacy path"
+            actual = bounded["playlist_rows"]
+            report["playlist"] = {
+                "expected_rows": expected,
+                "observed_rows": actual,
+                "row_count": len(actual),
+            }
+            exact_playlist_rows(actual, expected)
+            if not _fixtures_unchanged(fixtures, fixture_hashes):
+                raise ContractError("fixture bytes changed during bounded read-only inspection")
+            report["filesystem_unchanged"] = True
+        else:
+            import PIL.Image  # noqa: F401 - validates capture dependency
+            from pywinauto import Desktop
+
+            desktop = Desktop(backend="uia", allow_magic_lookup=False)
+            main_window = _wait_for(
+                lambda: (_verify_process_identity(process, psutil, identity, package_info.executable), _owned_main(desktop, identity))[1],
+                30,
+                "owned NMainWindow Pane",
+            )
+            tree = _tree(main_window)
+            _write_json(output / "player-uia.json", tree)
+            report["uia_tree_records"] = len(tree)
+            report["screenshot"] = _capture(main_window, output, "player.png")
+            if report["screenshot"] is None:
+                raise ContractError("main UI screenshot could not be captured")
+            playlist = _playlist(main_window)
+            def exact_rows_ready() -> list[Any] | None:
+                _verify_process_identity(process, psutil, identity, package_info.executable)
+                rows = list(playlist.descendants(control_type="ListItem"))
+                actual_rows = [_window_text(row) for row in rows]
+                report["playlist"] = {
+                    "expected_rows": expected,
+                    "observed_rows": actual_rows,
+                    "row_count": len(actual_rows),
+                }
+                return rows if actual_rows == expected else None
+
+            rows = _wait_for(exact_rows_ready, 30, "exact owned playlist rows")
+            actual = [_window_text(row) for row in rows]
+            exact_playlist_rows(actual, expected)
+            if not _fixtures_unchanged(fixtures, fixture_hashes):
+                raise ContractError("fixture bytes changed during read-only inspection")
+            report["filesystem_unchanged"] = True
+            if args.inspect_context_menu:
+                inspect_context_menu(
+                    main_window=main_window,
+                    playlist=playlist,
+                    rows=rows,
+                    expected_rows=expected,
+                    process=process,
+                    psutil=psutil,
+                    process_identity=identity,
+                    executable=package_info.executable,
+                    desktop=desktop,
+                    output=output,
+                    fixtures=fixtures,
+                    fixture_hashes=fixture_hashes,
+                    report=report,
+                    allow_owned_pointer_input=args.allow_owned_pointer_input,
+                )
         report["status"] = "PASS"
     except BlockedError as exc:
         report["status"] = "BLOCKED"
@@ -1262,8 +1549,15 @@ def run_inspection(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
                     report["error"] = f"final fixture verification failed: {verification_exc}"
                 else:
                     report["final_verification_error"] = repr(verification_exc)
+        retain_temp_root = (
+            "uia_supervisor" in report
+            and report["uia_supervisor"].get("cleanup_verified") is not True
+        )
         cleanup_verified, cleanup_errors = _cleanup(
-            process, temp_root, owner_check=cleanup_owner_check
+            process,
+            temp_root,
+            owner_check=cleanup_owner_check,
+            retain_temp_root=retain_temp_root,
         )
         report["cleanup"] = {
             "process_cleanup_verified": cleanup_verified,
