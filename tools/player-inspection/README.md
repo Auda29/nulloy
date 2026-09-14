@@ -62,3 +62,33 @@ test runs a real child with a trusted no-op `terminate` seam and exercises the
 real kill/wait fallback on either platform; this is transport containment, not
 native UIA acceptance. The missing-package CLI test expects `FAIL` on Windows
 and the explicit platform `BLOCKED` result elsewhere.
+
+## Bounded context-menu observation
+
+The context slice is opt-in and uses a separate supervised worker:
+
+```powershell
+python tools/player-inspection/inspect_player.py `
+  --package PATH_TO_EXACT_PACKAGE.zip `
+  --output evidence-context-bounded `
+  --source-sha EXACT_PACKAGE_SOURCE_COMMIT `
+  --archive-sha256 EXACT_ARCHIVE_SHA256 `
+  --bounded-context-menu
+```
+
+This mode validates the pinned `NMainWindow`/playlist, focuses the first exact
+row, and uses only UIA `SelectionItem.Select` followed by
+`AddToSelection` to establish `[True, True, False]`. It then posts one
+keyboard-reason `WM_CONTEXTMENU` (`LPARAM=-1`) to the already-owned root HWND.
+The worker observes one fresh owned `QMenu`/`Pane` and exactly four visible
+menu items, including the exact `Move To Trash` and `Remove From Playlist`
+labels and automation IDs with distinct runtime IDs. It records
+`menu_items_invoked=false` and performs no menu invocation, trash action,
+pointer input, global input, or modal handling.
+
+`--bounded-context-menu` is incompatible with `--bounded-read-only`,
+`--inspect-context-menu`, and `--allow-owned-pointer-input`. The mode is not
+passive read-only because it changes focus and selection and posts a context
+request. It emits primitive JSON only, does not claim screenshot evidence, and
+does not prove that a particular Qt build routes the keyboard-reason request;
+native Windows execution and independent review remain required.

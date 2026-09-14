@@ -4,9 +4,11 @@
 This runner launches one validated portable package with three generated WAV files,
 reads only its owned Qt UIA tree, and cleans up only the Popen-owned process and
 its own temporary files.  Default mode never invokes a UI control or changes the
-playlist; the explicit context-menu mode uses UIA SelectionItem selection and
-one guarded keyboard or real-pointer context request, and never invokes a menu
-item.  Real-pointer input requires the separate explicit allow flag.
+playlist; the explicit legacy context-menu mode uses UIA SelectionItem selection
+and one guarded keyboard or real-pointer context request, and never invokes a
+menu item.  The separate bounded context mode performs its UIA and keyboard-
+reason context request in a supervised worker.  Real-pointer input requires the
+separate explicit allow flag.
 """
 from __future__ import annotations
 
@@ -878,6 +880,7 @@ def _discover_owned_main_hwnd(
     *,
     timeout: float = 30.0,
     poll_interval: float = 0.25,
+    pinned_hwnd: int | None = None,
 ) -> dict[str, Any]:
     """Pin the sole visible owned top-level HWND; the worker checks its UIA role.
 
@@ -886,6 +889,8 @@ def _discover_owned_main_hwnd(
     """
     if not math.isfinite(float(timeout)) or timeout <= 0:
         raise ValueError("HWND discovery timeout must be finite and positive")
+    if pinned_hwnd is not None and (type(pinned_hwnd) is not int or pinned_hwnd <= 0):
+        raise ValueError("pinned HWND must be a positive integer")
     deadline = time.monotonic() + timeout
     while True:
         _verify_process_identity(process, psutil, identity, executable)
@@ -903,6 +908,10 @@ def _discover_owned_main_hwnd(
             raise ContractError("EnumWindows failed")
         if callback_errors:
             raise callback_errors[0]
+        if pinned_hwnd is not None:
+            # Context inspection intentionally creates a second top-level popup.
+            # Recheck only the previously pinned main HWND, never substitute it.
+            candidates = [target for target in candidates if target["hwnd"] == pinned_hwnd]
         if len(candidates) > 1:
             raise ContractError(f"owned visible native window count is {len(candidates)}, expected one")
         if candidates:
@@ -998,6 +1007,7 @@ def _bounded_read_only_snapshot(
     identity: dict[str, Any],
     executable: Path,
     expected_rows: Sequence[str],
+    worker_mode_args: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Run read-only UIA outside this controller with independent HWND checks."""
     parent_before = _discover_owned_main_hwnd(process, psutil, identity, executable)
@@ -1014,6 +1024,7 @@ def _bounded_read_only_snapshot(
                 "--create-time", str(identity["create_time"]),
                 "--exe", str(executable),
                 "--expected-rows", json.dumps(list(expected_rows), separators=(",", ":")),
+                *worker_mode_args,
             ),
             readiness_timeout=5.0,
             execution_timeout=30.0,
@@ -1026,7 +1037,8 @@ def _bounded_read_only_snapshot(
     postcheck_error: Exception | None = None
     parent_after: dict[str, Any] | None = None
     try:
-        parent_after = _discover_owned_main_hwnd(process, psutil, identity, executable, timeout=5.0)
+        post_options = {"pinned_hwnd": expected_hwnd} if worker_mode_args == ("--context-menu",) else {}
+        parent_after = _discover_owned_main_hwnd(process, psutil, identity, executable, timeout=5.0, **post_options)
         _validate_bounded_target(parent_after, identity, executable, expected_hwnd=expected_hwnd)
     except Exception as exc:
         postcheck_error = exc
@@ -1077,6 +1089,125 @@ def _bounded_read_only_snapshot(
         error.supervisor_result = result_dict
         raise error
     return {"result": result_dict, "snapshot": snapshot, "playlist_rows": rows, "target": parent_after}
+
+
+def _validate_bounded_context_payload(payload: Any, expected_rows: Sequence[str]) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise ContractError("bounded context worker payload is not an object")
+    context = payload.get("context_menu")
+    if not isinstance(context, dict):
+        raise ContractError("bounded context worker returned no context-menu contract")
+    if context.get("menu_items_invoked") is not False:
+        raise ContractError("bounded context worker did not prove menu_items_invoked=false")
+    stages = context.get("stage_diagnostics")
+    expected_stages = {
+        "root_playlist_rows_validated",
+        "focus_and_selection_validated",
+        "ownership_before_validated",
+        "keyboard_context_posted_once",
+        "fresh_menu_validated",
+        "selection_retained_after_menu",
+    }
+    if (
+        not isinstance(stages, dict)
+        or set(stages) != expected_stages
+        or any(value is not True for value in stages.values())
+    ):
+        raise ContractError("bounded context worker stage diagnostics are incomplete")
+    if context.get("selected_rows") != list(expected_rows[:2]):
+        raise ContractError("bounded context worker selection is not exactly the first two rows")
+    if context.get("selection_state") != [True, True, False]:
+        raise ContractError("bounded context worker selection state is not [True, True, False]")
+    if context.get("selection_after_menu") != [True, True, False]:
+        raise ContractError("bounded context worker did not retain the exact selection")
+    if context.get("menu_items_count") != 4 or not isinstance(context.get("menu_items"), list):
+        raise ContractError("bounded context worker did not observe exactly four menu items")
+    if len(context["menu_items"]) != 4:
+        raise ContractError("bounded context worker menu-item list is not exactly four entries")
+    expected_pid = payload.get("pid")
+    menu_root = context.get("menu_root")
+    if (
+        type(expected_pid) is not int or expected_pid <= 0
+        or not isinstance(menu_root, dict)
+        or menu_root.get("process_id") != expected_pid
+        or type(menu_root.get("nativehandle")) is not int
+        or menu_root["nativehandle"] <= 0
+        or menu_root.get("control_type") != "Pane"
+        or menu_root.get("class_name") != "QMenu"
+        or menu_root.get("automation_id") != "QtSingleApplication.QMenu"
+    ):
+        raise ContractError("bounded context worker menu root identity is not owned and observed")
+    if any(
+        not isinstance(record, dict) or record.get("process_id") != expected_pid
+        for record in context["menu_items"]
+    ):
+        raise ContractError("bounded context worker menu items contain a foreign record")
+    recognized = context.get("recognized_items")
+    if not isinstance(recognized, list) or len(recognized) != 2:
+        raise ContractError("bounded context worker returned the wrong recognized menu-item count")
+    for record in [menu_root, *context["menu_items"], *(entry.get("record") for entry in recognized if isinstance(entry, dict))]:
+        if not isinstance(record, dict) or type(record.get("process_id")) is not int or record["process_id"] != expected_pid:
+            raise ContractError("bounded context worker record PID is malformed or foreign")
+        runtime = record.get("runtimeID")
+        if not isinstance(runtime, list) or not runtime or any(
+            type(value) is not int or not -(2**31) <= value < 2**31 for value in runtime
+        ):
+            raise ContractError("bounded context worker runtime ID is malformed")
+    expected_ids = {
+        "Move To Trash": "QtSingleApplication.QMenu.MoveToTrashAction",
+        "Remove From Playlist": "QtSingleApplication.QMenu.RemoveFromPlaylistAction",
+    }
+    observed_ids = {
+        entry.get("label"): entry.get("record", {}).get("automation_id")
+        for entry in recognized
+        if isinstance(entry, dict) and isinstance(entry.get("record"), dict)
+    }
+    if observed_ids != expected_ids:
+        raise ContractError(f"bounded context worker menu IDs differ: {observed_ids!r}")
+    runtime_ids = [
+        json.dumps(entry["record"].get("runtimeID"), sort_keys=True, default=str)
+        for entry in recognized
+    ]
+    if len(set(runtime_ids)) != 2:
+        raise ContractError("bounded context worker menu action runtime IDs are not distinct")
+    ownership_before = context.get("ownership_before")
+    ownership_after = context.get("ownership_after")
+    if (
+        not isinstance(ownership_before, dict)
+        or ownership_before.get("owned_popup_count") != 0
+        or ownership_before.get("owned_context_menu_count") != 0
+    ):
+        raise ContractError("bounded context worker ownership-before state is not empty")
+    if not isinstance(ownership_after, dict) or ownership_after.get("owned_context_menu_count") != 1:
+        raise ContractError("bounded context worker ownership-after state lacks one menu")
+    return context
+
+
+def _bounded_context_menu_snapshot(
+    *,
+    output: Path,
+    process: Any,
+    psutil: Any,
+    identity: dict[str, Any],
+    executable: Path,
+    expected_rows: Sequence[str],
+) -> dict[str, Any]:
+    bounded = _bounded_read_only_snapshot(
+        output=output,
+        process=process,
+        psutil=psutil,
+        identity=identity,
+        executable=executable,
+        expected_rows=expected_rows,
+        worker_mode_args=("--context-menu",),
+    )
+    try:
+        context = _validate_bounded_context_payload(bounded["result"].get("child_payload"), expected_rows)
+    except Exception as exc:
+        exc.supervisor_result = bounded["result"]
+        raise
+    bounded["context_menu"] = context
+    return bounded
 
 
 def _fixtures_unchanged(fixtures: Sequence[Path], fixture_hashes: dict[str, dict[str, Any]]) -> bool:
@@ -1163,9 +1294,21 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="run read-only UIA traversal in a finite supervised worker; context mode remains separate",
     )
+    parser.add_argument(
+        "--bounded-context-menu",
+        action="store_true",
+        help="run finite owned context-menu observation without invoking a menu item",
+    )
     args = parser.parse_args(argv)
     if args.bounded_read_only and args.inspect_context_menu:
         parser.error("--bounded-read-only cannot be combined with --inspect-context-menu")
+    if args.bounded_context_menu and (
+        args.bounded_read_only or args.inspect_context_menu or args.allow_owned_pointer_input
+    ):
+        parser.error(
+            "--bounded-context-menu cannot be combined with bounded-read-only, "
+            "legacy context-menu, or pointer input flags"
+        )
     if args.allow_owned_pointer_input and not args.inspect_context_menu:
         parser.error("--allow-owned-pointer-input requires --inspect-context-menu")
     return args
@@ -1466,6 +1609,34 @@ def run_inspection(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
             exact_playlist_rows(actual, expected)
             if not _fixtures_unchanged(fixtures, fixture_hashes):
                 raise ContractError("fixture bytes changed during bounded read-only inspection")
+            report["filesystem_unchanged"] = True
+        elif args.bounded_context_menu:
+            bounded = _bounded_context_menu_snapshot(
+                output=output,
+                process=process,
+                psutil=psutil,
+                identity=identity,
+                executable=package_info.executable,
+                expected_rows=expected,
+            )
+            report["mode"] = "bounded-context-menu-supervised-worker"
+            report["context_menu_mode"] = "selection-and-menu-observation-only"
+            report["uia_supervisor"] = bounded["result"]
+            report["uia_target"] = bounded["target"]
+            report["context_menu"] = bounded["context_menu"]
+            _write_json(output / "player-uia.json", bounded["snapshot"])
+            report["uia_tree_records"] = len(bounded["snapshot"])
+            report["screenshot"] = None
+            report["screenshot_note"] = "bounded context mode serializes UIA primitives; no screenshot or menu action is performed"
+            actual = bounded["playlist_rows"]
+            report["playlist"] = {
+                "expected_rows": expected,
+                "observed_rows": actual,
+                "row_count": len(actual),
+            }
+            exact_playlist_rows(actual, expected)
+            if not _fixtures_unchanged(fixtures, fixture_hashes):
+                raise ContractError("fixture bytes changed during bounded context inspection")
             report["filesystem_unchanged"] = True
         else:
             import PIL.Image  # noqa: F401 - validates capture dependency
