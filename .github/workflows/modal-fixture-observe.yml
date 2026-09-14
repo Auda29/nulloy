@@ -1,0 +1,59 @@
+name: Harmless Qt modal observation (no Invoke acceptance)
+
+on:
+  push:
+    branches: ['test/windows-player-inspection']
+    paths:
+      - 'tools/modal-cancel-fixture/**'
+      - 'tools/player-inspection/uia_supervisor.py'
+      - '.github/workflows/modal-fixture-observe.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: modal-observation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test-fixture:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned harmless fixture dependencies
+        run: python -m pip install PySide6==6.8.2 psutil==7.0.0
+      - name: Run real offscreen Qt and safety regressions
+        run: python -m unittest discover -s tools/modal-cancel-fixture -p 'test_*.py' -v
+
+  observe-modal:
+    needs: test-fixture
+    runs-on: windows-2022
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned observer and harmless Qt fixture
+        run: python -m pip install PySide6==6.8.2 psutil==7.0.0 pywinauto==0.6.9
+      - name: Observe owned modal (Cancel remains blocked)
+        shell: pwsh
+        run: |
+          python tools/modal-cancel-fixture/controller.py --evidence-root modal-observation
+          exit $LASTEXITCODE
+      - name: Preserve observations even for BLOCKED or FAIL
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: harmless-modal-observation-${{ github.run_id }}
+          path: modal-observation/
+          if-no-files-found: error
+          retention-days: 7
