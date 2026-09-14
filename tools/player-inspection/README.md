@@ -92,3 +92,23 @@ passive read-only because it changes focus and selection and posts a context
 request. It emits primitive JSON only, does not claim screenshot evidence, and
 does not prove that a particular Qt build routes the keyboard-reason request;
 native Windows execution and independent review remain required.
+
+## Isolated focus diagnostic
+
+`--bounded-focus-diagnostic` is a separate opt-in mode, incompatible with all
+other inspection-mode flags. Use the same exact package/source/archive arguments
+and a distinct output directory such as `evidence-focus-diagnostic`.
+
+The supervised worker observes row, playlist and root UIA focus plus the owned
+GUI thread's native focus and the foreground HWND before and after exactly one
+validated first-row `SetFocus()` call. It does not select rows, post context
+messages, activate a window, invoke menu items or inject pointer/keyboard input.
+A foreground window belonging to another process is observed, never controlled.
+This is not passive read-only: the single `SetFocus()` call attempts a focus change.
+
+`PASS` with `diagnostic_only=true`, `context_acceptance=false` and
+`diagnostic_verdict=capture-completed-only` means only that evidence collection
+completed. False focus states and a recorded SetFocus exception are observations,
+not context-menu acceptance. Native-query failures remain failures.
+The separate context acceptance step stays strict; this diagnostic does not
+replace it or authorize trash tests.

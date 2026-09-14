@@ -27,6 +27,27 @@ class _OwnershipError(RuntimeError):
     """The requested UIA/native identity is unsafe or belongs elsewhere."""
 
 
+def _is_known_provider_not_ready(exc: BaseException) -> bool:
+    """Recognize only the UIA provider condition that is safe to retry."""
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if type(current).__name__ in {
+            "ElementNotAvailableError",
+        }:
+            return True
+        for attribute in ("hresult", "winerror", "errno"):
+            value = getattr(current, attribute, None)
+            if isinstance(value, int) and not isinstance(value, bool) and value in {
+                -2147220991,  # UIA_E_ELEMENTNOTAVAILABLE
+                2147746305,
+            }:
+                return True
+        current = current.__cause__ or current.__context__
+    return False
+
+
 def _emit(value: dict[str, Any]) -> None:
     print(json.dumps(value, sort_keys=True), flush=True)
 
@@ -94,6 +115,98 @@ def _native_window_info(hwnd: int) -> dict[str, Any]:
     if not get_pid(native, ctypes.byref(owner_pid)) or not owner_pid.value:
         raise _OwnershipError(f"GetWindowThreadProcessId failed for HWND {hwnd}")
     return {"hwnd": hwnd, "pid": int(owner_pid.value), "visible": bool(is_visible(native))}
+
+
+class _GUITHREADINFO(ctypes.Structure):
+    """Pointer-sized Win32 GUI-thread focus record."""
+
+    _fields_ = [
+        ("cbSize", wintypes.DWORD),
+        ("flags", wintypes.DWORD),
+        ("hwndActive", wintypes.HWND),
+        ("hwndFocus", wintypes.HWND),
+        ("hwndCapture", wintypes.HWND),
+        ("hwndMenuOwner", wintypes.HWND),
+        ("hwndMoveSize", wintypes.HWND),
+        ("hwndCaret", wintypes.HWND),
+        ("rcCaret", wintypes.RECT),
+    ]
+
+
+def _native_focus_error(operation: str) -> _OwnershipError:
+    get_last_error = getattr(ctypes, "get_last_error", lambda: 0)
+    return _OwnershipError(f"{operation} failed (Win32 error {int(get_last_error())})")
+
+
+def _native_hwnd_owner(get_pid: Any, hwnd: int, owner: str) -> dict[str, int]:
+    if not hwnd:
+        return {"hwnd": 0, "pid": 0}
+    owner_pid = wintypes.DWORD(0)
+    thread_id = get_pid(wintypes.HWND(hwnd), ctypes.byref(owner_pid))
+    if not thread_id or not owner_pid.value:
+        raise _native_focus_error(f"GetWindowThreadProcessId({owner})")
+    return {"hwnd": int(hwnd), "pid": int(owner_pid.value)}
+
+
+def _native_focus_snapshot(hwnd: int, expected_pid: int) -> dict[str, Any]:
+    """Observe the owned thread and foreground HWND without changing focus."""
+    if os.name != "nt":
+        raise _OwnershipError("native focus observation requires Windows")
+    if type(hwnd) is not int or hwnd <= 0 or type(expected_pid) is not int or expected_pid <= 0:
+        raise _OwnershipError("native focus observation identity is malformed")
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    is_window = user32.IsWindow
+    is_window.argtypes = [wintypes.HWND]
+    is_window.restype = wintypes.BOOL
+    get_pid = user32.GetWindowThreadProcessId
+    get_pid.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+    get_pid.restype = wintypes.DWORD
+    get_gui_thread_info = user32.GetGUIThreadInfo
+    get_gui_thread_info.argtypes = [wintypes.DWORD, ctypes.POINTER(_GUITHREADINFO)]
+    get_gui_thread_info.restype = wintypes.BOOL
+    get_foreground = user32.GetForegroundWindow
+    get_foreground.argtypes = []
+    get_foreground.restype = wintypes.HWND
+
+    root = wintypes.HWND(hwnd)
+    if not is_window(root):
+        raise _native_focus_error("IsWindow(owned root)")
+    owner_pid = wintypes.DWORD(0)
+    root_thread_id = get_pid(root, ctypes.byref(owner_pid))
+    if not root_thread_id or not owner_pid.value or int(owner_pid.value) != expected_pid:
+        raise _OwnershipError("owned root HWND does not belong to the expected process")
+
+    info = _GUITHREADINFO()
+    info.cbSize = ctypes.sizeof(_GUITHREADINFO)
+    if not get_gui_thread_info(wintypes.DWORD(root_thread_id), ctypes.byref(info)):
+        raise _native_focus_error("GetGUIThreadInfo(owned root thread)")
+
+    def handle_record(value: Any, label: str) -> dict[str, int]:
+        handle = int(getattr(value, "value", value) or 0)
+        if handle < 0:
+            raise _OwnershipError(f"{label} HWND is malformed")
+        return _native_hwnd_owner(get_pid, handle, label)
+
+    foreground_value = get_foreground()
+    foreground = int(getattr(foreground_value, "value", foreground_value) or 0)
+    return {
+        "root_thread_id": int(root_thread_id),
+        "owned_thread_focus": {
+            "flags": int(info.flags),
+            "active": handle_record(info.hwndActive, "GUI thread active"),
+            "focus": handle_record(info.hwndFocus, "GUI thread focus"),
+            "capture": handle_record(info.hwndCapture, "GUI thread capture"),
+            "menu_owner": handle_record(info.hwndMenuOwner, "GUI thread menu owner"),
+            "move_size": handle_record(info.hwndMoveSize, "GUI thread move-size"),
+            "caret": handle_record(info.hwndCaret, "GUI thread caret"),
+            "caret_rect": {
+                "left": int(info.rcCaret.left), "top": int(info.rcCaret.top),
+                "right": int(info.rcCaret.right), "bottom": int(info.rcCaret.bottom),
+            },
+        },
+        # A foreign foreground is evidence only; this path never activates it.
+        "foreground": _native_hwnd_owner(get_pid, foreground, "foreground"),
+    }
 
 
 def _validate_identity(process: Any, expected: dict[str, Any], executable: str) -> dict[str, Any]:
@@ -755,6 +868,152 @@ def _inspect_once(
     }
 
 
+def _focus_bool(control: Any, label: str) -> bool:
+    """Read UIA CurrentHasKeyboardFocus as a canonical native BOOL."""
+    try:
+        element = getattr(control.element_info, "element")
+        value = getattr(element, "CurrentHasKeyboardFocus")
+    except Exception as exc:
+        raise _OwnershipError(f"{label} CurrentHasKeyboardFocus is unavailable") from exc
+    if type(value) not in (bool, int) or value not in (0, 1):
+        raise _OwnershipError(f"{label} CurrentHasKeyboardFocus is not BOOL 0/1")
+    return bool(value)
+
+
+def _validate_focus_rows(rows: Sequence[Any], expected_rows: Sequence[str], pid: int) -> list[Any]:
+    if len(rows) != 3 or len(expected_rows) != 3:
+        raise _OwnershipError("focus diagnostic requires exactly three playlist rows")
+    helpers = _context_helpers()
+    elements = []
+    for row, expected_name in zip(rows, expected_rows):
+        try:
+            elements.append(helpers._validate_row_identity(row, expected_name, pid))
+        except Exception as exc:
+            raise _OwnershipError(f"focus diagnostic row identity is not owned: {expected_name!r}") from exc
+    return elements
+
+
+def _focus_diagnostic_once(
+    desktop: Any,
+    process: Any,
+    expected: dict[str, Any],
+    executable: str,
+    requested_hwnd: int,
+    expected_rows: Sequence[str],
+    emit_target: Callable[[dict[str, Any]], None],
+    *,
+    native_focus: Callable[[int, int], dict[str, Any]] = _native_focus_snapshot,
+) -> dict[str, Any]:
+    """Capture one exact Row.SetFocus transition and nothing else."""
+    _emit_stage("root/readiness", "started")
+    before_identity = _validate_identity(process, expected, executable)
+    root = _find_main(desktop, expected["pid"], requested_hwnd)
+    try:
+        descendants = list(root.descendants())
+    except Exception as exc:
+        if _is_known_provider_not_ready(exc):
+            raise _TransientNotReady("main window descendants are not ready") from exc
+        raise _OwnershipError("main window descendants could not be read safely") from exc
+    for item in descendants:
+        if getattr(item.element_info, "process_id", None) != expected["pid"]:
+            raise _OwnershipError("UIA descendants contained a foreign process record")
+    records = [_info_record(root, expected["pid"])] + [
+        _info_record(item, expected["pid"]) for item in descendants[:512]
+    ]
+    playlists = [
+        item for item in descendants
+        if getattr(item.element_info, "class_name", "") == "NPlaylistWidget"
+        and getattr(item.element_info, "automation_id", "") == "QtSingleApplication.mainWindow.borderWidget.splitter.playlistWidget"
+    ]
+    if len(playlists) == 0:
+        raise _TransientNotReady("owned Qt playlist is not ready")
+    if len(playlists) > 1:
+        raise _OwnershipError(f"owned Qt playlist count is {len(playlists)}, expected one")
+    playlist = playlists[0]
+    rows = list(playlist.descendants(control_type="ListItem"))
+    labels = [str(row.window_text()) for row in rows]
+    if labels != list(expected_rows):
+        raise _TransientNotReady("exact expected playlist rows are not ready")
+    elements = _validate_focus_rows(rows, expected_rows, expected["pid"])
+    _emit_stage("root/readiness", "completed")
+    target = {
+        **before_identity,
+        "hwnd": requested_hwnd,
+        "name": str(getattr(root.element_info, "name", "") or ""),
+        "class_name": "NMainWindow",
+        "visible": True,
+    }
+    emit_target(target)
+
+    _emit_stage("focus-diagnostic", "started")
+    ui_before = {
+        "row": _focus_bool(rows[0], "row"),
+        "playlist": _focus_bool(playlist, "playlist"),
+        "root": _focus_bool(root, "root"),
+    }
+    native_before = native_focus(requested_hwnd, expected["pid"])
+    _emit_stage("setfocus", "started")
+    set_focus_record: dict[str, Any] = {"call_count": 0, "return_value": None, "exception": None}
+    set_focus = elements[0].SetFocus if callable(getattr(elements[0], "SetFocus", None)) else None
+    if set_focus is None:
+        raise _OwnershipError("validated first playlist row has no native SetFocus")
+    set_focus_record["call_count"] = 1
+    try:
+        set_focus_record["return_value"] = repr(set_focus())
+    except Exception as exc:
+        # SetFocus failure is evidence; do not lose the post-observation.
+        set_focus_record["exception"] = repr(exc)
+    _emit({"event": "set_focus_outcome", "set_focus": set_focus_record})
+    _emit_stage("setfocus", "completed")
+    _emit_stage("focus-diagnostic", "post-observation-started")
+    try:
+        after_identity = _validate_identity(process, expected, executable)
+        _validate_main_root(root, expected["pid"], requested_hwnd)
+        ui_after = {
+            "row": _focus_bool(rows[0], "row"),
+            "playlist": _focus_bool(playlist, "playlist"),
+            "root": _focus_bool(root, "root"),
+        }
+        native_after = native_focus(requested_hwnd, expected["pid"])
+    except _TransientNotReady as exc:
+        # Readiness retries end at the single owned action boundary.
+        raise _OwnershipError("focus post-observation was not retryable") from exc
+    after_target = {
+        **after_identity, "hwnd": requested_hwnd, "name": target["name"],
+        "class_name": "NMainWindow", "visible": True,
+    }
+    _emit({"event": "post_target", "target": after_target})
+    _emit_stage("focus-diagnostic", "completed")
+    return {
+        "status": "PASS",
+        "pid": expected["pid"],
+        "hwnd": requested_hwnd,
+        "target_name": target["name"],
+        "target_before": target,
+        "target_after": after_target,
+        "snapshot": records,
+        "playlist_rows": labels,
+        "diagnostic_only": True,
+        "context_acceptance": False,
+        "capture_completed": True,
+        "focus_diagnostic": {
+            "row": {"name": expected_rows[0], "before": ui_before["row"], "after": ui_after["row"]},
+            "playlist": {"before": ui_before["playlist"], "after": ui_after["playlist"]},
+            "root": {"before": ui_before["root"], "after": ui_after["root"]},
+            "set_focus": set_focus_record,
+            "native": {"before": native_before, "after": native_after},
+            "actions": {
+                "set_focus_calls": 1,
+                "selection_item_actions": False,
+                "context_menu_posts": False,
+                "pointer_input": False,
+                "invoke_actions": False,
+                "foreground_activation": False,
+            },
+        },
+    }
+
+
 def inspect_context_target(
     hwnd: int,
     pid: int,
@@ -829,6 +1088,39 @@ def inspect_target(
     return _retry_until_ready(attempt, timeout=retry_timeout)
 
 
+def inspect_focus_target(
+    hwnd: int,
+    pid: int,
+    create_time: float,
+    executable: str,
+    expected_rows: Sequence[str],
+    *,
+    retry_timeout: float = 25.0,
+) -> dict[str, Any]:
+    if os.name != "nt":
+        return {"status": "FAIL", "failure_kind": "platform_guard", "detail": "focus diagnostic requires Windows"}
+    import psutil
+    from pywinauto import Desktop
+
+    process = psutil.Process(pid)
+    expected = {"pid": pid, "create_time": create_time}
+    emitted = False
+
+    def emit_target_once(target: dict[str, Any]) -> None:
+        nonlocal emitted
+        if not emitted:
+            _emit({"event": "target", "target": target})
+            emitted = True
+
+    def attempt() -> dict[str, Any]:
+        desktop = Desktop(backend="uia", allow_magic_lookup=False)
+        return _focus_diagnostic_once(
+            desktop, process, expected, executable, hwnd, expected_rows, emit_target_once,
+        )
+
+    return _retry_until_ready(attempt, timeout=retry_timeout)
+
+
 def _expected_rows(raw: str) -> list[str]:
     try:
         value = json.loads(raw)
@@ -848,6 +1140,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--expected-rows", required=True, type=_expected_rows)
     parser.add_argument("--ui-timeout", type=float, default=25.0)
     parser.add_argument("--context-menu", action="store_true")
+    parser.add_argument("--focus-diagnostic", action="store_true")
     return parser
 
 
@@ -858,9 +1151,16 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("target identity values must be positive")
         if not math.isfinite(args.ui_timeout) or args.ui_timeout <= 0:
             raise ValueError("--ui-timeout must be finite and positive")
+        if args.context_menu and args.focus_diagnostic:
+            raise ValueError("--context-menu and --focus-diagnostic are mutually exclusive")
         _emit({"event": "ready"})
         if args.context_menu:
             result = inspect_context_target(
+                args.hwnd, args.pid, args.create_time, args.exe, args.expected_rows,
+                retry_timeout=args.ui_timeout,
+            )
+        elif args.focus_diagnostic:
+            result = inspect_focus_target(
                 args.hwnd, args.pid, args.create_time, args.exe, args.expected_rows,
                 retry_timeout=args.ui_timeout,
             )

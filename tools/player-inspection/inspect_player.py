@@ -7,8 +7,10 @@ its own temporary files.  Default mode never invokes a UI control or changes the
 playlist; the explicit legacy context-menu mode uses UIA SelectionItem selection
 and one guarded keyboard or real-pointer context request, and never invokes a
 menu item.  The separate bounded context mode performs its UIA and keyboard-
-reason context request in a supervised worker.  Real-pointer input requires the
-separate explicit allow flag.
+reason context request in a supervised worker.  The strictly opt-in bounded
+focus diagnostic performs one direct Row.SetFocus observation in that worker,
+not product or context acceptance.  Real-pointer input requires the separate
+explicit allow flag.
 """
 from __future__ import annotations
 
@@ -1091,6 +1093,96 @@ def _bounded_read_only_snapshot(
     return {"result": result_dict, "snapshot": snapshot, "playlist_rows": rows, "target": parent_after}
 
 
+def _validate_native_focus_snapshot(snapshot: Any, expected_pid: int, label: str) -> dict[str, Any]:
+    """Validate the primitive schema emitted by the worker's Win32 snapshot."""
+    hwnd_max = (1 << (ctypes.sizeof(ctypes.c_void_p) * 8)) - 1
+    dword_max = (1 << 32) - 1
+    long_min, long_max = -(1 << 31), (1 << 31) - 1
+    if not isinstance(snapshot, dict) or set(snapshot) != {"root_thread_id", "owned_thread_focus", "foreground"}:
+        raise ContractError(f"bounded focus {label} native snapshot schema is incomplete")
+    root_thread_id = snapshot["root_thread_id"]
+    if type(root_thread_id) is not int or not 0 < root_thread_id <= dword_max:
+        raise ContractError(f"bounded focus {label} root thread ID is malformed")
+    owned = snapshot["owned_thread_focus"]
+    owned_names = {"flags", "active", "focus", "capture", "menu_owner", "move_size", "caret", "caret_rect"}
+    if not isinstance(owned, dict) or set(owned) != owned_names:
+        raise ContractError(f"bounded focus {label} owned thread focus schema is incomplete")
+    flags = owned["flags"]
+    if type(flags) is not int or not 0 <= flags <= dword_max:
+        raise ContractError(f"bounded focus {label} GUI flags are malformed")
+
+    def record(value: Any, record_label: str, *, require_expected_pid: bool) -> None:
+        if not isinstance(value, dict) or set(value) != {"hwnd", "pid"}:
+            raise ContractError(f"bounded focus {label} {record_label} record is malformed")
+        hwnd, pid = value["hwnd"], value["pid"]
+        if type(hwnd) is not int or not 0 <= hwnd <= hwnd_max:
+            raise ContractError(f"bounded focus {label} {record_label} HWND is malformed")
+        if type(pid) is not int or not 0 <= pid <= dword_max:
+            raise ContractError(f"bounded focus {label} {record_label} PID is malformed")
+        if (hwnd == 0) != (pid == 0):
+            raise ContractError(f"bounded focus {label} {record_label} zero HWND/PID pair is incoherent")
+        if require_expected_pid and hwnd and pid != expected_pid:
+            raise ContractError(f"bounded focus {label} {record_label} is not owned by the player")
+
+    for name in ("active", "focus", "capture", "menu_owner", "move_size", "caret"):
+        record(owned[name], name, require_expected_pid=True)
+    rect = owned["caret_rect"]
+    if not isinstance(rect, dict) or set(rect) != {"left", "top", "right", "bottom"}:
+        raise ContractError(f"bounded focus {label} caret RECT schema is malformed")
+    if any(type(value) is not int or not long_min <= value <= long_max for value in rect.values()):
+        raise ContractError(f"bounded focus {label} caret RECT contains a non-native integer")
+    # The foreground may be another process; retain it as observation, not ownership.
+    record(snapshot["foreground"], "foreground", require_expected_pid=False)
+    return snapshot
+
+
+def _validate_bounded_focus_payload(payload: Any, expected_rows: Sequence[str]) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise ContractError("bounded focus worker payload is not an object")
+    if payload.get("diagnostic_only") is not True or payload.get("context_acceptance") is not False:
+        raise ContractError("bounded focus worker did not declare diagnostic-only scope")
+    if payload.get("capture_completed") is not True or payload.get("status") != "PASS":
+        raise ContractError("bounded focus worker did not complete its diagnostic capture")
+    if payload.get("playlist_rows") != list(expected_rows):
+        raise ContractError("bounded focus worker playlist rows are not exact")
+    diagnostic = payload.get("focus_diagnostic")
+    if not isinstance(diagnostic, dict):
+        raise ContractError("bounded focus worker returned no focus diagnostic")
+    set_focus = diagnostic.get("set_focus")
+    if not isinstance(set_focus, dict) or type(set_focus.get("call_count")) is not int or set_focus["call_count"] != 1:
+        raise ContractError("bounded focus worker did not prove exactly one SetFocus call")
+    actions = diagnostic.get("actions")
+    if (
+        not isinstance(actions, dict)
+        or actions.get("set_focus_calls") != 1
+        or actions.get("selection_item_actions") is not False
+        or actions.get("context_menu_posts") is not False
+        or actions.get("pointer_input") is not False
+        or actions.get("invoke_actions") is not False
+        or actions.get("foreground_activation") is not False
+    ):
+        raise ContractError("bounded focus worker action envelope is not read-only and exact")
+    for owner in ("row", "playlist", "root"):
+        state = diagnostic.get(owner)
+        if (
+            not isinstance(state, dict)
+            or type(state.get("before")) is not bool
+            or type(state.get("after")) is not bool
+        ):
+            raise ContractError(f"bounded focus worker {owner} focus state is not strict BOOL evidence")
+    expected_pid = payload.get("pid")
+    if type(expected_pid) is not int or expected_pid <= 0 or expected_pid > (1 << 32) - 1:
+        raise ContractError("bounded focus worker PID is malformed")
+    native = diagnostic.get("native")
+    if not isinstance(native, dict) or set(native) != {"before", "after"}:
+        raise ContractError("bounded focus worker returned no native focus evidence")
+    before = _validate_native_focus_snapshot(native["before"], expected_pid, "before")
+    after = _validate_native_focus_snapshot(native["after"], expected_pid, "after")
+    if before["root_thread_id"] != after["root_thread_id"]:
+        raise ContractError("bounded focus worker root thread changed during diagnostic")
+    return diagnostic
+
+
 def _validate_bounded_context_payload(payload: Any, expected_rows: Sequence[str]) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ContractError("bounded context worker payload is not an object")
@@ -1299,15 +1391,28 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="run finite owned context-menu observation without invoking a menu item",
     )
+    parser.add_argument(
+        "--bounded-focus-diagnostic",
+        action="store_true",
+        help="run one supervised read-only Row.SetFocus focus diagnostic; not context acceptance",
+    )
     args = parser.parse_args(argv)
     if args.bounded_read_only and args.inspect_context_menu:
         parser.error("--bounded-read-only cannot be combined with --inspect-context-menu")
     if args.bounded_context_menu and (
         args.bounded_read_only or args.inspect_context_menu or args.allow_owned_pointer_input
+        or args.bounded_focus_diagnostic
     ):
         parser.error(
-            "--bounded-context-menu cannot be combined with bounded-read-only, "
-            "legacy context-menu, or pointer input flags"
+            "--bounded-context-menu cannot be combined with bounded-read-only, legacy context-menu, "
+            "pointer input, or bounded-focus-diagnostic flags"
+        )
+    if args.bounded_focus_diagnostic and (
+        args.bounded_read_only or args.inspect_context_menu or args.allow_owned_pointer_input
+    ):
+        parser.error(
+            "--bounded-focus-diagnostic cannot be combined with bounded-read-only, legacy context-menu, "
+            "or pointer input flags"
         )
     if args.allow_owned_pointer_input and not args.inspect_context_menu:
         parser.error("--allow-owned-pointer-input requires --inspect-context-menu")
@@ -1637,6 +1742,45 @@ def run_inspection(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
             exact_playlist_rows(actual, expected)
             if not _fixtures_unchanged(fixtures, fixture_hashes):
                 raise ContractError("fixture bytes changed during bounded context inspection")
+            report["filesystem_unchanged"] = True
+        elif args.bounded_focus_diagnostic:
+            bounded = _bounded_read_only_snapshot(
+                output=output,
+                process=process,
+                psutil=psutil,
+                identity=identity,
+                executable=package_info.executable,
+                expected_rows=expected,
+                worker_mode_args=("--focus-diagnostic",),
+            )
+            report["mode"] = "bounded-focus-diagnostic-supervised-worker"
+            report["diagnostic_only"] = True
+            report["context_acceptance"] = False
+            report["diagnostic_verdict"] = "capture-validation-failed"
+            report["uia_supervisor"] = bounded["result"]
+            report["uia_target"] = bounded["target"]
+            try:
+                diagnostic = _validate_bounded_focus_payload(
+                    bounded["result"].get("child_payload"), expected
+                )
+            except Exception as exc:
+                exc.supervisor_result = bounded["result"]
+                raise
+            report["diagnostic_verdict"] = "capture-completed-only"
+            report["focus_diagnostic"] = diagnostic
+            _write_json(output / "player-uia.json", bounded["snapshot"])
+            report["uia_tree_records"] = len(bounded["snapshot"])
+            report["screenshot"] = None
+            report["screenshot_note"] = "focus diagnostic serializes UIA/native focus observations; no product acceptance"
+            actual = bounded["playlist_rows"]
+            report["playlist"] = {
+                "expected_rows": expected,
+                "observed_rows": actual,
+                "row_count": len(actual),
+            }
+            exact_playlist_rows(actual, expected)
+            if not _fixtures_unchanged(fixtures, fixture_hashes):
+                raise ContractError("fixture bytes changed during bounded focus diagnostic")
             report["filesystem_unchanged"] = True
         else:
             import PIL.Image  # noqa: F401 - validates capture dependency
