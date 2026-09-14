@@ -871,7 +871,9 @@ def main(argv: list[str] | None = None) -> int:
             )
     except Exception as exc:
         result = {"status": "FAIL", "failure_kind": "worker", "detail": f"{type(exc).__name__}: {exc}"}
-        print(repr(exc), file=sys.stderr, flush=True)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
     _emit(result)
     return 0 if result.get("status") == "PASS" else 1
 
