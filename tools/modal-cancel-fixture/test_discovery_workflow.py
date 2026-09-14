@@ -4,6 +4,17 @@ import unittest
 
 
 class DiscoveryWorkflowTests(unittest.TestCase):
+    def test_cancel_requires_explicit_manual_dispatch(self):
+        text = (Path(__file__).resolve().parents[2] / '.github/workflows/modal-fixture-observe.yml').read_text()
+        self.assertIn('workflow_dispatch:', text)
+        self.assertIn('cancel_once:', text)
+        self.assertIn('type: boolean', text)
+        self.assertIn('default: false', text)
+        self.assertIn("github.event_name == 'workflow_dispatch' && inputs.cancel_once == true", text)
+        self.assertIn("if ($env:ALLOW_CANCEL_ONCE -eq 'true')", text)
+        self.assertIn("$actionArgs = @('--cancel-once')", text)
+        self.assertIn('--evidence-root modal-observation @actionArgs', text)
+
     def test_linux_qt_runtime_is_installed_before_fixture_tests(self):
         path = Path(__file__).resolve().parents[2] / '.github/workflows/modal-fixture-observe.yml'
         text = path.read_text()

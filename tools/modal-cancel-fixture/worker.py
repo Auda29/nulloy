@@ -1,12 +1,13 @@
-"""Bounded Windows UIA worker for read-only discovery of one owned modal.
+"""Bounded Windows UIA worker for discovery and opt-in one-Cancel action.
 
-All pywinauto/UIA imports and calls stay in this child. Discovery records the
-provider's observed identity without claiming native acceptance. Cancel Invoke
-remains fail-closed until a separately reviewed native ControlType pin exists.
+All pywinauto/UIA imports and calls stay in this child. Discovery is read-only
+by default; the explicit ``--cancel-once`` path is bound to the reviewed Qt
+identity and never retries an entered Invoke.
 """
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import os
 from pathlib import Path
@@ -18,13 +19,14 @@ from typing import Any, Callable
 # Select the windowless MTA before importing pywinauto/comtypes on Windows.
 sys.coinit_flags = 0
 
-# Intentionally empty: no native action is reachable at this review stage.
-PINNED_MODAL_CONTROL_TYPES: frozenset[str] = frozenset()
+PINNED_MODAL_CONTROL_TYPES: frozenset[str] = frozenset({"Window"})
 PINNED_MODAL_CLASS_NAME = "QMessageBox"
 PINNED_MODAL_CONTROL_TYPE = "Window"
 KNOWN_TRANSIENT_HRESULT = 0x80040201
 MAX_DISCOVERY_ATTEMPTS = 2
 DISCOVERY_RETRY_DELAY = 0.05
+DISAPPEARANCE_TIMEOUT = 5.0
+DISAPPEARANCE_POLL_DELAY = 0.05
 _MISSING = object()
 
 
@@ -35,12 +37,19 @@ class _BlockedObservation(ValueError):
 class _WorkerFailure(RuntimeError):
     """Fatal failure carrying the partial read-only evidence for main()."""
 
-    def __init__(self, message: str, *, observations: dict[str, Any], stages: list[dict[str, Any]],
-                 output_dir: Path):
+    def __init__(self, message: str, *, observations: dict[str, Any],
+                 stages: list[dict[str, Any]], output_dir: Path,
+                 action: dict[str, Any] | None = None):
         super().__init__(message)
         self.observations = observations
         self.stages = stages
         self.output_dir = output_dir
+        self.action = copy.deepcopy(action) if action is not None else _new_action()
+
+
+def _new_action() -> dict[str, Any]:
+    return {"cancel_attempted": 0, "cancel_completed": 0,
+            "yes_attempted": 0, "outcome": "not_attempted"}
 
 
 def _emit(value: dict[str, Any]) -> None:
@@ -408,13 +417,179 @@ def _find_modal(root: Any, pid: int, title: str, body: str, desktop: Any | None 
     return matches[0] if matches else None
 
 
+def _expected_shape(nonce: str) -> dict[str, dict[str, Any]]:
+    dialog_id = f"QApplication.ModalCancelDialog_{nonce}"
+    return {
+        "root": {"name": f"Modal Cancel Fixture Main {nonce}",
+                 "class_name": "QMainWindow", "control_type": "Window",
+                 "automation_id": f"QApplication.ModalCancelFixtureMain_{nonce}"},
+        "dialog": {"name": f"Modal Cancel Fixture {nonce}",
+                    "class_name": "QMessageBox", "control_type": "Window",
+                    "automation_id": dialog_id},
+        "body": {"name": f"Benign modal cancellation test {nonce}",
+                  "class_name": "QLabel", "control_type": "Text",
+                  "automation_id": dialog_id + ".qt_msgbox_label"},
+        "button": {"name": None, "class_name": "QPushButton",
+                    "control_type": "Button",
+                    "automation_id": dialog_id + ".qt_msgbox_buttonbox.QPushButton"},
+    }
+
+
+def _identity_fields(observed: dict[str, Any]) -> tuple[Any, ...]:
+    return tuple(observed[key] for key in (
+        "name", "process_id", "class_name", "control_type", "automation_id",
+        "visible", "runtime_id", "hwnd",
+    ))
+
+
+def _strict_shape(root: Any, match: tuple[Any, dict[str, Any]], nonce: str,
+                  pid: int, hwnd: int) -> dict[str, Any]:
+    expected = _expected_shape(nonce)
+    dialog, details = match
+    root_observation = _observed(root, "root", require_hwnd=True)
+    if root_observation["hwnd"] != hwnd or root_observation["process_id"] != pid:
+        raise _BlockedObservation("strict root ownership identity mismatch")
+    for key, value in expected["root"].items():
+        if root_observation[key] != value:
+            raise _BlockedObservation(f"root {key} is not the nonce-derived Qt identity")
+    dialog_observation = _observed(dialog, "dialog", require_hwnd=True)
+    if dialog_observation["process_id"] != pid:
+        raise _BlockedObservation("strict dialog ownership identity mismatch")
+    for key, value in expected["dialog"].items():
+        if dialog_observation[key] != value:
+            raise _BlockedObservation(f"dialog {key} is not the pinned Qt identity")
+    body = details["body"]
+    body_observation = _observed(body, "body", require_hwnd=False)
+    if body_observation["process_id"] != pid:
+        raise _BlockedObservation("fresh body PID differs from the owned fixture")
+    for key, value in expected["body"].items():
+        if body_observation[key] != value:
+            raise _BlockedObservation(f"body {key} is not the pinned Qt identity")
+    if body_observation["hwnd"] is not None:
+        raise _BlockedObservation("Qt modal body unexpectedly exposes a native HWND")
+    button_observations: dict[str, dict[str, Any]] = {}
+    runtime_ids: set[tuple[int, ...]] = set()
+    for button_name in ("Cancel", "Yes"):
+        button_observation = _observed(details["buttons"][button_name],
+                                       f"button.{button_name}", require_hwnd=False)
+        if button_observation["process_id"] != pid:
+            raise _BlockedObservation(f"fresh {button_name} PID differs from the owned fixture")
+        for key, value in expected["button"].items():
+            if key == "name":
+                value = button_name
+            if button_observation[key] != value:
+                raise _BlockedObservation(f"{button_name} {key} is not the pinned Qt identity")
+        if button_observation["hwnd"] is not None:
+            raise _BlockedObservation(f"Qt {button_name} button unexpectedly exposes a native HWND")
+        runtime = tuple(button_observation["runtime_id"])
+        if runtime in runtime_ids:
+            raise _BlockedObservation("pinned Cancel and Yes RuntimeIds are not distinct")
+        runtime_ids.add(runtime)
+        button_observations[button_name] = button_observation
+    return {"root": root_observation, "dialog": dialog_observation,
+            "body": body_observation, "buttons": button_observations,
+            "dialog_wrapper": dialog, "body_wrapper": body,
+            "button_wrappers": details["buttons"]}
+
+
+def _fresh_snapshot(desktop: Any, psutil: Any, pid: int, hwnd: int,
+                    title: str, body: str, nonce: str) -> dict[str, Any]:
+    absent_reason = "exact owned modal is absent during identity snapshot"
+    transient_seen = False
+    for attempt in range(1, MAX_DISCOVERY_ATTEMPTS + 1):
+        try:
+            fresh_root = desktop.window(handle=hwnd).wrapper_object()
+            local_observations: dict[str, Any] = {}
+            match = _find_modal(fresh_root, pid, title, body, desktop,
+                                local_observations, lambda: None)
+            if match is None:
+                raise _BlockedObservation(absent_reason)
+            snapshot = _strict_shape(fresh_root, match, nonce, pid, hwnd)
+            snapshot["process"] = _identity(psutil.Process(pid))
+            snapshot["root"]["native_owner_pid"] = _native_bind(
+                "main", snapshot["root"]["hwnd"], pid)
+            snapshot["dialog"]["native_owner_pid"] = _native_bind(
+                "dialog", snapshot["dialog"]["hwnd"], pid)
+            return snapshot
+        except _BlockedObservation as exc:
+            if str(exc) != absent_reason and not transient_seen:
+                raise
+            if attempt == MAX_DISCOVERY_ATTEMPTS:
+                raise
+        except Exception as exc:
+            if not _is_known_transient(exc) or attempt == MAX_DISCOVERY_ATTEMPTS:
+                raise
+            transient_seen = True
+        time.sleep(DISCOVERY_RETRY_DELAY)
+    raise _BlockedObservation(absent_reason)
+
+
+def _verify_post_owner(desktop: Any, psutil: Any, pid: int, hwnd: int,
+                       pinned: dict[str, Any]) -> None:
+    root = desktop.window(handle=hwnd).wrapper_object()
+    root_observation = _observed(root, "post.root", require_hwnd=True)
+    if _identity_fields(root_observation) != _identity_fields(pinned["root"]):
+        raise RuntimeError("root identity changed after Cancel Invoke")
+    _native_bind("post.main", root_observation["hwnd"], pid)
+    if _identity(psutil.Process(pid)) != pinned["process"]:
+        raise RuntimeError("owned process identity changed after Cancel Invoke")
+
+
+def _owned_replacement_modal(root: Any, pid: int, desktop: Any) -> bool:
+    candidates = [root, *_children(root), *list(desktop.windows())]
+    for child in candidates:
+        info = _info(child)
+        if _raw(info, "process_id") != pid:
+            continue
+        if _raw(info, "class_name") == PINNED_MODAL_CLASS_NAME and \
+                _raw(info, "control_type") == PINNED_MODAL_CONTROL_TYPE and \
+                _raw(info, "name") is not None and \
+                str(_raw(info, "name")).startswith("Modal Cancel Fixture ") and _visible(child):
+            return True
+    return False
+
+
+def _modal_absent(desktop: Any, psutil: Any, pid: int, hwnd: int,
+                  title: str, body: str, nonce: str,
+                  pinned: dict[str, Any]) -> bool:
+    root = desktop.window(handle=hwnd).wrapper_object()
+    root_observation = _observed(root, "post.root", require_hwnd=True)
+    if _identity_fields(root_observation) != _identity_fields(pinned["root"]):
+        raise RuntimeError("root identity changed while checking modal disappearance")
+    _native_bind("post.main", root_observation["hwnd"], pid)
+    if _identity(psutil.Process(pid)) != pinned["process"]:
+        raise RuntimeError("owned process identity changed while checking modal disappearance")
+    local: dict[str, Any] = {}
+    match = _find_modal(root, pid, title, body, desktop, local, lambda: None)
+    if match is not None or _owned_replacement_modal(root, pid, desktop):
+        return False
+    return True
+
+
+def _wait_for_modal_absence(desktop: Any, psutil: Any, pid: int, hwnd: int,
+                            title: str, body: str, nonce: str,
+                            pinned: dict[str, Any]) -> None:
+    deadline = time.monotonic() + DISAPPEARANCE_TIMEOUT
+    while time.monotonic() < deadline:
+        try:
+            if _modal_absent(desktop, psutil, pid, hwnd, title, body, nonce, pinned):
+                return
+        except Exception as exc:
+            if not _is_known_transient(exc):
+                raise
+        time.sleep(DISAPPEARANCE_POLL_DELAY)
+    raise RuntimeError("exact nonce modal did not disappear before the bounded deadline")
+
+
 def _identity(process: Any) -> tuple[int, float, str]:
     pid = _strict_int(process.pid, "process.pid", positive=True)
     return pid, float(process.create_time()), str(process.exe())
 
 
 def _blocked(reason: str, *, observations: dict[str, Any], stages: list[dict[str, Any]],
-             stages_path: Path, output_dir: Path) -> dict[str, Any]:
+             stages_path: Path, output_dir: Path,
+             action: dict[str, Any] | None = None) -> dict[str, Any]:
+    action = copy.deepcopy(action) if action is not None else _new_action()
     _write_observations(output_dir, observations)
     if not any(item.get("stage") == "discovery_completed" for item in stages):
         complete = all(key in observations for key in ("root", "dialog", "body", "buttons"))
@@ -425,9 +600,12 @@ def _blocked(reason: str, *, observations: dict[str, Any], stages: list[dict[str
         "reason": reason,
         "captured_readonly": True,
         "native_acceptance": False,
+        "action": action,
+        "modal_absent": False,
+        "post_identity_verified": False,
         "direct_cancel_invoke": False,
-        "direct_cancel_invoke_count": 0,
-        "yes_invoke_count": 0,
+        "direct_cancel_invoke_count": action["cancel_attempted"],
+        "yes_invoke_count": action["yes_attempted"],
         "observations": observations,
         "stages": stages,
         "output_dir": str(output_dir),
@@ -436,18 +614,24 @@ def _blocked(reason: str, *, observations: dict[str, Any], stages: list[dict[str
         result["dialog_control_type"] = observations["dialog"].get("control_type")
         result["dialog_class_name"] = observations["dialog"].get("class_name")
     _stage(stages_path, stages, "blocked", reason=reason,
-           captured_readonly=True, native_acceptance=False, direct_cancel_invoke_count=0)
+           captured_readonly=True, native_acceptance=False,
+           direct_cancel_invoke_count=action["cancel_attempted"],
+           action=action)
     result["stages"] = stages
     return result
 
 
 def inspect_target(args: argparse.Namespace) -> dict[str, Any]:
+    action = _new_action()
     if os.name != "nt":
         return {
             "status": "BLOCKED",
             "reason": "native UIA worker requires Windows; modal control type is unpinned",
             "captured_readonly": False,
             "native_acceptance": False,
+            "action": action,
+            "modal_absent": False,
+            "post_identity_verified": False,
             "direct_cancel_invoke": False,
             "direct_cancel_invoke_count": 0,
             "yes_invoke_count": 0,
@@ -517,55 +701,120 @@ def inspect_target(args: argparse.Namespace) -> dict[str, Any]:
         after_discovery = _identity(psutil.Process(pid))
         if after_discovery != before:
             raise _BlockedObservation("owned process identity changed after read-only discovery")
-        if not observations["dialog"]["control_type"] in PINNED_MODAL_CONTROL_TYPES:
-            return _blocked("modal control type is not pinned by native evidence",
-                            observations=observations, stages=stages,
-                            stages_path=stages_path, output_dir=output_dir)
+        if not getattr(args, "cancel_once", False):
+            return _blocked("Cancel invocation is not enabled", observations=observations,
+                            stages=stages, stages_path=stages_path,
+                            output_dir=output_dir, action=action)
+        if observations["dialog"]["control_type"] not in PINNED_MODAL_CONTROL_TYPES:
+            raise _BlockedObservation("modal control type is not pinned by native evidence")
 
-        # Future-only action gate: expected native identity is checked again
-        # after the pin. With the current empty pin this block is unreachable.
-        if observations["dialog"]["class_name"] != PINNED_MODAL_CLASS_NAME:
-            raise RuntimeError("pinned modal has unexpected native/UIA class")
-        if observations["dialog"]["control_type"] != PINNED_MODAL_CONTROL_TYPE:
-            raise RuntimeError("pinned modal has unexpected Window control type")
-        pinned_button_runtime_ids = {
-            name: tuple(value["runtime_id"])
-            for name, value in observations["buttons"].items()
+        # The action gate is deliberately separate from the descriptive
+        # discovery records.  Pinned values are never overwritten by a later
+        # provider query; every action-boundary query starts at a fresh root.
+        pinned = _fresh_snapshot(desktop, psutil, pid, hwnd,
+                                 args.dialog_title, args.dialog_body, args.nonce)
+        for role in ("root", "dialog", "body"):
+            if _identity_fields(observations[role]) != _identity_fields(pinned[role]):
+                raise _BlockedObservation(f"{role} identity changed after discovery")
+        for name in ("Cancel", "Yes"):
+            if _identity_fields(observations["buttons"][name]) != \
+                    _identity_fields(pinned["buttons"][name]):
+                raise _BlockedObservation(f"{name} identity changed after discovery")
+        if before != pinned["process"]:
+            raise _BlockedObservation("owned process identity changed after discovery snapshot")
+        for role in ("root", "dialog"):
+            if observations[role].get("native_owner_pid") != pinned[role]["native_owner_pid"]:
+                raise _BlockedObservation(f"{role} native owner changed after discovery")
+        before_action = _fresh_snapshot(desktop, psutil, pid, hwnd,
+                                        args.dialog_title, args.dialog_body, args.nonce)
+        for role in ("root", "dialog", "body"):
+            if _identity_fields(before_action[role]) != _identity_fields(pinned[role]):
+                raise _BlockedObservation(f"{role} identity changed before Cancel Invoke")
+        if before_action["buttons"].keys() != pinned["buttons"].keys():
+            raise _BlockedObservation("button identity set changed before Cancel Invoke")
+        for name in ("Cancel", "Yes"):
+            if _identity_fields(before_action["buttons"][name]) != \
+                    _identity_fields(pinned["buttons"][name]):
+                raise _BlockedObservation(f"{name} identity changed before Cancel Invoke")
+        if before_action["process"] != pinned["process"]:
+            raise _BlockedObservation("owned process identity changed before Cancel Invoke")
+        for role in ("root", "dialog"):
+            if before_action[role]["native_owner_pid"] != pinned[role]["native_owner_pid"]:
+                raise _BlockedObservation(f"{role} native owner changed before Cancel Invoke")
+        observations["action_snapshot"] = {
+            role: copy.deepcopy(pinned[role]) for role in ("root", "dialog", "body", "buttons")
         }
-        latest = _find_modal(root, pid, args.dialog_title, args.dialog_body, desktop,
-                             observations,
-                             lambda: _write_observations(output_dir, observations))
-        if latest is None or _runtime_key(latest[0]) != _runtime_key(dialog):
-            raise RuntimeError("modal identity changed before Cancel Invoke")
-        latest_button_runtime_ids = {
-            name: tuple(value["runtime_id"])
-            for name, value in observations["buttons"].items()
-        }
-        if latest_button_runtime_ids != pinned_button_runtime_ids:
-            raise RuntimeError("modal button identity changed before Cancel Invoke")
-        observations["dialog"]["native_owner_pid"] = _native_bind(
-            "dialog", observations["dialog"]["hwnd"], pid)
-        observations["root"]["native_owner_pid"] = _native_bind("main", hwnd, pid)
-        process_before_invoke = _identity(psutil.Process(pid))
-        if process_before_invoke != before:
-            raise RuntimeError("owned identity changed before Cancel Invoke")
-        _stage(stages_path, stages, "cancel_invoke_started", cancel_invoke_count=1)
-        latest[1]["buttons"]["Cancel"].invoke()
-        _stage(stages_path, stages, "cancel_invoke_completed", cancel_invoke_count=1, yes_invoke_count=0)
-        after = _identity(psutil.Process(pid))
-        observations["dialog"]["native_owner_pid"] = _native_bind(
-            "dialog", observations["dialog"]["hwnd"], pid)
-        observations["root"]["native_owner_pid"] = _native_bind("main", hwnd, pid)
-        if after != before:
-            raise RuntimeError("owned identity changed after Cancel Invoke")
-        _stage(stages_path, stages, "post_validated", cancel_invoke_count=1, yes_invoke_count=0)
-        return {"status": "PASS", "direct_cancel_invoke": True, "direct_cancel_invoke_count": 1,
-                "yes_invoke_count": 0, "captured_readonly": False, "native_acceptance": True,
-                "observations": observations, "stages": stages, "output_dir": str(output_dir)}
+        observations["action_snapshot"]["process"] = pinned["process"]
+        _write_observations(output_dir, observations)
+
+        # Flush the audit marker before entering the one syntactic Invoke.
+        # If that write fails, this remains a planned but unentered action.
+        action["cancel_attempted"] = 1
+        action["outcome"] = "unknown"
+        try:
+            _stage(stages_path, stages, "cancel_invoke_started",
+                   cancel_invoke_count=1, action=copy.deepcopy(action))
+        except Exception:
+            action = _new_action()
+            if stages and stages[-1].get("stage") == "cancel_invoke_started":
+                stages[-1].update(stage="cancel_invoke_not_entered", cancel_invoke_count=0,
+                                  action=copy.deepcopy(action), audit_write_failed=True)
+            raise
+        try:
+            before_action["button_wrappers"]["Cancel"].invoke()
+        except Exception as exc:
+            action["outcome"] = "unknown"
+            try:
+                _stage(stages_path, stages, "cancel_invoke_failed",
+                       cancel_invoke_count=1, yes_invoke_count=0,
+                       action=copy.deepcopy(action))
+            except Exception:
+                pass
+            raise _WorkerFailure("Cancel Invoke failed", observations=observations,
+                                 stages=stages, output_dir=output_dir,
+                                 action=action) from exc
+        action["cancel_completed"] = 1
+        action["outcome"] = "completed"
+        try:
+            _stage(stages_path, stages, "cancel_invoke_completed",
+                   cancel_invoke_count=1, yes_invoke_count=0,
+                   action=copy.deepcopy(action))
+            _verify_post_owner(desktop, psutil, pid, hwnd, pinned)
+            _wait_for_modal_absence(desktop, psutil, pid, hwnd,
+                                    args.dialog_title, args.dialog_body,
+                                    args.nonce, pinned)
+        except Exception as exc:
+            action["outcome"] = "unknown"
+            raise _WorkerFailure("post-Cancel identity/disappearance validation failed",
+                                 observations=observations, stages=stages,
+                                 output_dir=output_dir, action=action) from exc
+        try:
+            _stage(stages_path, stages, "post_validated", cancel_invoke_count=1,
+                   yes_invoke_count=0, action=copy.deepcopy(action),
+                   modal_absent=True, post_identity_verified=True)
+        except Exception as exc:
+            action["outcome"] = "unknown"
+            raise _WorkerFailure("post-Cancel audit stage failed", observations=observations,
+                                 stages=stages, output_dir=output_dir,
+                                 action=action) from exc
+        return {"status": "PASS", "action": action, "modal_absent": True,
+                "post_identity_verified": True, "direct_cancel_invoke": True,
+                "direct_cancel_invoke_count": action["cancel_attempted"],
+                "yes_invoke_count": action["yes_attempted"],
+                "captured_readonly": False, "native_acceptance": True,
+                "observations": observations, "stages": stages,
+                "output_dir": str(output_dir)}
+    except _WorkerFailure:
+        raise
     except _BlockedObservation as exc:
         # Even a blocked/partial discovery gets an independent post-query
         # ownership check. Preserve the discovery reason if the recheck also
         # fails; neither error is evidence of a native acceptance.
+        if action["cancel_attempted"]:
+            action["outcome"] = "unknown"
+            raise _WorkerFailure(str(exc), observations=observations,
+                                 stages=stages, output_dir=output_dir,
+                                 action=action) from exc
         reason = str(exc)
         for label, observed_hwnd in (("main", hwnd),
                                      ("dialog", observations.get("dialog", {}).get("hwnd"))):
@@ -576,12 +825,15 @@ def inspect_target(args: argparse.Namespace) -> dict[str, Any]:
             except _BlockedObservation as post_exc:
                 reason += f"; post-query {label} ownership check: {post_exc}"
         return _blocked(reason, observations=observations, stages=stages,
-                        stages_path=stages_path, output_dir=output_dir)
+                        stages_path=stages_path, output_dir=output_dir,
+                        action=action)
     except Exception as exc:
         # Attach the exact partial evidence without replacing the causal error;
         # main() prints the full chained traceback to stderr.
+        if action["cancel_attempted"]:
+            action["outcome"] = "unknown"
         raise _WorkerFailure(str(exc), observations=observations, stages=stages,
-                             output_dir=output_dir) from exc
+                             output_dir=output_dir, action=action) from exc
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -596,6 +848,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--main-title", required=False)
     parser.add_argument("--dialog-title", required=False)
     parser.add_argument("--dialog-body", required=False)
+    parser.add_argument("--cancel-once", action="store_true",
+                        help="explicitly opt in to exactly one native Cancel Invoke")
     return parser
 
 
@@ -610,14 +864,16 @@ def main(argv: list[str] | None = None) -> int:
         primary_exc = exc.__cause__ if isinstance(exc, _WorkerFailure) and exc.__cause__ is not None else exc
         observations = getattr(exc, "observations", {})
         stages = getattr(exc, "stages", [])
+        action = getattr(exc, "action", _new_action())
         output_dir = getattr(exc, "output_dir", None)
         if output_dir is not None:
             try:
                 _write_observations(output_dir, observations)
+                _atomic_json(output_dir / "worker-stages.json", stages)
                 _atomic_json(output_dir / "worker-failure.json", {
                     "error_type": type(primary_exc).__name__, "error": str(primary_exc),
                     "traceback": traceback.format_exc(), "observations": observations,
-                    "stages": stages,
+                    "stages": stages, "action": action,
                 })
             except Exception as evidence_exc:
                 print(f"evidence preservation failed: {type(evidence_exc).__name__}: {evidence_exc}",
@@ -625,9 +881,13 @@ def main(argv: list[str] | None = None) -> int:
         result = {
             "status": "FAIL", "error_type": type(primary_exc).__name__, "error": str(primary_exc),
             "traceback": traceback.format_exc(), "observations": observations, "stages": stages,
-            "captured_readonly": bool(observations), "native_acceptance": False,
-            "direct_cancel_invoke": False, "direct_cancel_invoke_count": 0,
-            "yes_invoke_count": 0,
+            "captured_readonly": bool(observations) and action["cancel_attempted"] == 0,
+            "native_acceptance": False,
+            "action": action, "modal_absent": False,
+            "post_identity_verified": False,
+            "direct_cancel_invoke": bool(action["cancel_attempted"]),
+            "direct_cancel_invoke_count": action["cancel_attempted"],
+            "yes_invoke_count": action["yes_attempted"],
         }
         traceback.print_exc(file=sys.stderr)
         _emit(result)

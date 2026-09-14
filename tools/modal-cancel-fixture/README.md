@@ -16,9 +16,10 @@ or delete arbitrary paths.
   executable, owned HWND, main title, exact modal title/body, button identities,
   and UIA runtime-ID deduplication. It performs all UIA work in the child. It
   persists a stage immediately before the one allowed `Cancel.invoke()`; it
-  never invokes `Yes` and never retries after the action. The modal
-  `ControlType` is intentionally **unpinned** until native Qt evidence exists,
-  so the worker returns `BLOCKED` rather than guessing.
+  never invokes `Yes` and never retries after the action. Read-only observation
+  remains the default. `--cancel-once` explicitly opts into the harmless fixture
+  only, using the native-observed Qt 6.8.2 `QMessageBox`/`Window` shape and exact
+  nonce-derived `QApplication.` automation IDs. Unknown outcomes cannot pass.
 - `controller.py` — fixed-path controller. The Windows CLI launches only the
   fixed fixture and this fixed worker through the reviewed existing
   `tools/player-inspection/uia_supervisor.py`; it has no arbitrary worker/script
@@ -58,8 +59,9 @@ temporary filesystem is full. Do not delete historical evidence to make room.
 The test run exercises invalid nonce, invalid lifetime, existing-root guard,
 real guarded callback failure, real Qt modal Cancel, independent counters and
 sentinel preservation, the real bounded supervisor timeout/reap path, the
-worker's unpinned-control-type block, and the Linux CLI block. No native
-Windows execution was performed here.
+worker's no-opt-in block, and the Linux CLI block. Native read-only evidence
+from run `34868391499` is replayed as a committed schema fixture. It does not
+prove native Invoke; the opt-in branch needs its own reviewed Windows run.
 
 ## Windows gate
 
@@ -78,7 +80,9 @@ must remain `BLOCKED`/partial; Linux or an offscreen run must not be upgraded
 into native acceptance.
 
 The isolated `modal-fixture-observe.yml` workflow runs the Linux regression
-suite first, then collects Windows observations without unpinning the gate.
+suite first. Pushes and default manual runs only observe. Only a manual
+`workflow_dispatch` with Boolean `cancel_once: true` adds `--cancel-once`;
+use this only after independent review of the exact source.
 It preserves the controller exit code: a BLOCKED/partial result is not painted
 green. The Windows evidence upload runs even on failure with seven-day retention;
 no player packages are downloaded or uploaded by this workflow. Raw runtime

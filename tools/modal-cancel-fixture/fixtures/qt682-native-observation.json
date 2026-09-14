@@ -1,0 +1,133 @@
+{
+  "source_run": 34868391499,
+  "source_commit": "50b5d6d88467357703b3850f94ac4c81c38bac43",
+  "nonce": "modal-3d42c3f5572459c05e0d",
+  "observations": {
+    "body": {
+      "auto_id": "QApplication.ModalCancelDialog_modal-3d42c3f5572459c05e0d.qt_msgbox_label",
+      "automation_id": "QApplication.ModalCancelDialog_modal-3d42c3f5572459c05e0d.qt_msgbox_label",
+      "class": "QLabel",
+      "class_name": "QLabel",
+      "control_type": "Text",
+      "controltype": "Text",
+      "hwnd": null,
+      "name": "Benign modal cancellation test modal-3d42c3f5572459c05e0d",
+      "pid": 3824,
+      "process_id": 3824,
+      "raw_visibility": true,
+      "runtime_id": [
+        42,
+        131228,
+        4,
+        -2147483646
+      ],
+      "runtime_ids": [
+        42,
+        131228,
+        4,
+        -2147483646
+      ],
+      "visible": true
+    },
+    "buttons": {
+      "Cancel": {
+        "auto_id": "QApplication.ModalCancelDialog_modal-3d42c3f5572459c05e0d.qt_msgbox_buttonbox.QPushButton",
+        "automation_id": "QApplication.ModalCancelDialog_modal-3d42c3f5572459c05e0d.qt_msgbox_buttonbox.QPushButton",
+        "class": "QPushButton",
+        "class_name": "QPushButton",
+        "control_type": "Button",
+        "controltype": "Button",
+        "hwnd": null,
+        "name": "Cancel",
+        "pid": 3824,
+        "process_id": 3824,
+        "raw_visibility": true,
+        "runtime_id": [
+          42,
+          131228,
+          4,
+          -2147483644
+        ],
+        "runtime_ids": [
+          42,
+          131228,
+          4,
+          -2147483644
+        ],
+        "visible": true
+      },
+      "Yes": {
+        "auto_id": "QApplication.ModalCancelDialog_modal-3d42c3f5572459c05e0d.qt_msgbox_buttonbox.QPushButton",
+        "automation_id": "QApplication.ModalCancelDialog_modal-3d42c3f5572459c05e0d.qt_msgbox_buttonbox.QPushButton",
+        "class": "QPushButton",
+        "class_name": "QPushButton",
+        "control_type": "Button",
+        "controltype": "Button",
+        "hwnd": null,
+        "name": "Yes",
+        "pid": 3824,
+        "process_id": 3824,
+        "raw_visibility": true,
+        "runtime_id": [
+          42,
+          131228,
+          4,
+          -2147483645
+        ],
+        "runtime_ids": [
+          42,
+          131228,
+          4,
+          -2147483645
+        ],
+        "visible": true
+      }
+    },
+    "dialog": {
+      "auto_id": "QApplication.ModalCancelDialog_modal-3d42c3f5572459c05e0d",
+      "automation_id": "QApplication.ModalCancelDialog_modal-3d42c3f5572459c05e0d",
+      "class": "QMessageBox",
+      "class_name": "QMessageBox",
+      "control_type": "Window",
+      "controltype": "Window",
+      "hwnd": 131228,
+      "name": "Modal Cancel Fixture modal-3d42c3f5572459c05e0d",
+      "native_owner_pid": 3824,
+      "pid": 3824,
+      "process_id": 3824,
+      "raw_visibility": true,
+      "runtime_id": [
+        42,
+        131228
+      ],
+      "runtime_ids": [
+        42,
+        131228
+      ],
+      "visible": true
+    },
+    "root": {
+      "auto_id": "QApplication.ModalCancelFixtureMain_modal-3d42c3f5572459c05e0d",
+      "automation_id": "QApplication.ModalCancelFixtureMain_modal-3d42c3f5572459c05e0d",
+      "class": "QMainWindow",
+      "class_name": "QMainWindow",
+      "control_type": "Window",
+      "controltype": "Window",
+      "hwnd": 131540,
+      "name": "Modal Cancel Fixture Main modal-3d42c3f5572459c05e0d",
+      "native_owner_pid": 3824,
+      "pid": 3824,
+      "process_id": 3824,
+      "raw_visibility": true,
+      "runtime_id": [
+        42,
+        131540
+      ],
+      "runtime_ids": [
+        42,
+        131540
+      ],
+      "visible": true
+    }
+  }
+}
