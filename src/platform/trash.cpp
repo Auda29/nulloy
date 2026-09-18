@@ -23,10 +23,10 @@
 #include <QMessageBox>
 #include <QProcess>
 
-int _trash(const QString &file, QString *error);
-
 QStringList NTrash::moveToTrash(QStringList files)
 {
+    files.removeDuplicates();
+    QStringList deleted;
     foreach (QString file, files) {
         if (NSettings::instance()->value("DisplayMoveToTrashConfirmDialog").toBool()) {
             QCheckBox *checkBox = new QCheckBox(QObject::tr("Don't show this dialog anymore"));
@@ -42,7 +42,7 @@ QStringList NTrash::moveToTrash(QStringList files)
             int res = msgBox.exec();
 
             if (res != QMessageBox::Yes) {
-                return files;
+                return deleted;
             }
 
             NSettings::instance()->setValue("DisplayMoveToTrashConfirmDialog",
@@ -50,7 +50,11 @@ QStringList NTrash::moveToTrash(QStringList files)
         }
 
         QString error;
-        if (_trash(file, &error) != 0) {
+        const NativeResult result = _trash(file, &error);
+        if (result.cancelled) {
+            break;
+        }
+        if (result.errorCode != 0) {
             QMessageBox box(QMessageBox::Warning, QObject::tr("Trash Error"), "",
                             QMessageBox::Yes | QMessageBox::Cancel, NULL);
             box.setDefaultButton(QMessageBox::Cancel);
@@ -69,8 +73,8 @@ QStringList NTrash::moveToTrash(QStringList files)
             }
         }
 
-        files.removeAt(files.indexOf(file));
+        deleted << file;
     }
 
-    return files;
+    return deleted;
 }
