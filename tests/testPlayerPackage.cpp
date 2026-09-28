@@ -58,6 +58,50 @@ class TestPlayerPackage : public QObject
 {
     Q_OBJECT
 private slots:
+    void trashHandleOwnership()
+    {
+        const QString root = qEnvironmentVariable("NULLOY_NATIVE_TRASH_PLAYER_ROOT");
+        if (root.isEmpty()) QSKIP("Explicit disposable native test root required");
+        QTemporaryDir directory(root + "/handle-probe-XXXXXX");
+        QVERIFY(directory.isValid());
+        const QString file = directory.filePath("owned-tone.wav");
+        QVERIFY(QFile::copy(QCoreApplication::applicationDirPath() + "/tests/01.wav", file));
+        auto *settings = NSettings::instance();
+        settings->setValue("RestorePlaylist", false);
+        settings->setValue("DisplayLogDialog", false);
+        settings->setValue("Volume", 0.0);
+#if !defined(_N_NO_SKINS_) && QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+        NSkinFileSystem::init();
+#endif
+        auto player = std::make_unique<NPlayer>();
+        auto check = [&](const char *stage) {
+            HANDLE handle = CreateFileW(reinterpret_cast<LPCWSTR>(file.utf16()), DELETE,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+            const DWORD error = handle == INVALID_HANDLE_VALUE ? GetLastError() : 0;
+            if (handle != INVALID_HANDLE_VALUE) CloseHandle(handle);
+            qInfo() << "delete-access" << stage << "win32-error" << error;
+            return error;
+        };
+        QCOMPARE(check("before-load"), DWORD(0));
+        player->playlistWidget()->setFiles({file});
+        player->playlistWidget()->playRow(0);
+        QTRY_COMPARE(player->playbackEngine()->state(), N::PlaybackPlaying);
+        check("playing");
+        player->tagReader()->setSource(QString());
+        check("tag-reader-released");
+        auto *waveform = dynamic_cast<NWaveformBuilderInterface *>(NPluginLoader::getPlugin(N::WaveformBuilder));
+        QVERIFY(waveform);
+        waveform->stop();
+        check("waveform-stopped");
+        player->playbackEngine()->stop();
+        check("playback-stopped");
+        player->tagReader()->setSource(QString());
+        check("tag-reader-released-again");
+        player.reset();
+        QCOMPARE(check("player-destroyed"), DWORD(0));
+    }
+
     void trashPlayer_data()
     {
         QTest::addColumn<QString>("state");
@@ -143,6 +187,7 @@ private slots:
                     answer = QMessageBox::Yes;
             } else if (box->windowTitle() == "Trash Error") {
                 ++fallbacks;
+                qInfo() << "native-trash-error" << box->text() << box->informativeText();
             } else {
                 ++unexpected;
             }

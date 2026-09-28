@@ -128,7 +128,7 @@ with tempfile.TemporaryDirectory(prefix="package check ä ", dir=build) as temp:
         cache = data / "testPlayerPackage.peaks"
         if cache.exists():
             cache.unlink()
-        selected_tests = ["trashPlayer"] if args.native_trash_root else []
+        selected_tests = ["trashHandleOwnership", "trashPlayer"] if args.native_trash_root else []
         completed = subprocess.run([str(root / "testPlayerPackage.exe"), *selected_tests, "-o", f"{result},txt"],
                                    cwd=temp, env=env, timeout=180 if args.native_trash_root else 90, capture_output=True)
         (evidence / f"{name}-stderr.txt").write_bytes(completed.stderr)

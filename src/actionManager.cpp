@@ -461,11 +461,6 @@ NActionManager::NActionManager(NPlayer *player) : QObject(player)
                 return;
             }
 
-            // TagLib caches its last FileRef (also used by the cover reader).
-            // On Windows that open metadata handle can prevent recycling the
-            // loaded track even after playback has stopped. Metadata can be
-            // reopened on demand; release it before the filesystem operation.
-            player->tagReader()->setSource(QString());
             QStringList deleted = NTrash::moveToTrash(files);
             player->playlistWidget()->removeFiles(deleted);
         });
