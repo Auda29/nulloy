@@ -148,7 +148,13 @@ private slots:
     void windowsShortAndLongExecutablePathsShareIdentity()
     {
 #ifdef Q_OS_WIN
-        const QString executable = QFileInfo(QCoreApplication::applicationFilePath()).canonicalFilePath();
+        // The checkout volume on hosted Windows has 8.3 names disabled. Use
+        // the user's actual temp volume, as in the Explorer acceptance probe.
+        QTemporaryDir aliasRoot;
+        QVERIFY(aliasRoot.isValid());
+        const QString executable = QFileInfo(aliasRoot.path()).canonicalFilePath()
+                                   + "/long-player-identity.exe";
+        QVERIFY(QFile::copy(QCoreApplication::applicationFilePath(), executable));
         const QString native = QDir::toNativeSeparators(executable);
         const DWORD length = GetShortPathNameW(reinterpret_cast<LPCWSTR>(native.utf16()), nullptr, 0);
         QVERIFY(length > 0);
