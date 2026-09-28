@@ -9,6 +9,45 @@ permissions:
   contents: read
 
 jobs:
+  native-geometry:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        qt: [5, 6]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: git mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja mingw-w64-x86_64-qt${{ matrix.qt }}-base mingw-w64-x86_64-qt5-winextras
+      - name: Verify native frame recovery and old-code failure
+        shell: msys2 {0}
+        run: |
+          cmake -S tests/upstream/236 -B geometry-build -G Ninja -DNULLOY_QT_MAJOR=${{ matrix.qt }} -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$(cygpath -m /mingw64)"
+          cmake --build geometry-build -j 2
+          export QT_QPA_PLATFORM=windows
+          geometry-build/testWindowRestoration.exe -o geometry-build/fixed-results.txt,txt
+          git show 2fd31b962ef1631042557c1312531213ff8c8f04:src/mainWindow.cpp > src/mainWindow.cpp
+          git show 2fd31b962ef1631042557c1312531213ff8c8f04:src/mainWindow.h > src/mainWindow.h
+          cmake --build geometry-build -j 2
+          if geometry-build/testWindowRestoration.exe oversizedNativeFrameFitsWorkArea -o geometry-build/old-results.txt,txt; then
+            echo 'Old geometry unexpectedly fits the complete native frame'
+            exit 1
+          fi
+          grep 'Native frame' geometry-build/old-results.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-frame-Qt${{ matrix.qt }}-evidence
+          path: geometry-build/*-results.txt
+          retention-days: 7
+
   build:
     uses: ./.github/workflows/windows-cmake.yml
     with:

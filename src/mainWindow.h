@@ -39,6 +39,7 @@ private:
     QPoint m_dragPoint;
     QPoint m_unmaximizedPos;
     QSize m_unmaximizedSize;
+    QSize m_normalFrameExtra = QSize(0, 0);
     bool m_isFullScreen;
 
     bool event(QEvent *event);
