@@ -1,0 +1,15 @@
+name: PR15 packaged player trash acceptance
+
+on:
+  push:
+    branches: ['test/windows-trash-player-acceptance']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    uses: ./.github/workflows/windows-cmake.yml
+    with:
+      upload_packages: true

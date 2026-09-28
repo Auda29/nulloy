@@ -100,6 +100,11 @@ jobs:
           for mode in missing corrupt changed-plugin; do
             python tools/phase2/verify-package.py --prefix "$(cygpath -m /mingw64)" --build ${{ matrix.build }} --headless-audio --trace-startup --registry-fallback "$mode"
           done
+      - name: Verify PR15 real player trash matrix
+        if: github.ref == 'refs/heads/test/windows-trash-player-acceptance'
+        shell: msys2 {0}
+        run: |
+          python tools/phase2/verify-package.py --prefix "$(cygpath -m /mingw64)" --build ${{ matrix.build }} --headless-audio --native-trash-root C:/nulloy-player-trash-${{ github.run_id }}-qt${{ matrix.qt }}
       - name: Verify audio formats and Unicode tag roundtrips
         shell: msys2 {0}
         run: |

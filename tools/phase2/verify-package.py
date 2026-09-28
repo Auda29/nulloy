@@ -22,11 +22,14 @@ parser.add_argument("--scale", type=float, choices=(1, 1.5, 2), help="Explicit Q
 parser.add_argument("--format-fixtures", help="Generated fixture folder; enables Unicode tag writing tests")
 parser.add_argument("--trace-startup", action="store_true")
 parser.add_argument("--registry-fallback", choices=("missing", "corrupt", "changed-plugin"))
+parser.add_argument("--native-trash-root", help="Opt in to real player trash actions using generated files only")
 args = parser.parse_args()
 if args.media and args.format_fixtures:
     parser.error("Private media and synthetic format tests are separate modes")
 build, prefix = Path(args.build).resolve(), Path(args.prefix).resolve()
 evidence = build / ("private-media-check" if args.media else "package-check")
+if args.native_trash_root:
+    evidence = build / "package-check" / "trash-player"
 if args.format_fixtures:
     evidence = build / "format-check"
 elif args.trace_startup:
@@ -35,7 +38,7 @@ if args.scale:
     evidence = evidence.with_name(evidence.name + f"-scale-{args.scale:g}")
 if args.registry_fallback:
     evidence = evidence.with_name(evidence.name + "-" + args.registry_fallback)
-evidence.mkdir(exist_ok=True)
+evidence.mkdir(parents=True, exist_ok=True)
 (evidence / "verified.json").unlink(missing_ok=True)
 info_file = build / "package-info.json"
 info = json.loads(info_file.read_text()) if info_file.exists() else {}
@@ -83,6 +86,11 @@ with tempfile.TemporaryDirectory(prefix="package check ä ", dir=build) as temp:
         env.pop("NULLOY_TEST_STARTUP_TRACE", None)
     env.pop("NULLOY_TEST_WRITE_TAGS", None)
     env.pop("NULLOY_TEST_SECOND_PLAYER", None)
+    env.pop("NULLOY_NATIVE_TRASH_PLAYER_ROOT", None)
+    if args.native_trash_root:
+        trash_root = Path(args.native_trash_root).resolve()
+        trash_root.mkdir(parents=True, exist_ok=True)
+        env["NULLOY_NATIVE_TRASH_PLAYER_ROOT"] = trash_root.as_posix()
     if args.headless_audio:
         env["GST_PLUGIN_FEATURE_RANK"] = "directsoundsink:0,waveformsink:0,wasapisink:0,wasapi2sink:0"
     version = subprocess.run([str(root / manifest.get("executable", "Nulloy.exe")), "--version"], cwd=temp, env=env,
@@ -119,8 +127,9 @@ with tempfile.TemporaryDirectory(prefix="package check ä ", dir=build) as temp:
         cache = data / "testPlayerPackage.peaks"
         if cache.exists():
             cache.unlink()
-        completed = subprocess.run([str(root / "testPlayerPackage.exe"), "-o", f"{result},txt"],
-                                   cwd=temp, env=env, timeout=90, capture_output=True)
+        selected_tests = ["trashPlayer"] if args.native_trash_root else []
+        completed = subprocess.run([str(root / "testPlayerPackage.exe"), *selected_tests, "-o", f"{result},txt"],
+                                   cwd=temp, env=env, timeout=180 if args.native_trash_root else 90, capture_output=True)
         (evidence / f"{name}-stderr.txt").write_bytes(completed.stderr)
         if (root / "render.png").exists():
             shutil.copy2(root / "render.png", evidence / f"{name}.png")
@@ -134,7 +143,7 @@ with tempfile.TemporaryDirectory(prefix="package check ä ", dir=build) as temp:
                     raise RuntimeError(f"{skin} script or persistence error: {marker}")
         if completed.returncode:
             raise RuntimeError(f"{skin} package workflow failed: {completed.returncode}")
-    process_check = bool(manifest.get("portable") and not (args.format_fixtures or args.registry_fallback or args.media))
+    process_check = bool(manifest.get("portable") and not (args.format_fixtures or args.registry_fallback or args.media or args.native_trash_root))
     if process_check:
         second = Path(temp) / "second portable ä"
         shutil.copytree(root, second)
@@ -155,5 +164,6 @@ with tempfile.TemporaryDirectory(prefix="package check ä ", dir=build) as temp:
         "explicit_scale_factor": args.scale, "formats": formats,
         "unicode_tag_roundtrip": bool(formats), "startup_trace": args.trace_startup,
         "registry_fallback": args.registry_fallback, "portable": manifest.get("portable", False),
-        "portable_process_isolation": process_check
+        "portable_process_isolation": process_check,
+        "native_trash_player": bool(args.native_trash_root)
     }, indent=2) + "\n", encoding="utf-8")
