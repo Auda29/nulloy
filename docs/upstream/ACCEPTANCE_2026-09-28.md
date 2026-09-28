@@ -264,7 +264,7 @@ Local evidence: `nulloy-acceptance-20260928/geometry-frame-local`.
 
 The verified geometry source/regression files were transplanted byte-for-byte to
 PR16 head `c7ce989`, with acceptance references in `docs/upstream/236.md`.
-PR checks: `36431008436` / `36431008472` (pending at this update).
+PR-head checks passed: Linux `36431008436` and Windows Qt5/Qt6 `36431008472`.
 Mixed-DPI and physical hotplug remain outstanding.
 
 ## Current merge decision
