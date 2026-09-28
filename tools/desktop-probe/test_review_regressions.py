@@ -188,7 +188,8 @@ class ReviewRegressions(unittest.TestCase):
                 raise OSError("UIA visibility failed")
             broken.is_visible = broken_visibility
             runtime.desktop = SimpleNamespace(windows=lambda: [invisible, broken])
-            self.assertIsNone(runtime._find_player())
+            with patch.object(runtime, "_capture_new_player_processes", return_value=True):
+                self.assertIsNone(runtime._find_player())
             record = json.loads((Path(tmp) / "player-discovery.jsonl").read_text())
             self.assertEqual(record["branch"], "no-main")
             self.assertTrue(record["processes"][0]["matches"])
@@ -397,17 +398,19 @@ class ReviewRegressions(unittest.TestCase):
                 events.append(("delete", path))
 
         runtime = object.__new__(probe.WindowsDesktopRun)
+        runtime.run_id = "run"
         runtime.profile = probe.shell_verb_profile("run", Path("player.exe"))
         runtime.registry_key_created = False
-        with patch.dict(sys.modules, {"winreg": Winreg()}):
+        with patch.dict(sys.modules, {"winreg": Winreg()}), \
+                patch.object(probe, "_create_exclusive_registry_key", return_value=Key()):
             with self.assertRaises(OSError):
                 runtime._registry_install()
             self.assertTrue(runtime.registry_key_created)
             with patch.object(probe, "_notify_association_changed") as notify:
-                self.assertTrue(runtime._registry_cleanup())
-                notify.assert_called_once_with()
+                self.assertFalse(runtime._registry_cleanup())
+                notify.assert_not_called()
         self.assertEqual([event[0] if isinstance(event, tuple) else event for event in events],
-                         ["create", "enter", "set", "exit", "delete", "delete"])
+                         ["enter", "set", "exit"])
 
     def test_fixture_audio_is_one_second_of_44100_frames(self):
         with tempfile.TemporaryDirectory() as tmp:

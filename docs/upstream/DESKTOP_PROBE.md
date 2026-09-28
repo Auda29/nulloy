@@ -1,5 +1,39 @@
 # Windows Explorer/UIA desktop probe
 
+## 2026-09-28 combined-candidate follow-up
+
+Branch `test/windows-open-acceptance` combines current integration (`5b2c600`)
+with PR #29 (`9d7de51`) and PR #24 (`21848c1`). The first diagnostic builds source
+`17bc6455d5b787754ad0540ebca9b5f02b8920e0`. Product PRs have not been merged into
+integration. The historical observations below still describe their original runs.
+
+`open-matrix.yml` reuses an exact previously built Qt6 package, verifies its source
+SHA and all manifest hashes, and runs all four EnqueueFiles/PlayEnqueued settings
+on cold and warm-empty starts plus a 12-file cold selection. Preferences are set
+only inside the freshly extracted portable package, including SettingsVersion so
+the application does not discard them. Every case has its own package extraction,
+fixtures and evidence directory. Unverified cleanup stops subsequent cases.
+
+The follow-up probe refreshes process discovery during window polling and before
+cleanup, retaining earlier process identities. Registry creation now checks the
+Win32 new-key disposition; deletion requires the run's ownership marker and an
+unchanged command. Menu discovery requires the exact fixture Explorer window in
+the foreground and the same Explorer PID. Local regression checks cover late
+primary discovery, foreign registry ownership and foreign-process menu labels.
+These changes still require actual native results; passing mock contracts alone
+does not close PR #28's review.
+
+The matrix checks exact file membership, multiplicity and a single player window.
+It does not yet assert received-message order, playing row/position, nonempty
+playing/paused warm state, independent rapid opens or audible output. The hosted
+Windows Server runner is not a Windows 11 or mixed-DPI hardware acceptance lab.
+
+Example scenario (omit `--warm-start` for cold startup):
+
+```text
+python tools/desktop-probe/probe.py --package package.zip --source-sha <package-source-sha> --output evidence --headless-audio --enqueue false --play-enqueued true --warm-start
+```
+
 `tools/desktop-probe/probe.py` is a bounded feasibility probe for the Qt 6 Windows package. It is not the complete upstream `#211` acceptance matrix and does not cover `#255` or `#236`.
 
 ## Current acceptance limits

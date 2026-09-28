@@ -85,6 +85,14 @@ class ShellVerbProfile:
     audio_mode: str = "device"
 
 
+@dataclasses.dataclass(frozen=True)
+class OpenScenario:
+    enqueue: bool
+    play_enqueued: bool
+    warm_start: bool = False
+    fixture_count: int = 3
+
+
 def parse_source_sha(value: str) -> str:
     if not SOURCE_SHA_RE.fullmatch(value):
         raise ContractError("--source-sha must be exactly 40 hexadecimal characters")
@@ -260,12 +268,21 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--package", type=Path, required=True, help="packaged Windows ZIP")
     parser.add_argument("--output", type=Path, required=True, help="evidence directory")
     parser.add_argument("--source-sha", required=True, help="exact 40-character source SHA")
+    parser.add_argument("--enqueue", choices=("true", "false"))
+    parser.add_argument("--play-enqueued", choices=("true", "false"))
+    parser.add_argument("--warm-start", action="store_true")
+    parser.add_argument("--fixture-count", type=int, choices=(3, 12), default=3)
     parser.add_argument(
         "--headless-audio",
         action="store_true",
         help="opt into no-device GStreamer ranks for the Explorer-launched app",
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if (args.enqueue is None) != (args.play_enqueued is None):
+        parser.error("--enqueue and --play-enqueued must be provided together")
+    if args.enqueue is None and (args.warm_start or args.fixture_count != 3):
+        parser.error("scenario options require explicit --enqueue and --play-enqueued")
+    return args
 
 
 def shell_command(executable: Path, headless_audio: bool = False) -> str:
@@ -424,11 +441,11 @@ def _windows_modules() -> tuple[Any, Any, Any]:
     return ImageGrab, Desktop, Application
 
 
-def _make_fixtures(directory: Path) -> list[Path]:
+def _make_fixtures(directory: Path, count: int = EXPECTED_FIXTURE_COUNT) -> list[Path]:
     directory.mkdir(parents=True, exist_ok=False)
     fixtures: list[Path] = []
     silence = b"\x00\x00" * FIXTURE_FRAMES
-    for index in range(1, EXPECTED_FIXTURE_COUNT + 1):
+    for index in range(1, count + 1):
         path = directory / f"desktop-probe-{index:02d}.wav"
         with wave.open(str(path), "wb") as output:
             output.setnchannels(1)
@@ -457,13 +474,41 @@ def _notify_association_changed() -> None:
     ctypes.windll.shell32.SHChangeNotify(0x08000000, 0, 0, 0)
 
 
+def _create_exclusive_registry_key(path: str) -> Any:
+    """Use the Win32 disposition result: never adopt an existing shell verb."""
+    import ctypes
+    from ctypes import wintypes
+    import winreg
+
+    create = ctypes.WinDLL("advapi32", use_last_error=True).RegCreateKeyExW
+    create.argtypes = [wintypes.HKEY, wintypes.LPCWSTR, wintypes.DWORD,
+                       wintypes.LPWSTR, wintypes.DWORD, wintypes.DWORD,
+                       ctypes.c_void_p, ctypes.POINTER(wintypes.HKEY),
+                       ctypes.POINTER(wintypes.DWORD)]
+    create.restype = wintypes.LONG
+    handle, disposition = wintypes.HKEY(), wintypes.DWORD()
+    # Predefined HKEYs are sign-extended on 64-bit Windows.
+    root = wintypes.HKEY(ctypes.c_ssize_t(-2147483647).value)
+    error = create(root, path, 0, None, 0, winreg.KEY_READ | winreg.KEY_WRITE,
+                   None, ctypes.byref(handle), ctypes.byref(disposition))
+    if error:
+        raise ctypes.WinError(error)
+    key = winreg.HKEYType(handle.value)
+    if disposition.value != 1:  # REG_CREATED_NEW_KEY
+        key.Close()
+        raise BlockedError("probe registry key already exists; refusing to reuse it")
+    return key
+
+
 class WindowsDesktopRun:
     def __init__(self, package: ExtractedPackage, evidence: Path, run_id: str,
-                 headless_audio: bool = False) -> None:
+                 headless_audio: bool = False, scenario: OpenScenario | None = None) -> None:
         self.package = package
         self.evidence = evidence
         self.run_id = run_id
         self.headless_audio = headless_audio
+        self.scenario = scenario
+        self.warm_process: Any = None
         self.profile = shell_verb_profile(run_id, package.executable, headless_audio=headless_audio)
         self.registry_key_created = False
         self.explorer_window: Any = None
@@ -500,8 +545,13 @@ class WindowsDesktopRun:
     def _capture_new_player_processes(self) -> bool:
         baseline = set(self.player_process_baseline)
         current = [identity for _, identity in self._process_snapshot()]
-        self.owned_player_processes = [identity for identity in current if identity not in baseline]
-        return bool(self.owned_player_processes)
+        discovered = [identity for identity in current if identity not in baseline]
+        # Retain exited identities for the report, and discover late primaries or
+        # extra windows on subsequent polls instead of freezing the first snapshot.
+        for identity in discovered:
+            if identity not in self.owned_player_processes:
+                self.owned_player_processes.append(identity)
+        return bool(discovered)
 
     def _player_processes_alive(self) -> list[ProcessIdentity]:
         current = {identity for _, identity in self._process_snapshot()}
@@ -579,10 +629,10 @@ class WindowsDesktopRun:
         import winreg
 
         key_path = self.profile.registry_path
-        key = winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_WRITE)
-        # CreateKeyEx creates the owned parent even if entering or writing it fails.
+        key = _create_exclusive_registry_key(key_path)
         self.registry_key_created = True
         with key:
+            winreg.SetValueEx(key, "NulloyProbeOwner", 0, winreg.REG_SZ, self.run_id)
             winreg.SetValueEx(key, "", 0, winreg.REG_SZ, self.profile.label)
             winreg.SetValueEx(key, "MultiSelectModel", 0, winreg.REG_SZ, "Document")
         command_path = key_path + r"\command"
@@ -601,6 +651,23 @@ class WindowsDesktopRun:
         if not self.registry_key_created:
             return True
         import winreg
+
+        # Revalidate the marker and command before deleting either key. A failed
+        # or changed ownership read preserves the key and makes the verdict fail.
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, self.profile.registry_path) as key:
+                owner, _ = winreg.QueryValueEx(key, "NulloyProbeOwner")
+            if owner != self.run_id:
+                return False
+            try:
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, self.profile.registry_path + r"\command") as key:
+                    command, _ = winreg.QueryValueEx(key, "")
+                if command != self.profile.command:
+                    return False
+            except FileNotFoundError:
+                pass  # The install may have failed before creating the command.
+        except OSError:
+            return False
 
         command_deleted = False
         try:
@@ -675,6 +742,8 @@ class WindowsDesktopRun:
         poll: dict[str, Any] = {"monotonic": time.monotonic(), "processes": [], "candidates": []}
         self._player_discovery_poll = poll
         try:
+            if getattr(self, "psutil", None) is not None:
+                self._capture_new_player_processes()
             mains = [window for window in self._owned_player_windows()
                      if window.element_info.class_name == "NMainWindow"]
             poll["main_count"] = len(mains)
@@ -792,6 +861,24 @@ class WindowsDesktopRun:
                 ) from last_error
             time.sleep(0.25)
 
+    def _find_probe_menu_item(self) -> Any:
+        # The label is unique, but it must also belong to this Explorer process
+        # while the exact fixture window owns the foreground interaction.
+        import win32gui
+
+        explorer = self._find_explorer()
+        if explorer is None or win32gui.GetForegroundWindow() != explorer.handle:
+            return None
+        pid = explorer.element_info.process_id
+        matches = []
+        for window in self.desktop.windows():
+            if window.element_info.process_id != pid:
+                continue
+            for item in window.descendants(control_type="MenuItem"):
+                if item.window_text() == self.profile.label and item.element_info.process_id == pid:
+                    matches.append(item)
+        return matches[0] if len(matches) == 1 else None
+
     def _cleanup_explorer(self) -> bool:
         if not self.explorer_launch_started:
             return True
@@ -870,6 +957,8 @@ class WindowsDesktopRun:
     def _cleanup_player(self) -> bool:
         cleanup_ok = True
         try:
+            if getattr(self, "player_launch_started", False):
+                self._capture_new_player_processes()
             windows = self._owned_player_windows()
             for window in windows:
                 try:
@@ -912,7 +1001,11 @@ class WindowsDesktopRun:
         self.fixture_directory = temp_root / f"fixtures-{self.run_id}"
         fixtures: list[Path] = []
         try:
-            fixtures = _make_fixtures(self.fixture_directory)
+            scenario = getattr(self, "scenario", None)
+            count = scenario.fixture_count if scenario else EXPECTED_FIXTURE_COUNT
+            fixtures = _make_fixtures(self.fixture_directory, count)
+            if scenario is not None:
+                self._prepare_scenario(environment)
             self._registry_install()
             explorer_process = subprocess.Popen(
                 ["explorer.exe", "/n", f"/root,{self.fixture_directory}"],
@@ -932,15 +1025,7 @@ class WindowsDesktopRun:
             _dump_uia(self.explorer_window, self.evidence / "explorer-selection-uia.jsonl")
             self.explorer_window.type_keys("+{F10}")
             menu_item = _wait_for(
-                lambda: next(
-                    (
-                        item
-                        for item in self.desktop.windows()
-                        for item in item.descendants(control_type="MenuItem")
-                        if item.window_text() == self.profile.label
-                    ),
-                    None,
-                ),
+                self._find_probe_menu_item,
                 10,
                 "probe shell verb in Explorer context menu",
             )
@@ -955,7 +1040,7 @@ class WindowsDesktopRun:
             return {
                 "fixture_files": [path.name for path in fixtures],
                 "assertions": {
-                    "three_generated_wav_files": len(fixtures) == EXPECTED_FIXTURE_COUNT,
+                    "expected_generated_wav_files": len(fixtures) == count,
                     "explorer_context_menu": True,
                     "playlist_rows_exact_once": True,
                 },
@@ -964,6 +1049,7 @@ class WindowsDesktopRun:
                 "exclusion": "audio_output_not_tested" if self.headless_audio else None,
                 "playlist_control": self.playlist_control_identity,
                 "shell_verb": dataclasses.asdict(self.profile),
+                "scenario": dataclasses.asdict(scenario) if scenario else None,
             }
         except Exception:
             if self.explorer_window is not None:
@@ -1017,6 +1103,34 @@ class WindowsDesktopRun:
                 cleanup_ok = False
             self.cleanup_verified = cleanup_ok and self.process_cleanup_verified and not self.cleanup_errors
 
+    def _prepare_scenario(self, environment: dict[str, str]) -> None:
+        if not self.package.contract.portable:
+            raise ContractError("scenario preferences require an isolated portable package")
+        scenario = self.scenario
+        data = self.package.root / "Data"
+        data.mkdir(exist_ok=True)
+        config = data / (self.package.executable.stem + ".cfg")
+        # SettingsVersion is essential: NSettings otherwise clears a fresh INI.
+        settings = ("[General]\nSettingsVersion=0.8\nSingleInstance=true\n"
+                    "RestorePlaylist=false\nLanguage=en\n"
+                    f"EnqueueFiles={str(scenario.enqueue).lower()}\n"
+                    f"PlayEnqueued={str(scenario.play_enqueued).lower()}\n")
+        config.write_text(settings, encoding="utf-8")
+        _write_text(self.evidence / "scenario-settings.cfg", settings)
+        if scenario.warm_start:
+            launch_environment = environment.copy()
+            if self.headless_audio:
+                launch_environment["GST_PLUGIN_FEATURE_RANK"] = (
+                    "directsoundsink:0,waveformsink:0,wasapisink:0,wasapi2sink:0")
+            self.player_launch_started = True
+            self.warm_process = subprocess.Popen(
+                [str(self.package.executable)], env=launch_environment)
+            _wait_for(self._capture_new_player_processes, 45, "warm primary process")
+            self.player_window = _wait_for(self._find_player, 45, "warm empty player window")
+            if self._playlist_snapshot():
+                raise ContractError("warm-start baseline playlist must be empty")
+            _capture_image(self.player_window.capture_as_image(), self.evidence / "warm-baseline.png")
+
 
 def run_probe(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
     output = args.output.resolve()
@@ -1056,7 +1170,12 @@ def run_probe(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
                 "qt_major": package.contract.qt_major,
             }
         )
-        runtime = WindowsDesktopRun(package, output, run_id, headless_audio=args.headless_audio)
+        scenario = None
+        if getattr(args, "enqueue", None) is not None:
+            scenario = OpenScenario(args.enqueue == "true", args.play_enqueued == "true",
+                                    args.warm_start, args.fixture_count)
+        runtime = WindowsDesktopRun(package, output, run_id, headless_audio=args.headless_audio,
+                                    scenario=scenario)
         runtime_result = runtime.execute()
         evidence.update(runtime_result)
         evidence["cleanup_verified"] = bool(runtime.cleanup_verified)
