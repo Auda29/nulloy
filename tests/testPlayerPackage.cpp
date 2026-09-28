@@ -108,7 +108,8 @@ private slots:
         QTest::addColumn<QString>("operation");
         for (const QString &state : {QString("playing"), QString("paused"), QString("stopped")})
             for (const QString &operation : {QString("cancel"), QString("partial"),
-                     QString("duplicates"), QString("current"), QString("next"), QString("locked")})
+                     QString("duplicates"), QString("current"), QString("cancel-current"),
+                     QString("next"), QString("locked")})
                 QTest::newRow(qPrintable(state + "-" + operation)) << state << operation;
     }
 
@@ -155,7 +156,9 @@ private slots:
         if (state == "paused") engine->pause();
         if (state == "stopped") engine->stop();
         const auto initialState = engine->state();
-        const bool current = operation == "current";
+        const qreal initialPosition = engine->position();
+        const QString initialMedia = engine->currentMedia();
+        const bool current = operation == "current" || operation == "cancel-current";
         list->clearSelection();
         list->item(current ? 0 : 1)->setSelected(true);
         if (operation == "partial") list->item(3)->setSelected(true);
@@ -183,7 +186,8 @@ private slots:
             QMessageBox::StandardButton answer = QMessageBox::Cancel;
             if (box->windowTitle() == "Confirmation") {
                 ++confirmations;
-                if (operation != "cancel" && !(operation == "partial" && confirmations == 2))
+                if (operation != "cancel" && operation != "cancel-current"
+                    && !(operation == "partial" && confirmations == 2))
                     answer = QMessageBox::Yes;
             } else if (box->windowTitle() == "Trash Error") {
                 ++fallbacks;
@@ -200,8 +204,10 @@ private slots:
         dialogs.stop();
         QCOMPARE(unexpected, 0);
         QCOMPARE(confirmations, operation == "partial" ? 2 : 1);
-        QCOMPARE(fallbacks, operation == "locked" ? 1 : 0);
-        const bool removed = operation != "cancel" && operation != "locked";
+        // Validate retained bytes and player state even when the current-track
+        // recycle expectation fails. Never let an early assertion hide these.
+        const bool removed = operation != "cancel" && operation != "cancel-current"
+                             && operation != "locked" && fallbacks == 0;
         const int removedFile = current ? 0 : 1;
         QStringList expected = {files[0], files[1], files[1], files[2]};
         if (removed) expected.removeAll(files[removedFile]);
@@ -219,8 +225,14 @@ private slots:
         }
         // Preserve pause/stop; require the next explicit play action to resolve
         // to a surviving file after removing the playing item or its successor.
-        if (state != "playing" || !current)
+        if (state != "playing" || !current || !removed)
             QCOMPARE(engine->state(), initialState);
+        if (!removed) {
+            QCOMPARE(engine->currentMedia(), initialMedia);
+            if (state != "playing")
+                QCOMPARE(engine->position(), initialPosition);
+            qInfo() << "cancelled-trash-retained-bytes-playback-state-and-paused-position";
+        }
         list->playNextItem();
         QTRY_COMPARE(engine->state(), N::PlaybackPlaying);
         QVERIFY(list->playingRow() >= 0);
@@ -228,6 +240,7 @@ private slots:
         QVERIFY(expected.contains(engine->currentMedia()));
         engine->stop();
         player->quit();
+        QCOMPARE(fallbacks, operation == "locked" ? 1 : 0);
     }
 
     void portableProcesses()
