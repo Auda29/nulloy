@@ -12,10 +12,14 @@
 #include <QThread>
 #include <QTimer>
 #include <QUuid>
+#include <vector>
 
 #include "singleInstanceStartup.h"
 #include "qtsingleapplication.h"
 #include "qtlocalpeer.h"
+#ifdef Q_OS_WIN
+#include <qt_windows.h>
+#endif
 
 namespace {
 
@@ -141,6 +145,42 @@ private:
     }
 
 private slots:
+    void windowsShortAndLongExecutablePathsShareIdentity()
+    {
+#ifdef Q_OS_WIN
+        const QString executable = QFileInfo(QCoreApplication::applicationFilePath()).canonicalFilePath();
+        const QString native = QDir::toNativeSeparators(executable);
+        const DWORD length = GetShortPathNameW(reinterpret_cast<LPCWSTR>(native.utf16()), nullptr, 0);
+        QVERIFY(length > 0);
+        std::vector<wchar_t> buffer(length);
+        QVERIFY(GetShortPathNameW(reinterpret_cast<LPCWSTR>(native.utf16()), buffer.data(), length) > 0);
+        const QString shortPath = QString::fromWCharArray(buffer.data());
+        if (shortPath.compare(native, Qt::CaseInsensitive) == 0)
+            QSKIP("Test volume does not supply a distinct 8.3 executable alias");
+        auto identity = [this](const QString &program) {
+            QProcess process;
+            setupProcess(process, {"--identity"});
+            process.setProgram(program);
+            process.start();
+            if (!process.waitForStarted(3000) || !process.waitForFinished(5000)
+                || process.exitCode() != 0) return QByteArray();
+            return process.readAllStandardOutput().trimmed();
+        };
+        const QByteArray longId = identity(executable);
+        QVERIFY(!longId.isEmpty());
+        QCOMPARE(identity(shortPath), longId);
+        QTemporaryDir other;
+        QVERIFY(other.isValid());
+        const QString copy = other.filePath("other-player.exe");
+        QVERIFY(QFile::copy(executable, copy));
+        const QByteArray otherId = identity(copy);
+        QVERIFY(!otherId.isEmpty());
+        QVERIFY(otherId != longId);
+#else
+        QSKIP("8.3 executable aliases are Windows-specific");
+#endif
+    }
+
     void windowsConnectionAcceptedInsideListenIsDelivered()
     {
 #if defined(Q_OS_WIN) && QT_VERSION >= QT_VERSION_CHECK(6, 3, 0)
@@ -496,6 +536,11 @@ int runProbe(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
+    if (argc > 1 && QByteArray(argv[1]) == "--identity") {
+        QtSingleApplication app(argc, argv);
+        QTextStream(stdout) << app.id() << Qt::endl;
+        return 0;
+    }
     if (argc > 1 && (QByteArray(argv[1]) == "--primary"
                     || QByteArray(argv[1]) == "--primary-frame"))
         return runPrimary(argc, argv);

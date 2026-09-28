@@ -76,6 +76,11 @@ QtLocalPeer::QtLocalPeer(QObject* parent, const QString &appId)
     if (id.isEmpty()) {
         id = QCoreApplication::applicationFilePath();
 #if defined(Q_OS_WIN)
+        // A short 8.3 launch path and Explorer's long path identify the same
+        // executable. Keep distinct installed/portable copies independent.
+        const QString canonical = QFileInfo(id).canonicalFilePath();
+        if (!canonical.isEmpty())
+            id = canonical;
         id = id.toLower();
 #endif
         prefix = id.section(QLatin1Char('/'), -1);

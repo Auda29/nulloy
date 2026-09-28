@@ -117,7 +117,53 @@ timing, re-enumerate all package windows after clients settle, and compare deliv
 messages with playlist changes. Increasing the batching timeout without this
 evidence would not establish a correct fix. No failed scenario has been waived.
 
-## Merge decision
+## Instrumented follow-up
+
+Diagnostic source `13bae8bb241b93360787fa925acd4b1007e1a8ef`, built in
+[36421225045](https://github.com/Auda29/nulloy/actions/runs/36421225045), adds
+opt-in per-PID JSONL records for application arguments, peer/lock identity,
+connection/acknowledgement, player construction, message dispatch and playlist
+results. The probe now waits for all expected launch outcomes and re-enumerates
+package windows before reading the playlist. Local probe tests: 46 passed.
+
+That run passed Linux and Windows builds but failed Explorer acceptance. Its
+downloaded trace shows primary PID 5860 and clients 768/3040 using the same
+socket and lock path. Both clients connected before `listen()` returned, then
+exited with code 1 after approximately five seconds without acknowledgement.
+The primary constructed the player in 4932 ms, but never logged a receive callback
+even during the following six seconds of its event loop. Its own file 01 was the
+only playlist row. Cleanup passed. ZIP SHA-256:
+`10820e2c18e39bfc9c58c519143a85314c35c19bce34e98bc2e4737d15cce1ad`.
+
+Qt's Windows implementation calls `_q_onNewConnection()` inside `listen()`;
+this can emit `newConnection` before the vendored code subscribes to it. Candidate
+`a8639e1` subscribes before listening and queues the receiver invocation until
+startup wiring is complete. A Windows/Qt6 regression uses a larger actual
+named-pipe backlog to exercise acceptance *inside* `listen()`, then connects
+the application message receiver after the primary claim, matching main.cpp.
+CI must establish success with the fix and missing delivery with the previous
+receiver. This candidate is not yet a completed package acceptance.
+
+The instrumented matrix `36422795897` confirms a second defect: all four warm
+cases end with two native main windows. The warm process hashes an 8.3 executable
+path (`C:/Users/RUNNER~1/...`), whereas Explorer's children hash its long form
+(`C:/Users/runneradmin/...`), producing distinct IPC channel/lock identities for
+the same executable. Canonicalizing the executable path before hashing addresses
+this independently of the listen-time race. Its subprocess regression compares
+long/short launch identities and checks that a separate executable copy still
+has a distinct identity. The matrix also contains cold missing-frame/timeout
+failures; no burst-timing limits have been relaxed.
+
+PR15 player-action tests run separately on `test/windows-trash-player-acceptance`
+at `bdc812e`: generated disposable WAV files, real player action and Windows
+adapter, ordinary/partial cancellation, duplicate rows, current/next removal,
+and a handle-denied recycle followed by declined permanent deletion. The matrix
+covers playing/paused/stopped and package skins; results are pending.
+
+Read-only local display discovery found two 2560x1440 monitors, both 96 DPI.
+Mixed-DPI and physical hotplug are not represented by this current setup.
+
+## Current merge decision
 
 All five functional/test PRs remain drafts. No functional PR was merged into
 integration, and integration was not promoted to master. Original-project PRs
