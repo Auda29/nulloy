@@ -641,10 +641,10 @@ class WindowsDesktopRun:
         key_path = self.profile.registry_path
         key = _create_exclusive_registry_key(key_path)
         self.registry_key_created = True
-        with key:
-            winreg.SetValueEx(key, "NulloyProbeOwner", 0, winreg.REG_SZ, self.run_id)
-            winreg.SetValueEx(key, "", 0, winreg.REG_SZ, self.profile.label)
-            winreg.SetValueEx(key, "MultiSelectModel", 0, winreg.REG_SZ, "Document")
+        with key as handle:
+            winreg.SetValueEx(handle, "NulloyProbeOwner", 0, winreg.REG_SZ, self.run_id)
+            winreg.SetValueEx(handle, "", 0, winreg.REG_SZ, self.profile.label)
+            winreg.SetValueEx(handle, "MultiSelectModel", 0, winreg.REG_SZ, "Document")
         command_path = key_path + r"\command"
         with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, command_path, 0, winreg.KEY_WRITE) as key:
             winreg.SetValueEx(key, "", 0, winreg.REG_SZ, self.profile.command)

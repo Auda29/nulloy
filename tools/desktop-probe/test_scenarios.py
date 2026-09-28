@@ -2,6 +2,7 @@ import tempfile
 import sys
 import os
 import uuid
+import dataclasses
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,6 +12,29 @@ import probe
 
 
 class ScenarioTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == 'nt', 'real Win32 registry lifecycle')
+    def test_native_registry_install_readback_and_cleanup(self):
+        import winreg
+
+        package = SimpleNamespace(executable=Path('private-player.exe'))
+        run = probe.WindowsDesktopRun(package, Path('.'), uuid.uuid4().hex)
+        path = 'Software\\NulloyProbeContract-' + run.run_id
+        run.profile = dataclasses.replace(run.profile, registry_path=path)
+        try:
+            with patch.object(probe, '_notify_association_changed'):
+                run._registry_install()
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path) as key:
+                    self.assertEqual(winreg.QueryValueEx(key, 'NulloyProbeOwner')[0], run.run_id)
+                self.assertTrue(run._registry_cleanup())
+                with self.assertRaises(FileNotFoundError):
+                    winreg.OpenKey(winreg.HKEY_CURRENT_USER, path)
+        finally:
+            for key in (path + '\\command', path):
+                try:
+                    winreg.DeleteKey(winreg.HKEY_CURRENT_USER, key)
+                except FileNotFoundError:
+                    pass
+
     @unittest.skipUnless(os.name == 'nt', 'real Win32 registry contract')
     def test_native_exclusive_registry_handle_and_collision(self):
         import winreg
