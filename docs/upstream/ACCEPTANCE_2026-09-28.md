@@ -184,7 +184,26 @@ EXE SHA-256: `ce6d54bed8dddf773cd0cca9714f1737668fd5c0a16910c1bace485e5d37f08b`.
 Probe `51326ac` also correlates
 client success/acknowledgements, received frames, player-message exact-once
 delivery and actual UI row order; 47 local probe tests passed. Matrix `36429597491`
-uses this stronger probe against the same `fd7e416` package and is pending.
+used this stronger probe against the same `fd7e416` package, exposing a probe-only
+short/long fixture-path mismatch. `afd5676` resolves actual file paths before
+comparing them. The next run `36430105997` exposed another probe defect: its
+playlist reader returned expected fixture order rather than the observed UI order.
+All nine saved raw UI orders matched player delivery. `e7c86b7` returns actual
+observations and requires two consecutive snapshots with the same order; 49
+local contracts passed.
+
+Final run **`36430784792`: 9/9 PASS**, all nine cleanup checks passed. It verifies
+all four enqueue/play-enqueued combinations for cold and warm-empty launches,
+plus a cold 12-file selection, using the unchanged `fd7e416` package. Every
+scenario passed acknowledgement/received-frame correlation, exact-once player
+delivery, UI row order and the settled single-window invariant. This establishes
+the startup/IPC acceptance slice, not the remaining #24 nonempty playback-state,
+position and independent-rapid-open semantics.
+
+The verified startup implementation and regression files were transplanted
+byte-for-byte to PR29 head `6170dbe`. Its Linux/Windows PR checks are pending in
+`36431623867` / `36431623652`. No desktop-probe workflow or #24 playlist policy
+was transplanted into that PR.
 
 PR15 player-action tests run separately on `test/windows-trash-player-acceptance`
 at `bdc812e`: generated disposable WAV files, real player action and Windows
@@ -236,7 +255,17 @@ frame containment. Run `36428998249` passed **46 native results each on Qt5 and
 Qt6**; both old-code comparisons failed the new frame-containment case. Its Qt5
 package build also passed. The Qt6 package job failed during MSYS installation
 with HTTP 500 and has been rerun; no source/test failure was reported in that job.
-Mixed-DPI, physical hotplug and the complete native-skin rerun remain outstanding.
+The failed-job rerun passed. The resulting Qt6 package passed **all eight local
+skin/phase checks**, including Native, on the two physical 96-DPI monitors. All
+eight owned processes were cleaned up; all 497 package hashes were verified.
+ZIP SHA-256: `2b1629f35d4230c37531990fc241b22f7868758c6a904b5a2dabcbd143213f47`;
+EXE SHA-256: `d1d5bc9dc69a8c41f5495c400e7f556bfaaa320d3267c9ee3f90523fa8895ab2`.
+Local evidence: `nulloy-acceptance-20260928/geometry-frame-local`.
+
+The verified geometry source/regression files were transplanted byte-for-byte to
+PR16 head `c7ce989`, with acceptance references in `docs/upstream/236.md`.
+PR checks: `36431008436` / `36431008472` (pending at this update).
+Mixed-DPI and physical hotplug remain outstanding.
 
 ## Current merge decision
 
