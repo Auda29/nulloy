@@ -18,7 +18,7 @@ target_link_libraries(testWindowRestoration PRIVATE
     Qt${NULLOY_QT_MAJOR}::Widgets Qt${NULLOY_QT_MAJOR}::Test)
 if(WIN32)
     target_sources(testWindowRestoration PRIVATE ${N_SRC}/platform/w7TaskBar.cpp ${N_SRC}/platform/w7TaskBar.h)
-    target_compile_definitions(testWindowRestoration PRIVATE WIN32)
+    target_compile_definitions(testWindowRestoration PRIVATE WIN32 UNICODE _UNICODE)
     target_link_libraries(testWindowRestoration PRIVATE dwmapi ole32 uuid)
     if(NULLOY_QT_MAJOR STREQUAL "5")
         find_package(Qt5 REQUIRED COMPONENTS WinExtras)
