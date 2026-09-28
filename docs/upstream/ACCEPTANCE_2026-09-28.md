@@ -175,9 +175,16 @@ and check that GUI message dispatch occurs on the original thread. Frames remain
 in memory, so this does not promise delivery across a primary-process crash.
 Regression `36426673584` passed all 12 results (no skips), including both
 blocked-GUI reception cases; the old-code identity/listen regressions failed as
-expected. Package run `36426674095` is pending. Probe `51326ac` also correlates
+expected. Package run `36426674095` passed Linux, Windows Qt5/Qt6 and real Explorer
+acceptance. The primary took 5671ms to construct the player while both clients
+received acknowledgements immediately and exited with code 0. All three files
+arrived exactly once, one settled player remained, and cleanup passed.
+ZIP SHA-256: `e668066d1e82fc72dc4edef67270323a0d09b3194541da48e7b277349fd61c2a`;
+EXE SHA-256: `ce6d54bed8dddf773cd0cca9714f1737668fd5c0a16910c1bace485e5d37f08b`.
+Probe `51326ac` also correlates
 client success/acknowledgements, received frames, player-message exact-once
-delivery and actual UI row order; 47 local probe tests passed.
+delivery and actual UI row order; 47 local probe tests passed. Matrix `36429597491`
+uses this stronger probe against the same `fd7e416` package and is pending.
 
 PR15 player-action tests run separately on `test/windows-trash-player-acceptance`
 at `bdc812e`: generated disposable WAV files, real player action and Windows
@@ -225,7 +232,10 @@ not a titlebar-height overflow. Evidence is retained locally under
 Candidate `5f82eee` on the geometry test branch includes native frame dimensions
 in fallback fitting, retaining normal-state frame dimensions during minimized/
 maximized transitions. A new actual native-window regression checks complete
-frame containment, with Qt5/Qt6 old-code comparison and fresh packages pending.
+frame containment. Run `36428998249` passed **46 native results each on Qt5 and
+Qt6**; both old-code comparisons failed the new frame-containment case. Its Qt5
+package build also passed. The Qt6 package job failed during MSYS installation
+with HTTP 500 and has been rerun; no source/test failure was reported in that job.
 Mixed-DPI, physical hotplug and the complete native-skin rerun remain outstanding.
 
 ## Current merge decision
@@ -233,4 +243,4 @@ Mixed-DPI, physical hotplug and the complete native-skin rerun remain outstandin
 All five functional/test PRs remain drafts. No functional PR was merged into
 integration, and integration was not promoted to master. Original-project PRs
 were not changed. Native component success narrows the remaining work but does
-not override the combined Explorer failure or the unexecuted acceptance cases.
+not override the unexecuted acceptance cases or the player-trash recycling gap.
