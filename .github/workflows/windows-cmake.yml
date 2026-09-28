@@ -7,13 +7,13 @@ on:
   workflow_dispatch:
     inputs:
       upload_packages:
-        description: 'Upload Qt5/Qt6 packages for a planned acceptance run (3 days)'
+        description: 'Retain downloadable packages for 3 days; archive acceptance references separately'
         type: boolean
         default: false
   workflow_call:
     inputs:
       upload_packages:
-        description: 'Explicitly retain packages for the calling workflow'
+        description: 'Retain packages for downstream consumers such as the release workflow'
         type: boolean
         default: false
 
@@ -21,6 +21,20 @@ permissions:
   contents: read
 
 jobs:
+  artifact-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify artifact upload policy and release caller
+        run: |
+          python -m pip install PyYAML==6.0.2
+          python tools/ci/test-artifact-policy.py
+          python tools/upstream/test-artifact-policy.py
+
   windows:
     strategy:
       fail-fast: false
