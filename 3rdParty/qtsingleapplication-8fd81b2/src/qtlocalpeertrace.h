@@ -10,12 +10,16 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMutex>
+#include <QMutexLocker>
 
 inline void startupTrace(const char *event, QJsonObject fields = {})
 {
     const QString directory = qEnvironmentVariable("NULLOY_STARTUP_TRACE_DIR");
     if (directory.isEmpty())
         return;
+    static QMutex mutex;
+    QMutexLocker lock(&mutex);
     fields.insert("event", QString::fromLatin1(event));
     fields.insert("time_msec", double(QDateTime::currentMSecsSinceEpoch()));
     fields.insert("pid", double(QCoreApplication::applicationPid()));

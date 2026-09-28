@@ -33,6 +33,12 @@ jobs:
           export QT_QPA_PLATFORM=offscreen
           race-build/testSingleInstanceStartup.exe -o race-build/fixed-results.txt,txt
           git show 13bae8bb241b93360787fa925acd4b1007e1a8ef:3rdParty/qtsingleapplication-8fd81b2/src/qtlocalpeer.cpp > 3rdParty/qtsingleapplication-8fd81b2/src/qtlocalpeer.cpp
+          for source in qtlocalpeer.h qtsingleapplication.h qtsingleapplication.cpp; do
+            git show 13bae8bb241b93360787fa925acd4b1007e1a8ef:3rdParty/qtsingleapplication-8fd81b2/src/$source > 3rdParty/qtsingleapplication-8fd81b2/src/$source
+          done
+          # Freeze the two original regression cases for the old API; new
+          # background-reception cases above exercise both enabled/disabled IO.
+          git show ba414e0cb3db93ce6b63f3cedc6ea7a35037f9be:tests/single-instance-startup/testSingleInstanceStartup.cpp > tests/single-instance-startup/testSingleInstanceStartup.cpp
           cmake --build race-build -j 2
           if race-build/testSingleInstanceStartup.exe windowsConnectionAcceptedInsideListenIsDelivered -o race-build/old-results.txt,txt; then
             echo 'Old receiver unexpectedly passed the listen-time regression'

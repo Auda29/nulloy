@@ -45,6 +45,7 @@
 #include <QCoreApplication>
 #include <QTime>
 #include <QDataStream>
+#include <QElapsedTimer>
 
 #if defined(Q_OS_WIN)
 #include <QLibrary>
@@ -67,7 +68,7 @@ namespace QtLP_Private {
 #endif
 }
 
-const char* QtLocalPeer::ack = "ack";
+static const char* ack = "ack";
 
 QtLocalPeer::QtLocalPeer(QObject* parent, const QString &appId)
     : QObject(parent), id(appId)
@@ -133,6 +134,34 @@ QtLocalPeer::QtLocalPeer(QObject* parent, const QString &appId)
 
 
 
+QtLocalPeer::~QtLocalPeer()
+{
+    if (receiverThread) {
+        receiverThread->requestInterruption();
+        receiverThread->quit();
+        receiverThread->wait();
+    }
+}
+
+void QtLocalPeer::startBackgroundReceiver()
+{
+    Q_ASSERT(QThread::currentThread() == thread());
+    if (receiverThread || !lockFile.isLocked() || !server->isListening())
+        return;
+    disconnect(server, nullptr, this, nullptr);
+    // Keep the native election mutex on its acquiring thread; only transfer
+    // socket IO. Pending connections migrate together with their server.
+    server->setParent(nullptr);
+    auto *receiver = new QtLocalPeerReceiver(server);
+    receiverThread = new QThread(this);
+    connect(receiver, &QtLocalPeerReceiver::messageReceived,
+            this, &QtLocalPeer::messageReceived, Qt::QueuedConnection);
+    connect(receiverThread, &QThread::finished, receiver, &QObject::deleteLater);
+    receiver->moveToThread(receiverThread);
+    receiverThread->start();
+    QMetaObject::invokeMethod(receiver, "drainConnections", Qt::QueuedConnection);
+}
+
 bool QtLocalPeer::isClient()
 {
     if (lockFile.isLocked())
@@ -194,11 +223,19 @@ bool QtLocalPeer::sendMessage(const QString &message, int timeout)
     QByteArray uMsg(message.toUtf8());
     QDataStream ds(&socket);
     ds.writeBytes(uMsg.constData(), uMsg.size());
-    bool res = socket.waitForBytesWritten(timeout);
+    bool res = !socket.bytesToWrite() || socket.waitForBytesWritten(timeout);
     if (res) {
-        res &= socket.waitForReadyRead(timeout);   // wait for ack
+        QElapsedTimer timer;
+        timer.start();
+        while (socket.bytesAvailable() < qint64(qstrlen(ack))) {
+            const int remaining = timeout - int(timer.elapsed());
+            if (remaining <= 0 || !socket.waitForReadyRead(remaining)) {
+                res = false;
+                break;
+            }
+        }
         if (res)
-            res &= (socket.read(qstrlen(ack)) == ack);
+            res = (socket.read(qstrlen(ack)) == ack);
     }
     startupTrace("send-end", {{"acknowledged", res}, {"error", socket.errorString()}});
     return res;
@@ -207,41 +244,82 @@ bool QtLocalPeer::sendMessage(const QString &message, int timeout)
 
 void QtLocalPeer::receiveConnection()
 {
+    // A queued notification from before migration may still reach this slot.
+    if (receiverThread)
+        return;
     QLocalSocket* socket = server->nextPendingConnection();
     if (!socket)
         return;
-    startupTrace("receive-connection", {{"available", double(socket->bytesAvailable())}});
+    QString message;
+    if (QtLocalPeerReceiver::readMessage(socket, &message))
+        emit messageReceived(message);
+}
 
+QtLocalPeerReceiver::QtLocalPeerReceiver(QLocalServer *listener) : server(listener)
+{
+    server->setParent(this);
+    connect(server, &QLocalServer::newConnection,
+            this, &QtLocalPeerReceiver::drainConnections, Qt::QueuedConnection);
+}
+
+void QtLocalPeerReceiver::drainConnections()
+{
+    while (!QThread::currentThread()->isInterruptionRequested()) {
+        QLocalSocket *socket = server->nextPendingConnection();
+        if (!socket)
+            break;
+        QString message;
+        if (readMessage(socket, &message))
+            emit messageReceived(message);
+    }
+}
+
+bool QtLocalPeerReceiver::readMessage(QLocalSocket *socket, QString *message)
+{
+    startupTrace("receive-connection", {{"available", double(socket->bytesAvailable())}});
+    QElapsedTimer deadline;
+    deadline.start();
+    auto waitForData = [&] {
+        const int remaining = 2000 - int(deadline.elapsed());
+        return remaining > 0 && socket->waitForReadyRead(remaining);
+    };
     while (socket->bytesAvailable() < (int)sizeof(quint32)) {
-        if (!socket->waitForReadyRead(2000)) {
+        if (!waitForData()) {
             qWarning("QtLocalPeer: Incomplete message header: %s", qPrintable(socket->errorString()));
             delete socket;
-            return;
+            return false;
         }
     }
     QDataStream ds(socket);
     QByteArray uMsg;
     quint32 remaining;
     ds >> remaining;
+    // Bound an untrusted local frame before allocating or waiting for it.
+    if (remaining > 1024 * 1024) {
+        delete socket;
+        return false;
+    }
     uMsg.resize(remaining);
     int got = 0;
     char* uMsgBuf = uMsg.data();
     do {
         got = ds.readRawData(uMsgBuf, remaining);
+        if (got < 0)
+            break;
         remaining -= got;
         uMsgBuf += got;
-    } while (remaining && got >= 0 && socket->waitForReadyRead(2000));
-    if (got < 0) {
+    } while (remaining && waitForData());
+    if (got < 0 || remaining) {
         qWarning("QtLocalPeer: Message reception failed %s", socket->errorString().toLatin1().constData());
         delete socket;
-        return;
+        return false;
     }
-    QString message(QString::fromUtf8(uMsg));
-    startupTrace("receive-frame", {{"message", message}, {"remaining", double(remaining)}});
+    *message = QString::fromUtf8(uMsg);
+    startupTrace("receive-frame", {{"message", *message}, {"remaining", double(remaining)}});
     socket->write(ack, qstrlen(ack));
     socket->waitForBytesWritten(1000);
     socket->waitForDisconnected(1000); // make sure client reads ack
     delete socket;
-    startupTrace("receive-dispatch", {{"message", message}});
-    emit messageReceived(message); //### (might take a long time to return)
+    startupTrace("receive-dispatch", {{"message", *message}});
+    return true;
 }

@@ -78,6 +78,7 @@ public:
 #endif // QT_VERSION < 0x050000
 
     bool isRunning();
+    void startBackgroundReceiver();
     QString id() const;
 
     void setActivationWindow(QWidget* aw, bool activateOnMessage = true);

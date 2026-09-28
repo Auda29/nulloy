@@ -145,6 +145,41 @@ private:
     }
 
 private slots:
+    void blockedGuiReception_data()
+    {
+        QTest::addColumn<bool>("background");
+        QTest::newRow("gui-thread-receiver-times-out") << false;
+        QTest::newRow("background-receiver-accepts") << true;
+    }
+
+    void blockedGuiReception()
+    {
+        QFETCH(bool, background);
+        const QString id = uniqueId();
+        QtLocalPeer peer(nullptr, id);
+        QVERIFY(!peer.isClient());
+        if (background)
+            peer.startBackgroundReceiver();
+        QStringList messages;
+        connect(&peer, &QtLocalPeer::messageReceived, this, [&](const QString &message) {
+            QCOMPARE(QThread::currentThread(), thread());
+            messages << message;
+        });
+        // Blocking process waits deliberately do not pump the GUI event loop.
+        // Both clients must finish before any player/GUI messages are handled.
+        for (int i = 0; i < 2; ++i) {
+            QProcess client;
+            ChildProcessCleanup cleanup(client);
+            launchProbe(client, id, true, 500);
+            QVERIFY(client.waitForStarted(3000));
+            QVERIFY(client.waitForFinished(3000));
+            QCOMPARE(client.exitCode(), background ? 0 : 3);
+        }
+        QVERIFY(messages.isEmpty());
+        if (background)
+            QTRY_COMPARE(messages, (QStringList{"probe", "probe"}));
+    }
+
     void windowsShortAndLongExecutablePathsShareIdentity()
     {
 #ifdef Q_OS_WIN

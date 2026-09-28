@@ -242,6 +242,11 @@ bool QtSingleApplication::isRunning()
     return peer->isClient();
 }
 
+void QtSingleApplication::startBackgroundReceiver()
+{
+    peer->startBackgroundReceiver();
+}
+
 
 /*!
     Tries to send the text \a message to the currently running

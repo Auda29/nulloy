@@ -171,6 +171,10 @@ int main(int argc, char *argv[])
 
     // construct message
     QString msg = (options + files).join(MSG_SPLITTER);
+    QStringList startupMessages;
+    const auto startupConnection = QObject::connect(
+        &instance, &QtSingleApplication::messageReceived, &instance,
+        [&startupMessages](const QString &message) { startupMessages << message; });
     if (NSettings::instance()->value("SingleInstance").toBool()) {
         const auto startup = singleInstanceStartup(instance, msg);
         if (startup == SingleInstanceStartupResult::MessageDelivered) {
@@ -182,6 +186,7 @@ int main(int argc, char *argv[])
             print_err("A running Nulloy instance did not acknowledge the startup message; no second player was started");
             return 1;
         }
+        instance.startBackgroundReceiver();
     }
 
 #if !defined(_N_NO_SKINS_) && QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
@@ -191,8 +196,6 @@ int main(int argc, char *argv[])
     startupTrace("player-construct-begin");
     NPlayer p;
     startupTrace("player-construct-end");
-    QObject::connect(&instance, SIGNAL(messageReceived(const QString &)), &p,
-                     SLOT(readMessage(const QString &)));
     QObject::connect(&instance, SIGNAL(aboutToQuit()), &p, SLOT(quit()));
     startupTrace("player-connected");
 
@@ -200,6 +203,10 @@ int main(int argc, char *argv[])
     if (!msg.isEmpty()) {
         p.readMessage(msg);
     }
+    while (!startupMessages.isEmpty())
+        p.readMessage(startupMessages.takeFirst());
+    QObject::disconnect(startupConnection);
+    QObject::connect(&instance, &QtSingleApplication::messageReceived, &p, &NPlayer::readMessage);
 
     instance.installEventFilter(&p);
 
