@@ -386,6 +386,44 @@ def verdict(assertions: Sequence[bool], cleanup_verified: bool) -> str:
     return "PASS" if bool(assertions) and all(assertions) and cleanup_verified else "FAIL"
 
 
+def startup_delivery(processes: dict[str, list[dict[str, Any]]], expected: Sequence[Path],
+                     observed_rows: Sequence[str], expected_launches: int) -> dict[str, Any]:
+    """Correlate successful launches, received frames and player/UI delivery order."""
+    started = [records for records in processes.values()
+               if any(row["event"] == "main-start" for row in records)]
+    primaries = [records for records in started
+                 if any(row["event"] == "player-connected" for row in records)]
+    if len(started) != expected_launches or len(primaries) != 1:
+        raise ContractError("startup traces do not identify the exact launches and one primary")
+    primary = primaries[0]
+    sent = []
+    for records in started:
+        if records is primary:
+            continue
+        exits = [row for row in records if row["event"] == "main-exit"]
+        sends = [row for row in records if row["event"] == "send-begin"]
+        acks = [row for row in records if row["event"] == "send-end"]
+        if (len(exits) != 1 or exits[0].get("exit_code") != 0
+                or exits[0].get("role") != "client" or len(sends) != 1
+                or len(acks) != 1 or acks[0].get("acknowledged") is not True):
+            raise ContractError("a secondary launch did not complete one acknowledged delivery")
+        sent.append(sends[0]["message"])
+    received = [row["message"] for row in primary if row["event"] == "receive-frame"]
+    dispatched = [row["message"] for row in primary if row["event"] == "receive-dispatch"]
+    if collections.Counter(sent) != collections.Counter(received) or received != dispatched:
+        raise ContractError("client messages differ from complete received/dispatched IPC frames")
+    delivered = [part for row in primary if row["event"] == "player-message"
+                 for part in row["message"].split("<|>") if part]
+    normalized = lambda value: str(value).replace("\\", "/").casefold()
+    if collections.Counter(map(normalized, delivered)) != collections.Counter(map(normalized, expected)):
+        raise ContractError("player message delivery is not exact-once for the selected files")
+    order = [value.replace("\\", "/").rsplit("/", 1)[-1] for value in delivered]
+    if list(observed_rows) != order:
+        raise ContractError("UI playlist order differs from player message delivery order")
+    return {"launch_count": len(started), "acknowledged_clients": len(sent),
+            "delivery_order": order}
+
+
 def _write_json(path: Path, value: Any) -> None:
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
@@ -1066,12 +1104,19 @@ class WindowsDesktopRun:
             exact_playlist_rows(rows, [path.name for path in fixtures])
             if getattr(self, "trace_directory", None) is not None:
                 self._assert_one_settled_player()
+                self._startup_settled(expected_launches)
+                delivery = startup_delivery(
+                    json.loads((self.evidence / "startup-processes.json").read_text(encoding="utf-8")),
+                    fixtures, rows, expected_launches)
+                _write_json(self.evidence / "startup-delivery.json", delivery)
             return {
                 "fixture_files": [path.name for path in fixtures],
                 "assertions": {
                     "expected_generated_wav_files": len(fixtures) == count,
                     "explorer_context_menu": True,
                     "playlist_rows_exact_once": True,
+                    **({"startup_delivery_exact_once": True, "playlist_delivery_order": True}
+                       if getattr(self, "trace_directory", None) is not None else {}),
                 },
                 "app_path_environment": environment["PATH"],
                 "audio_mode": self.profile.audio_mode,

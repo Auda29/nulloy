@@ -13,6 +13,30 @@ import probe
 
 
 class ScenarioTests(unittest.TestCase):
+    def test_trace_delivery_requires_client_success_and_matches_ui_order(self):
+        processes = {
+            '1': [{'event': 'main-start'}, {'event': 'player-connected'},
+                  {'event': 'player-message', 'message': 'C:/fixtures/01.wav'},
+                  {'event': 'receive-frame', 'message': 'C:/fixtures/02.wav'},
+                  {'event': 'receive-dispatch', 'message': 'C:/fixtures/02.wav'},
+                  {'event': 'player-message', 'message': 'C:/fixtures/02.wav'}],
+            '2': [{'event': 'main-start'},
+                  {'event': 'send-begin', 'message': 'C:/fixtures/02.wav'},
+                  {'event': 'send-end', 'acknowledged': True},
+                  {'event': 'main-exit', 'exit_code': 0, 'role': 'client'}]}
+        expected = [Path('C:/fixtures/01.wav'), Path('C:/fixtures/02.wav')]
+        rows = ['01.wav', '02.wav']
+        self.assertEqual(probe.startup_delivery(processes, expected, rows, 2)['delivery_order'], rows)
+        with self.assertRaisesRegex(probe.ContractError, 'order differs'):
+            probe.startup_delivery(processes, expected, rows[::-1], 2)
+        processes['2'][-1]['exit_code'] = 1
+        with self.assertRaisesRegex(probe.ContractError, 'acknowledged delivery'):
+            probe.startup_delivery(processes, expected, rows, 2)
+        processes['2'][-1]['exit_code'] = 0
+        processes['1'].append({'event': 'player-message', 'message': 'C:/fixtures/02.wav'})
+        with self.assertRaisesRegex(probe.ContractError, 'exact-once'):
+            probe.startup_delivery(processes, expected, rows, 2)
+
     def test_warm_primary_alone_is_not_a_settled_explorer_launch(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
