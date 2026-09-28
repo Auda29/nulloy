@@ -1,5 +1,7 @@
 import tempfile
 import sys
+import os
+import uuid
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -9,6 +11,24 @@ import probe
 
 
 class ScenarioTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == 'nt', 'real Win32 registry contract')
+    def test_native_exclusive_registry_handle_and_collision(self):
+        import winreg
+
+        path = 'Software\\NulloyProbeContract-' + uuid.uuid4().hex
+        created = False
+        try:
+            with probe._create_exclusive_registry_key(path) as key:
+                created = True
+                winreg.SetValueEx(key, 'Owner', 0, winreg.REG_SZ, 'original')
+            with self.assertRaises(probe.BlockedError):
+                probe._create_exclusive_registry_key(path)
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path) as key:
+                self.assertEqual(winreg.QueryValueEx(key, 'Owner')[0], 'original')
+        finally:
+            if created:
+                winreg.DeleteKey(winreg.HKEY_CURRENT_USER, path)
+
     def test_changed_registry_marker_prevents_deletion(self):
         class Key:
             def __enter__(self):

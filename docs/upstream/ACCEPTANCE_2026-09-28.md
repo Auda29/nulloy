@@ -67,6 +67,13 @@ matrix uses strengthened registry/menu checks and repeated process discovery,
 with the same verified package bytes. Its verdict belongs to its own run;
 this original failure must not be relabelled if a later run passes.
 
+Matrix run `36412673752` stopped each case in probe setup because Python cannot
+construct `winreg.PyHKEY` directly from the Win32 handle. Those nine setup errors
+are **not player failures** and its cleanup booleans cannot certify registry
+cleanup: creation had already occurred before the wrapper raised. The follow-up
+uses an explicitly closed raw handle and adds a real Windows regression for
+creation, collision refusal, retained foreign values and handle lifecycle.
+
 ## Merge decision
 
 All five functional/test PRs remain drafts. No functional PR was merged into

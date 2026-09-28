@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+from contextlib import contextmanager
 import dataclasses
 import hashlib
 import json
@@ -493,11 +494,20 @@ def _create_exclusive_registry_key(path: str) -> Any:
                    None, ctypes.byref(handle), ctypes.byref(disposition))
     if error:
         raise ctypes.WinError(error)
-    key = winreg.HKEYType(handle.value)
     if disposition.value != 1:  # REG_CREATED_NEW_KEY
-        key.Close()
+        winreg.CloseKey(handle.value)
         raise BlockedError("probe registry key already exists; refusing to reuse it")
-    return key
+
+    @contextmanager
+    def owned_key():
+        try:
+            # winreg accepts raw handles but PyHKEY cannot be constructed in
+            # Python. Keep exactly one owner of the RegCreateKeyExW handle.
+            yield handle.value
+        finally:
+            winreg.CloseKey(handle.value)
+
+    return owned_key()
 
 
 class WindowsDesktopRun:
