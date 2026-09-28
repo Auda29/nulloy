@@ -414,7 +414,9 @@ def startup_delivery(processes: dict[str, list[dict[str, Any]]], expected: Seque
         raise ContractError("client messages differ from complete received/dispatched IPC frames")
     delivered = [part for row in primary if row["event"] == "player-message"
                  for part in row["message"].split("<|>") if part]
-    normalized = lambda value: str(value).replace("\\", "/").casefold()
+    # tempfile may return a RUNNER~1 path while Explorer supplies the long
+    # spelling. Files still exist here: resolve their actual Windows identity.
+    normalized = lambda value: Path(str(value).replace("\\", "/")).resolve().as_posix().casefold()
     if collections.Counter(map(normalized, delivered)) != collections.Counter(map(normalized, expected)):
         raise ContractError("player message delivery is not exact-once for the selected files")
     order = [value.replace("\\", "/").rsplit("/", 1)[-1] for value in delivered]

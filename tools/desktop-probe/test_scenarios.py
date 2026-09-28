@@ -13,6 +13,29 @@ import probe
 
 
 class ScenarioTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == 'nt', 'native Windows path aliases')
+    def test_trace_delivery_accepts_real_short_and_long_paths(self):
+        import ctypes
+        from ctypes import wintypes
+
+        get_short = ctypes.windll.kernel32.GetShortPathNameW
+        get_short.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD]
+        profile_temp = Path(os.environ['USERPROFILE']) / 'AppData/Local/Temp'
+        with tempfile.TemporaryDirectory(dir=profile_temp, prefix='nulloy-alias-') as temp:
+            expected = Path(temp) / 'fixture.wav'
+            expected.write_bytes(b'fixture')
+            size = get_short(str(expected), None, 0)
+            self.assertGreater(size, 0)
+            buffer = ctypes.create_unicode_buffer(size)
+            self.assertGreater(get_short(str(expected), buffer, size), 0)
+            alias = Path(buffer.value)
+            if str(alias).casefold() == str(expected).casefold():
+                self.skipTest('Volume does not supply distinct short names')
+            processes = {'1': [{'event': 'main-start'}, {'event': 'player-connected'},
+                               {'event': 'player-message', 'message': str(expected)}]}
+            result = probe.startup_delivery(processes, [alias], ['fixture.wav'], 1)
+            self.assertEqual(result['launch_count'], 1)
+
     def test_trace_delivery_requires_client_success_and_matches_ui_order(self):
         processes = {
             '1': [{'event': 'main-start'}, {'event': 'player-connected'},
