@@ -107,12 +107,15 @@ private slots:
         connect(next, &QAction::triggered, playlist, &NPlaylistWidget::playNextItem);
         window->addAction(previous);
         window->addAction(next);
-        playlist->setFiles(files);
         window->resize(640, 160); // deliberately fewer visible rows than files
         window->show();
         window->activateWindow();
         playlist->setFocus();
         QTRY_VERIFY(playlist->hasFocus());
+        // setFiles() immediately refreshes visible/prefetched rows. Populate
+        // only after the shown layout has its bounded viewport; the default
+        // pre-layout size can otherwise cache even the last fixture row.
+        playlist->setFiles(files);
         connect(engine.get(), &NPlaybackEngineGStreamer::message, this,
                 [](N::MessageIcon, const QString &, const QString &message) {
                     QFAIL(qPrintable(message));
