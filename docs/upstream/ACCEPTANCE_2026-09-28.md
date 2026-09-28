@@ -141,27 +141,63 @@ this can emit `newConnection` before the vendored code subscribes to it. Candida
 startup wiring is complete. A Windows/Qt6 regression uses a larger actual
 named-pipe backlog to exercise acceptance *inside* `listen()`, then connects
 the application message receiver after the primary claim, matching main.cpp.
-CI must establish success with the fix and missing delivery with the previous
-receiver. This candidate is not yet a completed package acceptance.
+Run `36424862530` established delivery with the fix and zero delivered messages
+with the previous receiver. Its overall result was still red because the identity
+regression was skipped on the checkout volume. Candidate `a8639e1` also passed
+one real Explorer run (`36423121033`), but this was not full package acceptance.
 
 The instrumented matrix `36422795897` confirms a second defect: all four warm
 cases end with two native main windows. The warm process hashes an 8.3 executable
 path (`C:/Users/RUNNER~1/...`), whereas Explorer's children hash its long form
 (`C:/Users/runneradmin/...`), producing distinct IPC channel/lock identities for
-the same executable. Canonicalizing the executable path before hashing addresses
-this independently of the listen-time race. Its subprocess regression compares
+the same executable. `QFileInfo::canonicalFilePath()` alone did **not** expand 8.3
+names: `36425677590` reproduced the unequal identities with that first candidate.
+Candidate `6f245e0` additionally calls `GetLongPathNameW`. Run `36426203490` passed
+all ten Qt6 startup results without skips; both the lost-listen-notification and
+8.3-identity cases fail against the original receiver. Its subprocess regression compares
 long/short launch identities and checks that a separate executable copy still
 has a distinct identity. The matrix also contains cold missing-frame/timeout
 failures; no burst-timing limits have been relaxed.
+
+The next packaged run `36423455014` passed Linux/Qt5/Qt6 builds but still failed
+Explorer. The primary took **6524 ms** to construct its player. Both clients
+exited after their 5000 ms send budget; the now-connected receiver subsequently
+observed empty disconnected sockets. This is a separate GUI-blocked-reception
+failure, not evidence that the listen-notification fix regressed.
+
+Candidate `fd7e416` moves only the primary socket receiver to a dedicated thread,
+retaining the election mutex on its acquiring thread. Complete frames are
+acknowledged independently of GUI initialization, then delivered on the GUI
+thread. Main buffers startup notifications until its own initial arguments have
+been applied. The client deadline and file-open-burst limits are unchanged.
+Tests compare clients with/without background reception while the GUI is blocked,
+and check that GUI message dispatch occurs on the original thread. Frames remain
+in memory, so this does not promise delivery across a primary-process crash.
+Regression `36426673584` and package run `36426674095` are pending.
 
 PR15 player-action tests run separately on `test/windows-trash-player-acceptance`
 at `bdc812e`: generated disposable WAV files, real player action and Windows
 adapter, ordinary/partial cancellation, duplicate rows, current/next removal,
 and a handle-denied recycle followed by declined permanent deletion. The matrix
-covers playing/paused/stopped and package skins; results are pending.
+covers playing/paused/stopped and package skins. Run `36421958897` passed the
+15 non-current-track cases on Qt5/Qt6 Slim, but all three current-track cases
+reached the explicit permanent-delete fallback, which the harness cancelled.
+Releasing the cached metadata handle did not resolve this (`36423610588`) and
+that speculative product change was reverted at `0eea361`.
+
+Handle diagnosis `36425057304` checks Windows DELETE access without deleting:
+before loading it succeeds; during playback it fails with ERROR_SHARING_VIOLATION
+(32). Releasing tags and stopping waveform generation still leaves it blocked;
+stopping playback afterwards releases it. All four package skins on both Qt
+versions continue to fail the successful-current-track-recycling expectation.
+This establishes an open-handle obstacle; it does not yet establish safe state/
+position restoration after cancellation or successful current-track deletion.
 
 Read-only local display discovery found two 2560x1440 monitors, both 96 DPI.
 Mixed-DPI and physical hotplug are not represented by this current setup.
+PR16 package preparation is on `test/windows-geometry-player-acceptance` at
+`2fd31b9`, combining current integration with the PR16 head. Physical monitor
+and packaged-skin validation remain pending.
 
 ## Current merge decision
 
