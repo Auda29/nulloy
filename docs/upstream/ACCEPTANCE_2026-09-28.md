@@ -173,7 +173,11 @@ been applied. The client deadline and file-open-burst limits are unchanged.
 Tests compare clients with/without background reception while the GUI is blocked,
 and check that GUI message dispatch occurs on the original thread. Frames remain
 in memory, so this does not promise delivery across a primary-process crash.
-Regression `36426673584` and package run `36426674095` are pending.
+Regression `36426673584` passed all 12 results (no skips), including both
+blocked-GUI reception cases; the old-code identity/listen regressions failed as
+expected. Package run `36426674095` is pending. Probe `51326ac` also correlates
+client success/acknowledgements, received frames, player-message exact-once
+delivery and actual UI row order; 47 local probe tests passed.
 
 PR15 player-action tests run separately on `test/windows-trash-player-acceptance`
 at `bdc812e`: generated disposable WAV files, real player action and Windows
@@ -193,11 +197,36 @@ versions continue to fail the successful-current-track-recycling expectation.
 This establishes an open-handle obstacle; it does not yet establish safe state/
 position restoration after cancellation or successful current-track deletion.
 
+Follow-up `36427409143` at `fad2702` verifies retained file bytes, current media,
+playback state and paused/stopped position *before* reporting the current-track
+recycling failure, and adds ordinary-prompt cancellation for the current track.
+Qt6 Slim: 21 passed / 3 failed / no skips (includes init/cleanup/handle diagnosis).
+The three failures remain the expected-success current-track recycle cases;
+their fallback cancellation passes the byte/state checks. No successful
+current-track recycling acceptance is claimed.
+
 Read-only local display discovery found two 2560x1440 monitors, both 96 DPI.
 Mixed-DPI and physical hotplug are not represented by this current setup.
-PR16 package preparation is on `test/windows-geometry-player-acceptance` at
-`2fd31b9`, combining current integration with the PR16 head. Physical monitor
-and packaged-skin validation remain pending.
+PR16 package `2fd31b9` from `36426857899` combines current integration with the
+PR16 head. Locally verified all 497 manifest hashes. ZIP SHA-256:
+`61626accfe31831a1f927ddba8adefc64fe823216738fa90a45150b6df33a175`;
+EXE SHA-256: `26a55aece2c1ea3ea84d8597bc1178107a27f94ff1bfac2b137a4f60307eb03a`.
+
+The local native monitor probe (`tools/desktop-probe/monitor_probe.py`, `bee0ca5`)
+checks only its own disposable portable processes. Slim, Metro and Silver pass
+offscreen/oversized startup recovery, moving to each real monitor, minimizing/
+restoring on both, and a persisted restart: six case phases passed. The Native
+skin **fails** oversized startup: its outer rectangle `[-8, 0, 2568, 1431]`
+extends below primary work area `[0, 0, 2560, 1392]`. All seven started processes
+were cleaned up. The probe allows only a 16px invisible resize-border margin,
+not a titlebar-height overflow. Evidence is retained locally under
+`nulloy-acceptance-20260928/geometry-local`.
+
+Candidate `5f82eee` on the geometry test branch includes native frame dimensions
+in fallback fitting, retaining normal-state frame dimensions during minimized/
+maximized transitions. A new actual native-window regression checks complete
+frame containment, with Qt5/Qt6 old-code comparison and fresh packages pending.
+Mixed-DPI, physical hotplug and the complete native-skin rerun remain outstanding.
 
 ## Current merge decision
 
