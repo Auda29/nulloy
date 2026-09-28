@@ -128,6 +128,11 @@ bool QtLocalPeer::isClient()
         return true;
     }
 
+    // On Windows listen() can accept a pipe and emit newConnection before it
+    // returns. Subscribe first, and defer delivery until the caller has wired
+    // its application receiver; otherwise that initial notification is lost.
+    QObject::connect(server, SIGNAL(newConnection()), this, SLOT(receiveConnection()),
+                     Qt::QueuedConnection);
     bool res = server->listen(socketName);
 #if defined(Q_OS_UNIX) && (QT_VERSION >= QT_VERSION_CHECK(4,5,0))
     // ### Workaround
@@ -138,8 +143,8 @@ bool QtLocalPeer::isClient()
 #endif
     if (!res)
         qWarning("QtSingleCoreApplication: listen on local socket failed, %s", qPrintable(server->errorString()));
-    QObject::connect(server, SIGNAL(newConnection()), SLOT(receiveConnection()));
     startupTrace("peer-primary", {{"socket", socketName}, {"listening", res},
+                                 {"pending", server->hasPendingConnections()},
                                  {"error", server->errorString()}});
     return false;
 }

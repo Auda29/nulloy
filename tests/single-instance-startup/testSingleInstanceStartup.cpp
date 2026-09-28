@@ -15,6 +15,7 @@
 
 #include "singleInstanceStartup.h"
 #include "qtsingleapplication.h"
+#include "qtlocalpeer.h"
 
 namespace {
 
@@ -140,6 +141,62 @@ private:
     }
 
 private slots:
+    void windowsConnectionAcceptedInsideListenIsDelivered()
+    {
+#if defined(Q_OS_WIN) && QT_VERSION >= QT_VERSION_CHECK(6, 3, 0)
+        class InspectablePeer : public QtLocalPeer {
+        public:
+            explicit InspectablePeer(const QString &id) : QtLocalPeer(nullptr, id) {}
+            QString address() const { return socketName; }
+            QLocalServer *listener() const { return server; }
+        } peer(uniqueId());
+        // Stretch actual Windows named-pipe initialization, not a mocked signal.
+        // Qt5 has a fixed backlog and cannot make this interleaving deterministic.
+        peer.listener()->setListenBacklogSize(4096);
+        bool claimReturned = false, acceptedDuringListen = false;
+        connect(peer.listener(), &QLocalServer::newConnection, &peer, [&] {
+            acceptedDuringListen |= !claimReturned;
+        });
+        bool acknowledged = false;
+        const QString address = peer.address();
+        QThread *client = QThread::create([address, &acknowledged] {
+            QLocalSocket socket;
+            QElapsedTimer timer;
+            timer.start();
+            while (timer.elapsed() < 5000) {
+                socket.connectToServer(address);
+                if (socket.waitForConnected(20)) break;
+                socket.abort();
+                QThread::yieldCurrentThread();
+            }
+            if (socket.state() != QLocalSocket::ConnectedState) return;
+            QDataStream stream(&socket);
+            stream.writeBytes("early", 5);
+            if (socket.bytesToWrite() && !socket.waitForBytesWritten(5000)) return;
+            if (!socket.bytesAvailable() && !socket.waitForReadyRead(5000)) return;
+            acknowledged = socket.read(3) == "ack";
+        });
+        struct JoinThread {
+            QThread *thread;
+            ~JoinThread() { thread->wait(); delete thread; }
+        } cleanup{client};
+        client->start();
+        QVERIFY(!peer.isClient());
+        claimReturned = true;
+        QVERIFY2(acceptedDuringListen, "test did not exercise acceptance inside Windows listen()");
+        // Match main.cpp: the player receiver is connected only after claiming
+        // the primary role. Delivery during listen() would be lost as well.
+        QStringList received;
+        connect(&peer, &QtLocalPeer::messageReceived, &peer,
+                [&received](const QString &message) { received << message; });
+        QTRY_COMPARE_WITH_TIMEOUT(received, QStringList{"early"}, 7000);
+        QVERIFY(client->wait(3000));
+        QVERIFY(acknowledged);
+#else
+        QSKIP("Deterministic Windows listen-time interleaving requires Qt >= 6.3 backlog control");
+#endif
+    }
+
     void disconnectedClientWithoutHeaderDoesNotBlockPrimary()
     {
         const QString id = uniqueId();

@@ -18,6 +18,39 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  listen-regression:
+    runs-on: windows-2022
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja mingw-w64-x86_64-qt6-base
+      - name: Verify fixed receiver and old-code regression
+        shell: msys2 {0}
+        run: |
+          cmake -S tests/single-instance-startup -B race-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$(cygpath -m /mingw64)"
+          cmake --build race-build -j 2
+          export QT_QPA_PLATFORM=offscreen
+          race-build/testSingleInstanceStartup.exe -o race-build/fixed-results.txt,txt
+          git show 13bae8bb241b93360787fa925acd4b1007e1a8ef:3rdParty/qtsingleapplication-8fd81b2/src/qtlocalpeer.cpp > 3rdParty/qtsingleapplication-8fd81b2/src/qtlocalpeer.cpp
+          cmake --build race-build -j 2
+          if race-build/testSingleInstanceStartup.exe windowsConnectionAcceptedInsideListenIsDelivered -o race-build/old-results.txt,txt; then
+            echo 'Old receiver unexpectedly passed the listen-time regression'
+            exit 1
+          fi
+          grep -E 'Actual.*received' race-build/old-results.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: listen-race-red-green
+          path: race-build/*-results.txt
+          retention-days: 7
+
   build:
     uses: ./.github/workflows/windows-cmake.yml
     with:
