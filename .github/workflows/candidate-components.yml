@@ -1,0 +1,76 @@
+name: PR15 and PR16 native Windows component checks
+
+on:
+  push:
+    branches: ['test/windows-open-acceptance']
+    paths: ['.github/workflows/candidate-components.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        qt: [5, 6]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 791ea82705898652d15866be7b77e3ad5f720976
+          path: geometry
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 774894c4eba7b646beafb38313fe0dc73cfb4671
+          path: trash
+          persist-credentials: false
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-qt${{ matrix.qt }}-base
+            mingw-w64-x86_64-qt5-winextras
+      - name: Build exact candidate component harnesses
+        shell: msys2 {0}
+        run: |
+          mkdir -p evidence
+          pacman -Q > evidence/toolchain.txt
+          cmake -S geometry/tests/upstream/236 -B geometry-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$(cygpath -m /mingw64)" -DNULLOY_QT_MAJOR=${{ matrix.qt }}
+          cmake --build geometry-build -j 2
+          cmake -S trash/tests/upstream/255 -B trash-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$(cygpath -m /mingw64)" -DQT_DIR="$(cygpath -m /mingw64)/lib/cmake/Qt${{ matrix.qt }}" -DNULLOY_NATIVE_TRASH_TESTS=ON
+          cmake --build trash-build -j 2
+      - name: Run geometry using the real Windows QPA backend
+        shell: msys2 {0}
+        run: |
+          export QT_QPA_PLATFORM=windows
+          geometry-build/testWindowRestoration.exe -o evidence/geometry-native.txt,txt -o evidence/geometry-native.xml,junitxml
+      - name: Run shared trash contracts
+        if: ${{ !cancelled() }}
+        shell: msys2 {0}
+        run: |
+          export QT_QPA_PLATFORM=offscreen
+          trash-build/testTrash.exe -o evidence/trash-contract.txt,txt -o evidence/trash-contract.xml,junitxml
+      - name: Verify real recycling with disposable files
+        if: ${{ !cancelled() }}
+        shell: msys2 {0}
+        run: |
+          mkdir -p /c/nulloy-trash-${{ github.run_id }}-qt${{ matrix.qt }}
+          export NULLOY_TRASH_TEST_ROOT=C:/nulloy-trash-${{ github.run_id }}-qt${{ matrix.qt }}
+          export NULLOY_TRASH_EXPECT_RECYCLE=1
+          trash-build/testWindowsTrash.exe -o evidence/trash-native.txt,txt -o evidence/trash-native.xml,junitxml
+      - name: Preserve native component evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-native-components-Qt${{ matrix.qt }}
+          path: evidence/
+          retention-days: 7

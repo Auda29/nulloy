@@ -3,6 +3,9 @@ name: Combined PR24 and PR29 Windows acceptance
 on:
   push:
     branches: ['test/windows-open-acceptance']
+    paths-ignore:
+      - '.github/workflows/candidate-components.yml'
+      - '.github/workflows/open-acceptance.yml'
   workflow_dispatch:
 
 permissions:
