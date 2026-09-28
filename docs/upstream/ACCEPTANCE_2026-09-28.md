@@ -201,9 +201,15 @@ the startup/IPC acceptance slice, not the remaining #24 nonempty playback-state,
 position and independent-rapid-open semantics.
 
 The verified startup implementation and regression files were transplanted
-byte-for-byte to PR29 head `6170dbe`. Its Linux/Windows PR checks are pending in
-`36431623867` / `36431623652`. No desktop-probe workflow or #24 playlist policy
-was transplanted into that PR.
+byte-for-byte to PR29 head `6170dbe`. Windows Qt5/Qt6 `36431623652` passed.
+Linux `36431623867` failed the #146 metadata harness: the final fixture already
+had duration 30 instead of the assumed unread value -1. That harness does not
+link the changed IPC/startup sources. Its setup populated the playlist before
+showing/sizing the layout, although `setFiles()` immediately preloads visible
+and prefetched rows. PR29 follow-up `9d8b352` moves population after the bounded
+viewport is established, retaining the offscreen-row/unread-metadata assertions.
+New head checks `36433117692` / `36433117685` are pending. No desktop-probe
+workflow or #24 playlist policy was transplanted into that PR.
 
 PR15 player-action tests run separately on `test/windows-trash-player-acceptance`
 at `bdc812e`: generated disposable WAV files, real player action and Windows
