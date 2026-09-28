@@ -150,7 +150,12 @@ private slots:
 #ifdef Q_OS_WIN
         // The checkout volume on hosted Windows has 8.3 names disabled. Use
         // the user's actual temp volume, as in the Explorer acceptance probe.
-        QTemporaryDir aliasRoot;
+        // MSYS redirects TEMP to D:\a\_temp too; use the native profile's
+        // temp directory, whose existing RUNNER~1 alias reproduces the failure.
+        const QString profileTemp = QDir(qEnvironmentVariable("USERPROFILE"))
+                                        .filePath("AppData/Local/Temp");
+        QVERIFY(QDir(profileTemp).exists());
+        QTemporaryDir aliasRoot(profileTemp + "/nulloy-identity-XXXXXX");
         QVERIFY(aliasRoot.isValid());
         const QString executable = QFileInfo(aliasRoot.path()).canonicalFilePath()
                                    + "/long-player-identity.exe";
