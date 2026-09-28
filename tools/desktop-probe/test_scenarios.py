@@ -3,6 +3,7 @@ import sys
 import os
 import uuid
 import dataclasses
+import json
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -12,6 +13,37 @@ import probe
 
 
 class ScenarioTests(unittest.TestCase):
+    def test_warm_primary_alone_is_not_a_settled_explorer_launch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run = object.__new__(probe.WindowsDesktopRun)
+            run.trace_directory = root
+            run.evidence = root
+            def trace(pid, events):
+                (root / f'{pid}.jsonl').write_text(''.join(
+                    json.dumps({'event': event}) + '\n' for event in events))
+            trace(1, ['main-start', 'player-connected'])
+            self.assertFalse(run._startup_settled(4))
+            trace(2, ['main-start', 'send-begin'])
+            trace(3, ['main-start', 'main-exit'])
+            trace(4, ['main-start', 'main-exit'])
+            self.assertFalse(run._startup_settled(4))
+            trace(2, ['main-start', 'send-begin', 'main-exit'])
+            self.assertTrue(run._startup_settled(4))
+
+    def test_late_second_main_window_invalidates_warm_observation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run = object.__new__(probe.WindowsDesktopRun)
+            run.evidence = Path(tmp)
+            windows = [SimpleNamespace(handle=pid, window_text=lambda: 'Player',
+                       element_info=SimpleNamespace(process_id=pid, class_name='NMainWindow'))
+                       for pid in (1, 2)]
+            run.player_window = windows[0]
+            with patch.object(run, '_capture_new_player_processes'), \
+                    patch.object(run, '_owned_player_windows', return_value=windows):
+                with self.assertRaisesRegex(probe.ContractError, 'observed 2'):
+                    run._assert_one_settled_player()
+
     @unittest.skipUnless(os.name == 'nt', 'real Win32 registry lifecycle')
     def test_native_registry_install_readback_and_cleanup(self):
         import winreg

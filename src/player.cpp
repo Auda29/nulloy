@@ -70,6 +70,7 @@
 #include <QMetaObject>
 #include <QResizeEvent>
 #include <QToolTip>
+#include <qtlocalpeertrace.h>
 
 NPlayer::NPlayer()
 {
@@ -388,6 +389,7 @@ bool NPlayer::eventFilter(QObject *obj, QEvent *event)
 
 void NPlayer::readMessage(const QString &str)
 {
+    startupTrace("player-message", {{"message", str}, {"rows_before", m_playlistWidget->count()}});
     if (str.isEmpty()) {
         m_mainWindow->show();
         m_mainWindow->activateWindow();
@@ -430,7 +432,10 @@ void NPlayer::readMessage(const QString &str)
         const bool playEnqueued = NSettings::instance()->value("PlayEnqueued").toBool();
         // Shell selections can arrive as several launches/messages. Apply the
         // original policy immediately once, then append this bounded burst.
-        if (m_fileOpenBurst->isContinuation(enqueue, playEnqueued)) {
+        const bool continuation = m_fileOpenBurst->isContinuation(enqueue, playEnqueued);
+        startupTrace("player-open-policy", {{"enqueue", enqueue}, {"play_enqueued", playEnqueued},
+                                           {"continuation", continuation}});
+        if (continuation) {
             m_playlistWidget->addFiles(files);
         } else if (enqueue) {
             int lastRow = m_playlistWidget->count();
@@ -443,6 +448,11 @@ void NPlayer::readMessage(const QString &str)
             m_playlistWidget->setFiles(files);
             m_playlistWidget->playRow(0);
         }
+        QStringList rows;
+        for (int row = 0; row < m_playlistWidget->count(); ++row)
+            rows << m_playlistWidget->item(row)->data(N::PathRole).toString();
+        startupTrace("player-open-result", {{"rows", QJsonArray::fromStringList(rows)},
+                                           {"playing_row", m_playlistWidget->playingRow()}});
     }
 }
 

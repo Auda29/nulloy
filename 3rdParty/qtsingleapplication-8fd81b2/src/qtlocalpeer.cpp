@@ -41,6 +41,7 @@
 
 
 #include "qtlocalpeer.h"
+#include "qtlocalpeertrace.h"
 #include <QCoreApplication>
 #include <QTime>
 #include <QDataStream>
@@ -111,6 +112,8 @@ QtLocalPeer::QtLocalPeer(QObject* parent, const QString &appId)
                        + QLatin1String("-lockfile");
     lockFile.setFileName(lockName);
     lockFile.open(QIODevice::ReadWrite);
+    startupTrace("peer-created", {{"id", id}, {"socket", socketName},
+                                 {"lock", lockName}, {"lock_open", lockFile.isOpen()}});
 }
 
 
@@ -120,8 +123,10 @@ bool QtLocalPeer::isClient()
     if (lockFile.isLocked())
         return false;
 
-    if (!lockFile.lock(QtLP_Private::QtLockedFile::WriteLock, false))
+    if (!lockFile.lock(QtLP_Private::QtLockedFile::WriteLock, false)) {
+        startupTrace("peer-client", {{"socket", socketName}});
         return true;
+    }
 
     bool res = server->listen(socketName);
 #if defined(Q_OS_UNIX) && (QT_VERSION >= QT_VERSION_CHECK(4,5,0))
@@ -134,12 +139,15 @@ bool QtLocalPeer::isClient()
     if (!res)
         qWarning("QtSingleCoreApplication: listen on local socket failed, %s", qPrintable(server->errorString()));
     QObject::connect(server, SIGNAL(newConnection()), SLOT(receiveConnection()));
+    startupTrace("peer-primary", {{"socket", socketName}, {"listening", res},
+                                 {"error", server->errorString()}});
     return false;
 }
 
 
 bool QtLocalPeer::sendMessage(const QString &message, int timeout)
 {
+    startupTrace("send-begin", {{"message", message}, {"timeout", timeout}, {"socket", socketName}});
     if (!isClient())
         return false;
 
@@ -159,6 +167,7 @@ bool QtLocalPeer::sendMessage(const QString &message, int timeout)
         nanosleep(&ts, NULL);
 #endif
     }
+    startupTrace("send-connected", {{"connected", connOk}, {"error", socket.errorString()}});
     if (!connOk)
         return false;
 
@@ -171,6 +180,7 @@ bool QtLocalPeer::sendMessage(const QString &message, int timeout)
         if (res)
             res &= (socket.read(qstrlen(ack)) == ack);
     }
+    startupTrace("send-end", {{"acknowledged", res}, {"error", socket.errorString()}});
     return res;
 }
 
@@ -180,6 +190,7 @@ void QtLocalPeer::receiveConnection()
     QLocalSocket* socket = server->nextPendingConnection();
     if (!socket)
         return;
+    startupTrace("receive-connection", {{"available", double(socket->bytesAvailable())}});
 
     while (socket->bytesAvailable() < (int)sizeof(quint32)) {
         if (!socket->waitForReadyRead(2000)) {
@@ -206,9 +217,11 @@ void QtLocalPeer::receiveConnection()
         return;
     }
     QString message(QString::fromUtf8(uMsg));
+    startupTrace("receive-frame", {{"message", message}, {"remaining", double(remaining)}});
     socket->write(ack, qstrlen(ack));
     socket->waitForBytesWritten(1000);
     socket->waitForDisconnected(1000); // make sure client reads ack
     delete socket;
+    startupTrace("receive-dispatch", {{"message", message}});
     emit messageReceived(message); //### (might take a long time to return)
 }

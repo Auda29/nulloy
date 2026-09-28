@@ -53,7 +53,7 @@ jobs:
         run: |
           $packages = @(Get-ChildItem .desktop-probe/package -Filter '*.zip' -Recurse)
           if ($packages.Count -ne 1) { throw "Expected one package, got $($packages.Count)" }
-          python tools/desktop-probe/probe.py --package $packages[0].FullName --output .desktop-probe/evidence --source-sha $env:PROBE_SOURCE_SHA --headless-audio
+          python tools/desktop-probe/probe.py --package $packages[0].FullName --output .desktop-probe/evidence --source-sha $env:PROBE_SOURCE_SHA --headless-audio --trace-startup
           exit $LASTEXITCODE
       - name: Preserve exact diagnostic evidence
         if: always()
@@ -66,5 +66,6 @@ jobs:
             .desktop-probe/evidence/*.txt
             .desktop-probe/evidence/*.png
             .desktop-probe/evidence/*.sha256
+            .desktop-probe/evidence/startup-trace/*.jsonl
           if-no-files-found: warn
           retention-days: 7

@@ -65,7 +65,7 @@ jobs:
               foreach ($play in @('false', 'true')) {
                 $name = "warm-$warm-enqueue-$enqueue-play-$play"
                 $arguments = @('--package', $packages[0].FullName, '--source-sha', $env:PACKAGE_SHA,
-                  '--output', "evidence/$name", '--headless-audio', '--enqueue', $enqueue, '--play-enqueued', $play)
+                  '--output', "evidence/$name", '--headless-audio', '--trace-startup', '--enqueue', $enqueue, '--play-enqueued', $play)
                 if ($warm) { $arguments += '--warm-start' }
                 python tools/desktop-probe/probe.py @arguments
                 if ($LASTEXITCODE -ne 0) { $failed = $true }
@@ -74,7 +74,7 @@ jobs:
               }
             }
           }
-          python tools/desktop-probe/probe.py --package $packages[0].FullName --source-sha $env:PACKAGE_SHA --output evidence/large-selection --headless-audio --enqueue false --play-enqueued true --fixture-count 12
+          python tools/desktop-probe/probe.py --package $packages[0].FullName --source-sha $env:PACKAGE_SHA --output evidence/large-selection --headless-audio --trace-startup --enqueue false --play-enqueued true --fixture-count 12
           if ($LASTEXITCODE -ne 0) { $failed = $true }
           if ($failed) { exit 1 }
       - name: Preserve every matrix result

@@ -19,6 +19,7 @@
 #include "player.h"
 #include "settings.h"
 #include "singleInstanceStartup.h"
+#include <qtlocalpeertrace.h>
 
 #if !defined(_N_NO_SKINS_) && QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 #include "skinFileSystem.h"
@@ -130,6 +131,8 @@ int main(int argc, char *argv[])
     instance.setQuitOnLastWindowClosed(false);
 
     qInstallMessageHandler(messageHandler);
+    startupTrace("main-start", {{"arguments", QJsonArray::fromStringList(instance.arguments())},
+                                {"settings", NCore::settingsPath()}});
 
     QStringList argList = instance.arguments();
     argList.takeFirst();
@@ -171,9 +174,11 @@ int main(int argc, char *argv[])
     if (NSettings::instance()->value("SingleInstance").toBool()) {
         const auto startup = singleInstanceStartup(instance, msg);
         if (startup == SingleInstanceStartupResult::MessageDelivered) {
+            startupTrace("main-exit", {{"exit_code", 0}, {"role", "client"}});
             return 0;
         }
         if (startup == SingleInstanceStartupResult::MessageDeliveryFailed) {
+            startupTrace("main-exit", {{"exit_code", 1}, {"role", "client"}});
             print_err("A running Nulloy instance did not acknowledge the startup message; no second player was started");
             return 1;
         }
@@ -183,10 +188,13 @@ int main(int argc, char *argv[])
     NSkinFileSystem::init();
 #endif
 
+    startupTrace("player-construct-begin");
     NPlayer p;
+    startupTrace("player-construct-end");
     QObject::connect(&instance, SIGNAL(messageReceived(const QString &)), &p,
                      SLOT(readMessage(const QString &)));
     QObject::connect(&instance, SIGNAL(aboutToQuit()), &p, SLOT(quit()));
+    startupTrace("player-connected");
 
     // manually read the message
     if (!msg.isEmpty()) {
@@ -195,5 +203,7 @@ int main(int argc, char *argv[])
 
     instance.installEventFilter(&p);
 
-    return instance.exec();
+    const int exitCode = instance.exec();
+    startupTrace("main-exit", {{"exit_code", exitCode}, {"role", "primary"}});
+    return exitCode;
 }

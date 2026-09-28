@@ -272,6 +272,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--enqueue", choices=("true", "false"))
     parser.add_argument("--play-enqueued", choices=("true", "false"))
     parser.add_argument("--warm-start", action="store_true")
+    parser.add_argument("--trace-startup", action="store_true")
     parser.add_argument("--fixture-count", type=int, choices=(3, 12), default=3)
     parser.add_argument(
         "--headless-audio",
@@ -286,13 +287,19 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     return args
 
 
-def shell_command(executable: Path, headless_audio: bool = False) -> str:
+def shell_command(executable: Path, headless_audio: bool = False,
+                  trace_directory: Path | None = None) -> str:
     """Return a one-file command with a hermetic app PATH, never %*."""
     executable = executable.resolve()
     # Explorer expands %1 before invoking this command. cmd.exe sets the
     # child's environment, which also works when Explorer is a singleton and
     # ignores environment changes made only to the Explorer Popen request.
     assignments = ['set "PATH=%SystemRoot%\\System32"']
+    if trace_directory is not None:
+        trace_path = str(trace_directory.resolve())
+        if re.search(r'[%!"&<>|^\r\n]', trace_path):
+            raise ContractError("trace directory is not safe in an Explorer shell command")
+        assignments.append(f'set "NULLOY_STARTUP_TRACE_DIR={trace_path}"')
     if headless_audio:
         assignments.append(
             'set "GST_PLUGIN_FEATURE_RANK=directsoundsink:0,waveformsink:0,wasapisink:0,wasapi2sink:0"'
@@ -301,7 +308,8 @@ def shell_command(executable: Path, headless_audio: bool = False) -> str:
     return f'cmd.exe /d /s /c "{prefix}&&"{executable}" "%1""'
 
 
-def shell_verb_profile(run_id: str, executable: Path, headless_audio: bool = False) -> ShellVerbProfile:
+def shell_verb_profile(run_id: str, executable: Path, headless_audio: bool = False,
+                       trace_directory: Path | None = None) -> ShellVerbProfile:
     if not re.fullmatch(r"[A-Za-z0-9-]+", run_id):
         raise ContractError("run id is not safe for a registry key")
     key_name = f"NulloyDesktopProbe-{run_id}"
@@ -310,7 +318,8 @@ def shell_verb_profile(run_id: str, executable: Path, headless_audio: bool = Fal
         key_name=key_name,
         registry_path=registry_path,
         label=f"Nulloy desktop probe ({run_id})",
-        command=shell_command(executable, headless_audio=headless_audio),
+        command=shell_command(executable, headless_audio=headless_audio,
+                              trace_directory=trace_directory),
         audio_mode="no-device-fallback" if headless_audio else "device",
     )
 
@@ -512,14 +521,17 @@ def _create_exclusive_registry_key(path: str) -> Any:
 
 class WindowsDesktopRun:
     def __init__(self, package: ExtractedPackage, evidence: Path, run_id: str,
-                 headless_audio: bool = False, scenario: OpenScenario | None = None) -> None:
+                 headless_audio: bool = False, scenario: OpenScenario | None = None,
+                 trace_startup: bool = False) -> None:
         self.package = package
         self.evidence = evidence
         self.run_id = run_id
         self.headless_audio = headless_audio
         self.scenario = scenario
         self.warm_process: Any = None
-        self.profile = shell_verb_profile(run_id, package.executable, headless_audio=headless_audio)
+        self.trace_directory = evidence.resolve() / "startup-trace" if trace_startup else None
+        self.profile = shell_verb_profile(run_id, package.executable, headless_audio=headless_audio,
+                                         trace_directory=self.trace_directory)
         self.registry_key_created = False
         self.explorer_window: Any = None
         self.player_window: Any = None
@@ -1042,11 +1054,18 @@ class WindowsDesktopRun:
             self.player_launch_started = True
             menu_item.click_input()
             _wait_for(self._capture_new_player_processes, 45, "owned packaged player process")
+            if getattr(self, "trace_directory", None) is not None:
+                expected_launches = count + (1 if scenario and scenario.warm_start else 0)
+                _wait_for(lambda: self._startup_settled(expected_launches), 25,
+                          "all Explorer client outcomes and primary construction")
+                self._assert_one_settled_player()
             self.player_window = _wait_for(self._find_player, 45, "cold packaged player window")
             _capture_image(self.player_window.capture_as_image(), self.evidence / "player.png")
             _dump_uia(self.player_window, self.evidence / "player-uia.jsonl")
             rows = self._read_playlist_rows(fixtures)
             exact_playlist_rows(rows, [path.name for path in fixtures])
+            if getattr(self, "trace_directory", None) is not None:
+                self._assert_one_settled_player()
             return {
                 "fixture_files": [path.name for path in fixtures],
                 "assertions": {
@@ -1129,6 +1148,8 @@ class WindowsDesktopRun:
         _write_text(self.evidence / "scenario-settings.cfg", settings)
         if scenario.warm_start:
             launch_environment = environment.copy()
+            if self.trace_directory is not None:
+                launch_environment["NULLOY_STARTUP_TRACE_DIR"] = str(self.trace_directory)
             if self.headless_audio:
                 launch_environment["GST_PLUGIN_FEATURE_RANK"] = (
                     "directsoundsink:0,waveformsink:0,wasapisink:0,wasapi2sink:0")
@@ -1140,6 +1161,31 @@ class WindowsDesktopRun:
             if self._playlist_snapshot():
                 raise ContractError("warm-start baseline playlist must be empty")
             _capture_image(self.player_window.capture_as_image(), self.evidence / "warm-baseline.png")
+
+    def _startup_settled(self, expected_launches: int) -> bool:
+        processes = {}
+        for path in self.trace_directory.glob("*.jsonl"):
+            # Files may be appended while sampled; retry incomplete snapshots.
+            records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+            processes[path.stem] = records
+        _write_json(self.evidence / "startup-processes.json", processes)
+        started = [records for records in processes.values()
+                   if any(row["event"] == "main-start" for row in records)]
+        return len(started) >= expected_launches and all(
+            any(row["event"] in ("main-exit", "player-connected") for row in records)
+            for records in started)
+
+    def _assert_one_settled_player(self) -> None:
+        self._capture_new_player_processes()
+        windows = self._owned_player_windows()
+        inventory = [{"pid": window.element_info.process_id,
+                      "hwnd": window.handle, "class": window.element_info.class_name,
+                      "title": window.window_text()} for window in windows]
+        _write_json(self.evidence / "settled-windows.json", inventory)
+        mains = [window for window in windows if window.element_info.class_name == "NMainWindow"]
+        if len(mains) != 1:
+            raise ContractError(f"expected one settled player window, observed {len(mains)}")
+        self.player_window = mains[0]
 
 
 def run_probe(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
@@ -1185,7 +1231,9 @@ def run_probe(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
             scenario = OpenScenario(args.enqueue == "true", args.play_enqueued == "true",
                                     args.warm_start, args.fixture_count)
         runtime = WindowsDesktopRun(package, output, run_id, headless_audio=args.headless_audio,
-                                    scenario=scenario)
+                                    scenario=scenario, trace_startup=getattr(args, "trace_startup", False))
+        if getattr(runtime, "trace_directory", None) is not None:
+            runtime.trace_directory.mkdir()
         runtime_result = runtime.execute()
         evidence.update(runtime_result)
         evidence["cleanup_verified"] = bool(runtime.cleanup_verified)
