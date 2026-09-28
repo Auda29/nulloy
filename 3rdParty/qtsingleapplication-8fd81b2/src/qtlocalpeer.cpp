@@ -81,6 +81,16 @@ QtLocalPeer::QtLocalPeer(QObject* parent, const QString &appId)
         const QString canonical = QFileInfo(id).canonicalFilePath();
         if (!canonical.isEmpty())
             id = canonical;
+        // QFileInfo resolves links but preserves Windows 8.3 spelling.
+        const QString native = QDir::toNativeSeparators(id);
+        const DWORD length = GetLongPathNameW(reinterpret_cast<LPCWSTR>(native.utf16()), nullptr, 0);
+        if (length) {
+            QVector<wchar_t> buffer(length);
+            const DWORD written = GetLongPathNameW(
+                reinterpret_cast<LPCWSTR>(native.utf16()), buffer.data(), length);
+            if (written && written < length)
+                id = QDir::fromNativeSeparators(QString::fromWCharArray(buffer.constData(), written));
+        }
         id = id.toLower();
 #endif
         prefix = id.section(QLatin1Char('/'), -1);
