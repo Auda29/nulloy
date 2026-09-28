@@ -13,6 +13,18 @@ import probe
 
 
 class ScenarioTests(unittest.TestCase):
+    def test_playlist_observation_returns_stable_actual_order(self):
+        with tempfile.TemporaryDirectory() as temp:
+            run = object.__new__(probe.WindowsDesktopRun)
+            run.evidence = Path(temp)
+            first = ['01.wav (0:01)', '02.wav (0:01)']
+            changed = first[::-1]
+            with patch.object(run, '_playlist_snapshot', side_effect=[first, changed, changed]) as snapshot, \
+                    patch.object(probe.time, 'sleep'):
+                self.assertEqual(run._read_playlist_rows([Path('01.wav'), Path('02.wav')]),
+                                 ['02.wav', '01.wav'])
+                self.assertEqual(snapshot.call_count, 3)
+
     @unittest.skipUnless(os.name == 'nt', 'native Windows path aliases')
     def test_trace_delivery_accepts_real_short_and_long_paths(self):
         import ctypes

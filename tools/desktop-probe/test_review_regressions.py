@@ -80,12 +80,13 @@ class ReviewRegressions(unittest.TestCase):
                 ["one.wav"],
                 ["two.wav", "one.wav"],
                 ["one.wav", "two.wav"],
+                ["one.wav", "two.wav"],
             ]
             with patch.object(runtime, "_playlist_snapshot", side_effect=snapshots) as snapshot, \
                     patch.object(probe.time, "sleep"):
                 rows = runtime._read_playlist_rows([Path("one.wav"), Path("two.wav")])
             self.assertEqual(rows, ["one.wav", "two.wav"])
-            self.assertEqual(snapshot.call_count, 3)
+            self.assertEqual(snapshot.call_count, 4)
             observations = (Path(tmp) / "playlist-row-observations.jsonl").read_text().splitlines()
             self.assertEqual([json.loads(line) for line in observations], snapshots)
 
@@ -364,7 +365,7 @@ class ReviewRegressions(unittest.TestCase):
             noise = Control(children=[Control('one.wav')], class_name='OtherList', control_type='List')
             runtime.player_window = Control(children=[noise, playlist])
             rows = runtime._read_playlist_rows(expected)
-            self.assertEqual(rows, ['one.wav', 'two.wav'])
+            self.assertEqual(rows, ['two.wav', 'one.wav'])
             self.assertEqual(runtime.playlist_control_identity, {
                 'class_name': 'NPlaylistWidget',
                 'automation_id': playlist.element_info.automation_id,

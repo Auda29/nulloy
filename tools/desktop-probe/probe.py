@@ -895,6 +895,7 @@ class WindowsDesktopRun:
         expected_names = [path.name for path in expected]
         observations: list[list[str]] = []
         stable_exact = 0
+        previous_rows: list[str] | None = None
         deadline = time.monotonic() + PLAYLIST_STABILIZATION_TIMEOUT
         last_error: Exception | None = None
         while True:
@@ -907,12 +908,14 @@ class WindowsDesktopRun:
                 )
                 _write_text(self.evidence / "playlist-rows.txt", "\n".join(names) + "\n")
                 try:
-                    fixture_playlist_names(names, expected_names)
-                    stable_exact += 1
+                    rows = fixture_playlist_names(names, expected_names)
+                    stable_exact = stable_exact + 1 if rows == previous_rows else 1
+                    previous_rows = rows
                     if stable_exact >= PLAYLIST_STABLE_SNAPSHOTS:
-                        return list(expected_names)
+                        return rows
                 except ContractError as exc:
                     stable_exact = 0
+                    previous_rows = None
                     last_error = exc
             except Exception as exc:
                 stable_exact = 0
