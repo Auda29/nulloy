@@ -27,6 +27,9 @@ Windows Server 2022 Hyper-V display.
 Physical unplug/replug, mixed per-monitor DPI and final packaged-skin testing
 remain open. This does not certify a multi-monitor Windows 11 installation.
 
+The updated PR also passed its complete Linux CI (`36411979841`) and Windows
+Qt5/Qt6 CI (`36411979847`) against the current integration base.
+
 ## PR #15 — real recycle-bin adapter
 
 The same run checked unchanged PR head
@@ -73,6 +76,46 @@ are **not player failures** and its cleanup booleans cannot certify registry
 cleanup: creation had already occurred before the wrapper raised. The follow-up
 uses an explicitly closed raw handle and adds a real Windows regression for
 creation, collision refusal, retained foreign values and handle lifecycle.
+
+Run `36412991184` exposed a second setup bug: `_registry_install` passed the
+context manager instead of its yielded raw handle to `SetValueEx`. This was
+reproduced locally with a real, disposable HKCU test key; the full
+install/readback/cleanup regression failed before correction and passed after it.
+These two failed automation runs are not product verdicts.
+
+### Completed preference matrix
+
+[Run 36413203120](https://github.com/Auda29/nulloy/actions/runs/36413203120),
+probe source `3218973`, executed all nine scenarios against the same package ZIP
+above. The Windows probe suite passed 44 tests before the native matrix.
+All nine result files agree on the ZIP hash and report verified cleanup with no
+cleanup errors. Exact Explorer selections and playlist snapshots were downloaded.
+
+| Startup | EnqueueFiles | PlayEnqueued | Selected files | Observed playlist rows | Verdict |
+| --- | --- | --- | ---: | ---: | --- |
+| Cold | false | false | 3 | 1 | FAIL |
+| Cold | false | true | 3 | 2 | FAIL |
+| Cold | true | false | 3 | 3 | PASS |
+| Cold | true | true | 3 | 1 | FAIL |
+| Warm, initially empty | false | false | 3 | 0 | FAIL |
+| Warm, initially empty | false | true | 3 | 0 | FAIL |
+| Warm, initially empty | true | false | 3 | 0 | FAIL |
+| Warm, initially empty | true | true | 3 | 0 | FAIL |
+| Cold, larger selection | false | true | 12 | 12 | PASS |
+
+The two PASS results cover this probe's exact membership/multiplicity checks,
+not a full PR acceptance. It does not yet establish delivery order, playing row,
+position, rapid independent opens or a final single-window invariant after all
+secondary processes have settled. Warm observation may select the existing main
+window before later launches settle; do not infer that no additional window
+existed solely from its early single-window discovery.
+
+The missing playlist rows are confirmed under multiple scenarios, but attribution
+to transport, startup wiring or burst handling needs further diagnostics. The
+next product investigation must capture per-launch exit codes and IPC receipt
+timing, re-enumerate all package windows after clients settle, and compare delivered
+messages with playlist changes. Increasing the batching timeout without this
+evidence would not establish a correct fix. No failed scenario has been waived.
 
 ## Merge decision
 
