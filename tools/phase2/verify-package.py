@@ -117,6 +117,7 @@ with tempfile.TemporaryDirectory(prefix="package check ä ", dir=build) as temp:
         env["NULLOY_TEST_WRITE_TAGS"] = "1"
     else:
         cases = [(skin, None, attempt) for skin in skins for attempt in range(args.repeat)]
+    failed_trash_cases = []
     for skin, fmt, attempt in cases:
         name = (fmt or skin.split("/")[0].lower()) + (f"-{attempt + 1}" if args.repeat > 1 else "")
         if fmt:
@@ -142,7 +143,12 @@ with tempfile.TemporaryDirectory(prefix="package check ä ", dir=build) as temp:
                 if marker in log:
                     raise RuntimeError(f"{skin} script or persistence error: {marker}")
         if completed.returncode:
-            raise RuntimeError(f"{skin} package workflow failed: {completed.returncode}")
+            if args.native_trash_root:
+                failed_trash_cases.append(skin)
+            else:
+                raise RuntimeError(f"{skin} package workflow failed: {completed.returncode}")
+    if failed_trash_cases:
+        raise RuntimeError(f"Native trash player failures: {failed_trash_cases}")
     process_check = bool(manifest.get("portable") and not (args.format_fixtures or args.registry_fallback or args.media or args.native_trash_root))
     if process_check:
         second = Path(temp) / "second portable ä"
