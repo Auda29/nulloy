@@ -17,6 +17,7 @@
 
 #include "common.h"
 #include "settings.h"
+#include "windowGeometry.h"
 
 #ifndef _N_NO_SKINS_
 #include <QUiLoader>
@@ -35,9 +36,8 @@
 #endif
 
 #include <QApplication>
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 #include <QScreen>
-#else
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 #include <QDesktopWidget>
 #endif
 #include <QEvent>
@@ -45,6 +45,7 @@
 #include <QIcon>
 #include <QLayout>
 #include <QTime>
+#include <QTimer>
 #include <QWindowStateChangeEvent>
 
 #define RESIZE_BORDER 5
@@ -99,6 +100,25 @@ NMainWindow::NMainWindow(const QString &uiFile, QWidget *parent, QUiLoader *skin
     setWindowIcon(icon);
 
     QMetaObject::connectSlotsByName(this);
+
+    const auto watchScreen = [this](QScreen *screen) {
+        const auto connection = Qt::ConnectionType(Qt::QueuedConnection | Qt::UniqueConnection);
+        connect(screen, &QScreen::availableGeometryChanged, this,
+                &NMainWindow::ensureVisibleGeometry, connection);
+        connect(screen, &QScreen::geometryChanged, this, &NMainWindow::ensureVisibleGeometry,
+                connection);
+    };
+    for (QScreen *screen : QGuiApplication::screens())
+        watchScreen(screen);
+    // Register a new screen synchronously while its pointer is valid, but defer
+    // recovery until Qt has finished updating the screen list and work areas.
+    connect(qApp, &QGuiApplication::screenAdded, this, watchScreen);
+    connect(qApp, &QGuiApplication::screenAdded, this, &NMainWindow::ensureVisibleGeometry,
+            Qt::QueuedConnection);
+    connect(qApp, &QGuiApplication::screenRemoved, this, &NMainWindow::ensureVisibleGeometry,
+            Qt::QueuedConnection);
+    connect(qApp, &QGuiApplication::primaryScreenChanged, this, &NMainWindow::ensureVisibleGeometry,
+            Qt::QueuedConnection);
 }
 
 NMainWindow::~NMainWindow() {}
@@ -110,25 +130,32 @@ bool NMainWindow::isFullSceen()
 
 void NMainWindow::loadSettings()
 {
-    QPoint _pos;
-    QStringList posList = NSettings::instance()->value("Position").toStringList();
-    if (!posList.isEmpty()) {
-        _pos = QPoint(posList.at(0).toInt(), posList.at(1).toInt());
-        move(_pos);
+    const QStringList posList = NSettings::instance()->value("Position").toStringList();
+    if (posList.size() == 2) {
+        bool xValid = false;
+        bool yValid = false;
+        const int x = posList.at(0).toInt(&xValid);
+        const int y = posList.at(1).toInt(&yValid);
+        if (xValid && yValid)
+            move(x, y);
     }
 
-    QSize _size;
-    QStringList sizeList = NSettings::instance()->value("Size").toStringList();
-    if (!sizeList.isEmpty()) {
-        _size = QSize(sizeList.at(0).toInt(), sizeList.at(1).toInt());
-    } else {
-        _size = QSize(430, 350);
+    QSize storedSize(430, 350);
+    const QStringList sizeList = NSettings::instance()->value("Size").toStringList();
+    if (sizeList.size() == 2) {
+        bool widthValid = false;
+        bool heightValid = false;
+        const int width = sizeList.at(0).toInt(&widthValid);
+        const int height = sizeList.at(1).toInt(&heightValid);
+        if (widthValid && heightValid && width > 0 && height > 0)
+            storedSize = QSize(width, height);
     }
-    resize(_size);
+    resize(storedSize);
+    ensureVisibleGeometry();
 
     if (NSettings::instance()->value("Maximized").toBool()) {
-        m_unmaximizedPos = _pos;
-        m_unmaximizedSize = _size;
+        m_unmaximizedPos = pos();
+        m_unmaximizedSize = size();
         toggleMaximize();
     }
 }
@@ -150,16 +177,50 @@ void NMainWindow::saveSettings()
                                                           << QString::number(_size.height()));
 }
 
+void NMainWindow::ensureVisibleGeometry()
+{
+    QList<QRect> availableScreens;
+    QScreen *primary = QGuiApplication::primaryScreen();
+    if (primary)
+        availableScreens.append(primary->availableGeometry());
+    for (QScreen *screen : QGuiApplication::screens()) {
+        if (screen != primary)
+            availableScreens.append(screen->availableGeometry());
+    }
+    const bool normal = !isMinimized() && !isMaximized() && !isFullScreen();
+    QRect current(pos(), size());
+    if (m_unmaximizedSize.isValid())
+        current = QRect(m_unmaximizedPos, m_unmaximizedSize);
+    else if (!normal && normalGeometry().isValid())
+        current = normalGeometry();
+    const QRect restored = NWindowGeometry::restored(current, availableScreens);
+    if (!normal) {
+        // Do not unminimize, unmaximize, or reveal a tray-hidden window on hotplug.
+        if (restored != current) {
+            m_unmaximizedPos = restored.topLeft();
+            m_unmaximizedSize = restored.size();
+        }
+    } else {
+        m_unmaximizedPos = QPoint();
+        m_unmaximizedSize = QSize();
+        if (restored != QRect(pos(), size())) {
+            resize(restored.size());
+            move(restored.topLeft());
+        }
+    }
+}
+
 void NMainWindow::show()
 {
     if (isMaximized()) {
         showMaximized();
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
-        setGeometry(QApplication::desktop()->availableGeometry());
+        setGeometry(QApplication::desktop()->availableGeometry(this));
         showMaximized();
 #endif
     } else {
         showNormal();
+        ensureVisibleGeometry();
     }
 }
 
@@ -176,12 +237,13 @@ void NMainWindow::toggleMaximize()
         }
         m_unmaximizedPos = QPoint();
         m_unmaximizedSize = QSize();
+        ensureVisibleGeometry();
     } else {
         m_unmaximizedPos = pos();
         m_unmaximizedSize = size();
         showMaximized();
 #if defined(Q_OS_WIN) && QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
-        setGeometry(QApplication::desktop()->availableGeometry());
+        setGeometry(QApplication::desktop()->availableGeometry(this));
         showMaximized();
 #endif
     }
@@ -210,6 +272,7 @@ void NMainWindow::toggleFullScreen()
             m_unmaximizedSize = QSize();
             m_unmaximizedPos = QPoint();
         }
+        ensureVisibleGeometry();
     }
 
     m_isFullScreen = !m_isFullScreen;
@@ -228,10 +291,8 @@ void NMainWindow::changeEvent(QEvent *event)
 
     emit focusChanged(isActiveWindow());
 
-    if (windowFlags() & Qt::FramelessWindowHint) {
+    if (windowFlags() & Qt::FramelessWindowHint)
         setAttribute(Qt::WA_Hover, true);
-        return;
-    }
 
     if (event->type() == QEvent::WindowStateChange) {
         QWindowStateChangeEvent *stateEvent = static_cast<QWindowStateChangeEvent *>(event);
@@ -240,9 +301,15 @@ void NMainWindow::changeEvent(QEvent *event)
                 m_unmaximizedPos = pos();
                 m_unmaximizedSize = size();
             }
-        } else if (!isMaximized() && !isMinimized() && !m_isFullScreen) {
-            m_unmaximizedSize = QSize();
-            m_unmaximizedPos = QPoint();
+        } else if (!isMaximized() && !isMinimized() && !isFullScreen()) {
+            // Native restore can bypass show()/toggleMaximize(). Wait for Qt to
+            // finish applying the window manager's geometry before correcting it.
+            QTimer::singleShot(0, this, [this]() {
+                if (!isMaximized() && !isMinimized() && !isFullScreen()) {
+                    m_isFullScreen = false;
+                    ensureVisibleGeometry();
+                }
+            });
         }
     }
 }
