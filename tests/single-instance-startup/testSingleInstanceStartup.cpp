@@ -12,9 +12,14 @@
 #include <QThread>
 #include <QTimer>
 #include <QUuid>
+#include <vector>
 
 #include "singleInstanceStartup.h"
 #include "qtsingleapplication.h"
+#include "qtlocalpeer.h"
+#ifdef Q_OS_WIN
+#include <qt_windows.h>
+#endif
 
 namespace {
 
@@ -140,6 +145,144 @@ private:
     }
 
 private slots:
+    void blockedGuiReception_data()
+    {
+        QTest::addColumn<bool>("background");
+        QTest::newRow("gui-thread-receiver-times-out") << false;
+        QTest::newRow("background-receiver-accepts") << true;
+    }
+
+    void blockedGuiReception()
+    {
+        QFETCH(bool, background);
+        const QString id = uniqueId();
+        QtLocalPeer peer(nullptr, id);
+        QVERIFY(!peer.isClient());
+        if (background)
+            peer.startBackgroundReceiver();
+        QStringList messages;
+        connect(&peer, &QtLocalPeer::messageReceived, this, [&](const QString &message) {
+            QCOMPARE(QThread::currentThread(), thread());
+            messages << message;
+        });
+        // Blocking process waits deliberately do not pump the GUI event loop.
+        // Both clients must finish before any player/GUI messages are handled.
+        for (int i = 0; i < 2; ++i) {
+            QProcess client;
+            ChildProcessCleanup cleanup(client);
+            launchProbe(client, id, true, 500);
+            QVERIFY(client.waitForStarted(3000));
+            QVERIFY(client.waitForFinished(3000));
+            QCOMPARE(client.exitCode(), background ? 0 : 3);
+        }
+        QVERIFY(messages.isEmpty());
+        if (background)
+            QTRY_COMPARE(messages, (QStringList{"probe", "probe"}));
+    }
+
+    void windowsShortAndLongExecutablePathsShareIdentity()
+    {
+#ifdef Q_OS_WIN
+        // The checkout volume on hosted Windows has 8.3 names disabled. Use
+        // the user's actual temp volume, as in the Explorer acceptance probe.
+        // MSYS redirects TEMP to D:\a\_temp too; use the native profile's
+        // temp directory, whose existing RUNNER~1 alias reproduces the failure.
+        const QString profileTemp = QDir(qEnvironmentVariable("USERPROFILE"))
+                                        .filePath("AppData/Local/Temp");
+        QVERIFY(QDir(profileTemp).exists());
+        QTemporaryDir aliasRoot(profileTemp + "/nulloy-identity-XXXXXX");
+        QVERIFY(aliasRoot.isValid());
+        const QString executable = QFileInfo(aliasRoot.path()).canonicalFilePath()
+                                   + "/long-player-identity.exe";
+        QVERIFY(QFile::copy(QCoreApplication::applicationFilePath(), executable));
+        const QString native = QDir::toNativeSeparators(executable);
+        const DWORD length = GetShortPathNameW(reinterpret_cast<LPCWSTR>(native.utf16()), nullptr, 0);
+        QVERIFY(length > 0);
+        std::vector<wchar_t> buffer(length);
+        QVERIFY(GetShortPathNameW(reinterpret_cast<LPCWSTR>(native.utf16()), buffer.data(), length) > 0);
+        const QString shortPath = QString::fromWCharArray(buffer.data());
+        if (shortPath.compare(native, Qt::CaseInsensitive) == 0)
+            QSKIP("Test volume does not supply a distinct 8.3 executable alias");
+        auto identity = [this](const QString &program) {
+            QProcess process;
+            setupProcess(process, {"--identity"});
+            process.setProgram(program);
+            process.start();
+            if (!process.waitForStarted(3000) || !process.waitForFinished(5000)
+                || process.exitCode() != 0) return QByteArray();
+            return process.readAllStandardOutput().trimmed();
+        };
+        const QByteArray longId = identity(executable);
+        QVERIFY(!longId.isEmpty());
+        QCOMPARE(identity(shortPath), longId);
+        QTemporaryDir other;
+        QVERIFY(other.isValid());
+        const QString copy = other.filePath("other-player.exe");
+        QVERIFY(QFile::copy(executable, copy));
+        const QByteArray otherId = identity(copy);
+        QVERIFY(!otherId.isEmpty());
+        QVERIFY(otherId != longId);
+#else
+        QSKIP("8.3 executable aliases are Windows-specific");
+#endif
+    }
+
+    void windowsConnectionAcceptedInsideListenIsDelivered()
+    {
+#if defined(Q_OS_WIN) && QT_VERSION >= QT_VERSION_CHECK(6, 3, 0)
+        class InspectablePeer : public QtLocalPeer {
+        public:
+            explicit InspectablePeer(const QString &id) : QtLocalPeer(nullptr, id) {}
+            QString address() const { return socketName; }
+            QLocalServer *listener() const { return server; }
+        } peer(uniqueId());
+        // Stretch actual Windows named-pipe initialization, not a mocked signal.
+        // Qt5 has a fixed backlog and cannot make this interleaving deterministic.
+        peer.listener()->setListenBacklogSize(4096);
+        bool claimReturned = false, acceptedDuringListen = false;
+        connect(peer.listener(), &QLocalServer::newConnection, &peer, [&] {
+            acceptedDuringListen |= !claimReturned;
+        });
+        bool acknowledged = false;
+        const QString address = peer.address();
+        QThread *client = QThread::create([address, &acknowledged] {
+            QLocalSocket socket;
+            QElapsedTimer timer;
+            timer.start();
+            while (timer.elapsed() < 5000) {
+                socket.connectToServer(address);
+                if (socket.waitForConnected(20)) break;
+                socket.abort();
+                QThread::yieldCurrentThread();
+            }
+            if (socket.state() != QLocalSocket::ConnectedState) return;
+            QDataStream stream(&socket);
+            stream.writeBytes("early", 5);
+            if (socket.bytesToWrite() && !socket.waitForBytesWritten(5000)) return;
+            if (!socket.bytesAvailable() && !socket.waitForReadyRead(5000)) return;
+            acknowledged = socket.read(3) == "ack";
+        });
+        struct JoinThread {
+            QThread *thread;
+            ~JoinThread() { thread->wait(); delete thread; }
+        } cleanup{client};
+        client->start();
+        QVERIFY(!peer.isClient());
+        claimReturned = true;
+        QVERIFY2(acceptedDuringListen, "test did not exercise acceptance inside Windows listen()");
+        // Match main.cpp: the player receiver is connected only after claiming
+        // the primary role. Delivery during listen() would be lost as well.
+        QStringList received;
+        connect(&peer, &QtLocalPeer::messageReceived, &peer,
+                [&received](const QString &message) { received << message; });
+        QTRY_COMPARE_WITH_TIMEOUT(received, QStringList{"early"}, 7000);
+        QVERIFY(client->wait(3000));
+        QVERIFY(acknowledged);
+#else
+        QSKIP("Deterministic Windows listen-time interleaving requires Qt >= 6.3 backlog control");
+#endif
+    }
+
     void disconnectedClientWithoutHeaderDoesNotBlockPrimary()
     {
         const QString id = uniqueId();
@@ -439,6 +582,11 @@ int runProbe(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
+    if (argc > 1 && QByteArray(argv[1]) == "--identity") {
+        QtSingleApplication app(argc, argv);
+        QTextStream(stdout) << app.id() << Qt::endl;
+        return 0;
+    }
     if (argc > 1 && (QByteArray(argv[1]) == "--primary"
                     || QByteArray(argv[1]) == "--primary-frame"))
         return runPrimary(argc, argv);
