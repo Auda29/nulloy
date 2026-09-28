@@ -21,6 +21,7 @@
 #include "actionManager.h"
 #include "common.h"
 #include "coverWidget.h"
+#include "fileOpenBurst.h"
 #include "i18nLoader.h"
 #include "logDialog.h"
 #include "mainWindow.h"
@@ -72,6 +73,7 @@
 
 NPlayer::NPlayer()
 {
+    m_fileOpenBurst = new NFileOpenBurst(this);
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     preserveLegacyWindowsAppearance();
 #endif
@@ -405,26 +407,35 @@ void NPlayer::readMessage(const QString &str)
 
     foreach (QString arg, options) {
         if (arg == "--next") {
+            m_fileOpenBurst->reset();
             m_playlistWidget->playNextItem();
             return;
         } else if (arg == "--prev") {
+            m_fileOpenBurst->reset();
             m_playlistWidget->playPrevItem();
             return;
         } else if (arg == "--stop") {
+            m_fileOpenBurst->reset();
             m_playbackEngine->stop();
             return;
         } else if (arg == "--pause") {
+            m_fileOpenBurst->reset();
             m_playbackEngine->play();
             return;
         }
     }
 
     if (!files.isEmpty()) {
-        if (NSettings::instance()->value("EnqueueFiles").toBool()) {
+        const bool enqueue = NSettings::instance()->value("EnqueueFiles").toBool();
+        const bool playEnqueued = NSettings::instance()->value("PlayEnqueued").toBool();
+        // Shell selections can arrive as several launches/messages. Apply the
+        // original policy immediately once, then append this bounded burst.
+        if (m_fileOpenBurst->isContinuation(enqueue, playEnqueued)) {
+            m_playlistWidget->addFiles(files);
+        } else if (enqueue) {
             int lastRow = m_playlistWidget->count();
             m_playlistWidget->addFiles(files);
-            if (m_playbackEngine->state() == N::PlaybackStopped ||
-                NSettings::instance()->value("PlayEnqueued").toBool()) {
+            if (m_playbackEngine->state() == N::PlaybackStopped || playEnqueued) {
                 m_playlistWidget->playRow(lastRow);
                 m_playbackEngine->setPosition(0); // overrides setPosition() in loadDefaultPlaylist()
             }
