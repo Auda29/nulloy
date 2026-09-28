@@ -13,27 +13,33 @@
 **
 *********************************************************************/
 
-// clang-format off
-#include <windows.h>
-#include <shellapi.h>
-// clang-format on
+#include "trash.h"
 
-#include <QString>
+#include <QFile>
+#include <QFileInfo>
+#include <QObject>
 
-int _trash(const QString &file, QString *error)
+NTrash::NativeResult _trash(const QString &file, QString *error)
 {
-    Q_UNUSED(error);
-    QString file_nul = file;
-    file_nul.append("00");
-    file_nul[file.size()] = QChar(0);
-    file_nul[file.size() + 1] = QChar(0);
-    SHFILEOPSTRUCT shfo = SHFILEOPSTRUCT();
-    shfo.wFunc = FO_DELETE;
-    shfo.pFrom = (wchar_t *)(file_nul.utf16());
-    shfo.fFlags = FOF_NOCONFIRMATION | FOF_SIMPLEPROGRESS | FOF_NOERRORUI | FOF_ALLOWUNDO;
-    shfo.fAnyOperationsAborted = false;
-    shfo.hNameMappings = NULL;
-    shfo.pTo = NULL;
-    shfo.lpszProgressTitle = NULL;
-    return SHFileOperation(&shfo);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
+    // On supported Windows versions Qt uses IFileOperation with
+    // FOFX_RECYCLEONDELETE and a progress sink that refuses permanent deletion.
+    // SHFileOperation silently deleted files on a volume with NukeOnDelete=1,
+    // even with FOF_WANTNUKEWARNING and without FOF_NOCONFIRMATION.
+    QFile source(QFileInfo(file).absoluteFilePath());
+    if (source.moveToTrash() && !QFileInfo::exists(file)) {
+        return {0, false};
+    }
+    if (error) {
+        *error = source.errorString();
+    }
+#else
+    Q_UNUSED(file);
+    if (error) {
+        *error = QObject::tr("Safe recycling requires Qt 5.15 or newer.");
+    }
+#endif
+    // No shell confirmation UI is opened by Qt. Failure reaches the existing
+    // explicit permanent-delete question; the adapter never deletes directly.
+    return {1, false};
 }
