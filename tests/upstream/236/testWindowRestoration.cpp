@@ -21,6 +21,22 @@ class TestWindowRestoration : public QObject
 {
     Q_OBJECT
 private slots:
+    void oversizedNativeFrameFitsWorkArea()
+    {
+        NSettings::instance()->setValue("Maximized", false);
+        NSettings::instance()->setValue("Position", QStringList({"100000", "100000"}));
+        NSettings::instance()->setValue("Size", QStringList({"9999", "9999"}));
+        NMainWindow window;
+        window.loadSettings();
+        window.show();
+        const QRect available = QGuiApplication::primaryScreen()->availableGeometry();
+        QTRY_VERIFY2(available.contains(window.frameGeometry()),
+                     qPrintable(QString("Native frame %1,%2 %3x%4 exceeds work area %5,%6 %7x%8")
+                         .arg(window.frameGeometry().x()).arg(window.frameGeometry().y())
+                         .arg(window.frameGeometry().width()).arg(window.frameGeometry().height())
+                         .arg(available.x()).arg(available.y()).arg(available.width()).arg(available.height())));
+    }
+
     void init()
     {
         NSettings::instance()->setValue("Maximized", false);

@@ -47,6 +47,7 @@
 #include <QTime>
 #include <QTimer>
 #include <QWindowStateChangeEvent>
+#include <QWindow>
 
 #define RESIZE_BORDER 5
 
@@ -188,12 +189,27 @@ void NMainWindow::ensureVisibleGeometry()
             availableScreens.append(screen->availableGeometry());
     }
     const bool normal = !isMinimized() && !isMaximized() && !isFullScreen();
+    QSize frameExtra(0, 0);
+    if (!(windowFlags() & Qt::FramelessWindowHint)) {
+        if (normal) {
+            // Query native decoration metrics before recovering an oversized
+            // hidden window. QWidget::size() covers only its client area.
+            winId();
+            const QMargins margins = windowHandle()->frameMargins();
+            m_normalFrameExtra = QSize(margins.left() + margins.right(),
+                                       margins.top() + margins.bottom());
+        }
+        frameExtra = m_normalFrameExtra;
+    }
     QRect current(pos(), size());
     if (m_unmaximizedSize.isValid())
         current = QRect(m_unmaximizedPos, m_unmaximizedSize);
     else if (!normal && normalGeometry().isValid())
         current = normalGeometry();
-    const QRect restored = NWindowGeometry::restored(current, availableScreens);
+    const QRect frame(current.topLeft(), current.size() + frameExtra);
+    const QRect restoredFrame = NWindowGeometry::restored(frame, availableScreens);
+    const QRect restored(restoredFrame.topLeft(),
+                         (restoredFrame.size() - frameExtra).expandedTo(QSize(1, 1)));
     if (!normal) {
         // Do not unminimize, unmaximize, or reveal a tray-hidden window on hotplug.
         if (restored != current) {
