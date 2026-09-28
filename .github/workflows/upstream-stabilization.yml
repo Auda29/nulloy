@@ -6,6 +6,7 @@ on:
   pull_request:
     branches: ['integration/upstream-issues']
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read

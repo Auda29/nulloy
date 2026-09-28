@@ -1,0 +1,65 @@
+name: Combined PR24 and PR29 Windows acceptance
+
+on:
+  push:
+    branches: ['test/windows-open-acceptance']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: open-acceptance-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    uses: ./.github/workflows/windows-cmake.yml
+    with:
+      upload_packages: true
+
+  linux:
+    uses: ./.github/workflows/upstream-stabilization.yml
+
+  explorer:
+    name: Combined packaged Explorer diagnostic
+    needs: build
+    runs-on: windows-2022
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned desktop dependencies
+        run: python -m pip install pywinauto==0.6.9 Pillow==11.3.0 psutil==7.0.0
+      - name: Verify probe contracts
+        run: python -B -m unittest discover -s tools/desktop-probe -p 'test_*.py' -v
+      - uses: actions/download-artifact@v4
+        with:
+          name: Nulloy-Qt6-windows-x64
+          path: .desktop-probe/package
+      - name: Exercise combined package through real Explorer
+        shell: pwsh
+        env:
+          PROBE_SOURCE_SHA: ${{ github.sha }}
+        run: |
+          $packages = @(Get-ChildItem .desktop-probe/package -Filter '*.zip' -Recurse)
+          if ($packages.Count -ne 1) { throw "Expected one package, got $($packages.Count)" }
+          python tools/desktop-probe/probe.py --package $packages[0].FullName --output .desktop-probe/evidence --source-sha $env:PROBE_SOURCE_SHA --headless-audio
+          exit $LASTEXITCODE
+      - name: Preserve exact diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: combined-open-desktop-evidence
+          path: |
+            .desktop-probe/evidence/*.json
+            .desktop-probe/evidence/*.jsonl
+            .desktop-probe/evidence/*.txt
+            .desktop-probe/evidence/*.png
+            .desktop-probe/evidence/*.sha256
+          if-no-files-found: warn
+          retention-days: 7
