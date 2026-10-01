@@ -1,0 +1,86 @@
+name: Packaged Windows desktop probe
+
+on:
+  pull_request:
+    paths:
+      - 'tools/desktop-probe/**'
+      - '.github/workflows/desktop-probe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -B -m unittest discover -s tools/desktop-probe -p 'test_*.py' -v
+      - name: Verify opt-in and evidence retention policy
+        run: |
+          python -m pip install PyYAML==6.0.2
+          python tools/ci/test-artifact-policy.py
+
+  build:
+    # Explicit dispatch only: do not run untrusted PR code on a real desktop.
+    if: github.event_name == 'workflow_dispatch'
+    needs: contracts
+    uses: ./.github/workflows/windows-cmake.yml
+    with:
+      upload_packages: true
+
+  explorer:
+    if: github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned desktop dependencies
+        run: python -m pip install pywinauto==0.6.9 Pillow==11.3.0 psutil==7.0.0
+      - name: Verify native and mocked probe contracts
+        run: python -B -m unittest discover -s tools/desktop-probe -p 'test_*.py' -v
+      - uses: actions/download-artifact@v4
+        with:
+          name: Nulloy-Qt6-windows-x64
+          path: package
+      - name: Exercise tooling on its own package without PR24
+        shell: pwsh
+        env:
+          PACKAGE_SHA: ${{ github.sha }}
+        run: |
+          $packages = @(Get-ChildItem package -Filter '*.zip' -Recurse)
+          if ($packages.Count -ne 1) { throw "Expected exactly one package" }
+          $failed = $false
+          foreach ($warm in @($false, $true)) {
+            foreach ($count in @(3, 12)) {
+              $name = "warm-$warm-count-$count"
+              $arguments = @('--package', $packages[0].FullName, '--source-sha', $env:PACKAGE_SHA,
+                '--output', "evidence/$name", '--headless-audio', '--trace-startup',
+                '--enqueue', 'true', '--play-enqueued', 'false', '--fixture-count', "$count")
+              if ($warm) { $arguments += '--warm-start' }
+              python tools/desktop-probe/probe.py @arguments
+              if ($LASTEXITCODE -ne 0) { $failed = $true }
+              $result = Get-Content "evidence/$name/result.json" -Raw | ConvertFrom-Json
+              if (-not $result.cleanup_verified) { throw "Cleanup unverified; stop at $name" }
+            }
+          }
+          if ($failed) { exit 1 }
+      - name: Preserve exact package and desktop evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-probe-evidence
+          path: evidence/
+          retention-days: 7

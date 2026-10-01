@@ -91,6 +91,26 @@ class ArtifactPolicy(unittest.TestCase):
         self.assertIn('python -m pip install PyYAML==6.0.2', commands)
         self.assertIn('python tools/ci/test-artifact-policy.py', commands)
 
+    def test_desktop_tooling_is_dispatch_only_and_separate_from_pr24(self):
+        workflow = load('desktop-probe.yml')
+        self.assertNotIn('push', workflow['on'])
+        self.assertEqual(workflow['permissions'], {'contents': 'read'})
+        jobs = workflow['jobs']
+        for name in ('build', 'explorer'):
+            self.assertEqual(jobs[name]['if'], "github.event_name == 'workflow_dispatch'")
+        self.assertEqual(jobs['build']['uses'], './.github/workflows/windows-cmake.yml')
+        self.assertEqual(jobs['build']['with'], {'upload_packages': 'true'})
+        steps = jobs['explorer']['steps']
+        checkout = next(step for step in steps if step.get('uses') == 'actions/checkout@v4')
+        self.assertEqual(checkout['with']['persist-credentials'], 'false')
+        upload = next(step for step in steps if step.get('uses') == 'actions/upload-artifact@v4')
+        self.assertEqual(upload['if'], 'always()')
+        self.assertEqual(upload['with']['retention-days'], '7')
+        commands = '\n'.join(step.get('run', '') for step in steps)
+        self.assertIn("'--enqueue', 'true', '--play-enqueued', 'false'", commands)
+        self.assertIn('@(3, 12)', commands)
+        self.assertIn('$result.cleanup_verified', commands)
+
 
 if __name__ == '__main__':
     unittest.main()
