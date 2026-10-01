@@ -225,6 +225,12 @@ check before compilation; the provenance command now scopes `safe.directory`
 to the checkout path for that invocation only. No desktop-probe workflow or
 #24 playlist policy was transplanted into PR29.
 
+Pinned-head fixture verification `36839972967` passed: three offscreen runs and
+one XCB/Xvfb run each report **7 passed / 0 failed / 0 skipped**. Disabling
+forced metadata refresh then fails on the seeded stale cached title, as required
+by the sensitivity check. The corrected fixture therefore retains its ability
+to detect broken activation-time refresh. Full-head CI remains the merge gate.
+
 PR15 player-action tests run separately on `test/windows-trash-player-acceptance`
 at `bdc812e`: generated disposable WAV files, real player action and Windows
 adapter, ordinary/partial cancellation, duplicate rows, current/next removal,
