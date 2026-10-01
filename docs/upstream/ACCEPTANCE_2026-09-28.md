@@ -315,6 +315,17 @@ integration (PR29 and PR16) with the existing PR24 test candidate and diagnostic
 probe on `test/windows-open-acceptance`. A fresh combined package will give the
 user the accepted geometry implementation plus the actual PR24 policy to test.
 
+Combined source `be5b1e8` passed build/Explorer run `36843804143`: Linux native,
+Windows Qt5/Qt6 and packaged Explorer diagnostic are green. The Qt6 archive was
+downloaded and all 497 manifest hashes independently verified locally.
+ZIP SHA-256: `039c21768668d69649ee6950b9039f16b6fde0ec0835e2f8f8278ba3a79fe9be`;
+EXE SHA-256: `a231f27777954ced66ba349998863c59bc415f866bda727bd72e84368ec282f2`.
+Manual executable: `%LOCALAPPDATA%/Temp/opencode/nulloy-acceptance-20260928/`
+`pr24-manual-player/NulloyFork/NulloyFork.exe`. It was extracted into a new
+disposable portable directory without starting it or changing user settings.
+Nine-scenario matrix `36845642787` is running against this exact package;
+manual populated-playlist/position and independent-open acceptance is pending.
+
 ## Current merge decision (updated 1 October 2026)
 
 **Fork PR29 merged into integration** on 1 October 2026 at
