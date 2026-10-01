@@ -369,8 +369,20 @@ three new `locked-current` rows failed before the operation when constructing
 their external handle (it denied write sharing needed by the metadata reader).
 Fixture-only follow-up `ba1490e` permits READ/WRITE sharing while still denying
 DELETE, with no skipped assertion or product-source change. Repeat `36851212173`
-is pending. This is a candidate, not a verified fix; it has not been transferred
-into PR15. Native macOS and VLC remain unverified.
+passed on exact source `ba1490e`: **29/0/0 in all eight skin/toolkit results**,
+including every locked-current row. The eight local result logs were independently
+reviewed; no unrelated default-mode skips are counted as native acceptance.
+
+Verified product/test paths were then transferred into PR15 on accepted
+integration `c96ea63`, without merging experimental test workflows or PR24.
+Final head `9a88d4324acf97dd7118c90bd263c2540c0c1bf4` has product/test/package-
+verification sources identical to candidate `ba1490e`. Its supported Windows
+workflow adds explicit `native_trash_player=false` inputs for dispatch/call;
+real trash actions never run on ordinary PR triggers. Local 49 probe tests and
+7 CI/5 upstream retention contracts pass. Final Linux `36853084955`, Windows
+PR `36853085000`, and explicit native/package `36853083884` checks are pending.
+PR15 remains draft until those final-head checks pass. Native macOS and VLC
+remain unverified; the original macOS crash is not declared resolved.
 
 ## Current merge decision (updated 1 October 2026)
 
@@ -394,8 +406,8 @@ Qt5/Qt6 `36843462281`.
 `c96ea63a127abd30cdfd83997c6e90e108cfccc1`, following independent tooling-only
 acceptance on head `da34a2b`. The merged diff was checked to leave accepted
 product/test sources unchanged and exclude PR24. Post-merge Windows Qt5/Qt6
-`36851357922` passed on exact integration head `c96ea63`, without opt-in package
-retention. Linux `36851355719` is pending.
+`36851357922` and Linux `36851355719` passed on exact integration head `c96ea63`,
+without opt-in package retention.
 
 PR24 and PR15 remain draft/open. PR24 manual acceptance must use a package
 containing its fix; its independent-rapid-open slice was not explicitly confirmed.
