@@ -327,6 +327,12 @@ Nine-scenario matrix `36845642787` passed **9/9** against this exact package,
 with matching source identity and all nine cleanup checks verified;
 manual populated-playlist/position and independent-open acceptance is pending.
 
+The user requested postponement of PR24's manual acceptance on 1 October 2026:
+the described tests cannot be performed on the current machine. This is deferred,
+not a failed test or a waiver. PR24 remains draft/open and must not be merged on
+the automated checks alone. Resume with the identified combined package (or an
+equivalently verified rebuild) when a suitable machine is available.
+
 ## Current merge decision (updated 1 October 2026)
 
 **Fork PR29 merged into integration** on 1 October 2026 at
