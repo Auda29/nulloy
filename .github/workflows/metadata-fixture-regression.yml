@@ -30,7 +30,7 @@ jobs:
       - name: Repeat exact PR29 metadata fixture and verify sensitivity
         run: |
           mkdir -p /tmp/metadata-evidence
-          git rev-parse HEAD > /tmp/metadata-evidence/source-sha.txt
+          git -c safe.directory="$PWD" rev-parse HEAD > /tmp/metadata-evidence/source-sha.txt
           cmake -S tests/upstream/146 -B /tmp/metadata-build -G Ninja -DCMAKE_BUILD_TYPE=Release
           cmake --build /tmp/metadata-build --parallel 2
           for attempt in 1 2 3; do
