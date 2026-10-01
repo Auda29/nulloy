@@ -328,11 +328,15 @@ class ReviewRegressions(unittest.TestCase):
                 patch.object(runtime, "_registry_install"), \
                 patch.object(runtime, "_select_all_fixture_files", side_effect=lambda: events.append("select")), \
                 patch.object(runtime, "_read_playlist_rows", return_value=["one.wav"]), \
+                patch.object(runtime, "_assert_one_settled_player") as one_window, \
                 patch.object(runtime, "_cleanup_player", return_value=True), \
                 patch.object(runtime, "_cleanup_explorer", return_value=True), \
                 patch.object(runtime, "_registry_cleanup", return_value=True), \
                 patch.object(probe.shutil, "rmtree"):
-            runtime.execute()
+            result = runtime.execute()
+            one_window.assert_called_once()
+            self.assertTrue(result["assertions"]["one_observed_player_window"])
+            self.assertNotIn("startup_delivery_exact_once", result["assertions"])
 
         self.assertLess(events.index("explorer-selection.png"), events.index("invoke"))
         self.assertLess(events.index("explorer-selection-uia.jsonl"), events.index("invoke"))

@@ -110,6 +110,7 @@ class ArtifactPolicy(unittest.TestCase):
         self.assertIn("'--enqueue', 'true', '--play-enqueued', 'false'", commands)
         self.assertIn('@(3, 12)', commands)
         self.assertIn('$result.cleanup_verified', commands)
+        self.assertNotIn('--trace-startup', commands)
 
 
 if __name__ == '__main__':

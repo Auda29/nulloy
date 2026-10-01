@@ -67,7 +67,7 @@ jobs:
             foreach ($count in @(3, 12)) {
               $name = "warm-$warm-count-$count"
               $arguments = @('--package', $packages[0].FullName, '--source-sha', $env:PACKAGE_SHA,
-                '--output', "evidence/$name", '--headless-audio', '--trace-startup',
+                '--output', "evidence/$name", '--headless-audio',
                 '--enqueue', 'true', '--play-enqueued', 'false', '--fixture-count', "$count")
               if ($warm) { $arguments += '--warm-start' }
               python tools/desktop-probe/probe.py @arguments

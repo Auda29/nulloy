@@ -1107,8 +1107,10 @@ class WindowsDesktopRun:
             _dump_uia(self.player_window, self.evidence / "player-uia.jsonl")
             rows = self._read_playlist_rows(fixtures)
             exact_playlist_rows(rows, [path.name for path in fixtures])
+            # Window multiplicity is a UI/ownership assertion, not conditional
+            # on the package supplying optional message-delivery telemetry.
+            self._assert_one_settled_player()
             if getattr(self, "trace_directory", None) is not None:
-                self._assert_one_settled_player()
                 self._startup_settled(expected_launches)
                 delivery = startup_delivery(
                     json.loads((self.evidence / "startup-processes.json").read_text(encoding="utf-8")),
@@ -1120,6 +1122,7 @@ class WindowsDesktopRun:
                     "expected_generated_wav_files": len(fixtures) == count,
                     "explorer_context_menu": True,
                     "playlist_rows_exact_once": True,
+                    "one_observed_player_window": True,
                     **({"startup_delivery_exact_once": True, "playlist_delivery_order": True}
                        if getattr(self, "trace_directory", None) is not None else {}),
                 },

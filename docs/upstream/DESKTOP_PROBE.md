@@ -19,6 +19,16 @@ The optional `monitor_probe.py` helper is retained as test tooling only. This
 workflow does not run or claim physical-monitor, hotplug or mixed-DPI acceptance.
 The historical sections below describe their original package sources and scope.
 
+The first rebuilt dispatch, `36848055700` (source `47274d0`), passed both toolkit
+builds and the 49 contracts. All four Explorer cases reached playlist observation
+and verified cleanup, then failed the additional trace correlation: integration
+does not contain the combined branch's `player-message` instrumentation. The
+tooling-only dispatch therefore does not request `--trace-startup`. That option
+remains a stricter, separate check requiring an appropriately instrumented package;
+the failing correlation has not been relabeled as a passing trace test. PR28's
+native scope is exact UI membership/multiplicity, process ownership and cleanup,
+not player-message delivery order or PR24 policy acceptance.
+
 ## 2026-09-28 combined-candidate follow-up
 
 Branch `test/windows-open-acceptance` combines current integration (`5b2c600`)
