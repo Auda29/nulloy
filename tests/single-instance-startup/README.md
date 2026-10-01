@@ -7,6 +7,14 @@ secondary subprocesses.
 
 It covers:
 
+- background reception while the GUI thread is blocked: secondary processes
+  finish successfully before GUI event processing, and notifications are later
+  dispatched exactly once on the GUI thread; disabling the background receiver
+  in the same test demonstrates the original timeout;
+- Windows 8.3/long executable aliases sharing an IPC identity, while a separate
+  executable copy retains a different identity;
+- a real Windows connection accepted inside `QLocalServer::listen()`: the
+  receiver must subscribe before listening and defer application dispatch;
 - a client that disconnects without sending a frame header: the primary must return to its event loop and exit normally without emitting a message;
 - a fast primary that acknowledges one forwarded message;
 - a deterministic delayed-acknowledgement failure: a primary is held outside
@@ -29,10 +37,40 @@ It covers:
 The zero-or-one assertion in the failure case is intentional. A secondary
 that timed out waiting for an acknowledgement cannot establish lossless file
 open delivery, even if the primary later receives the already-written frame.
-Only the separate successful delayed case asserts an exact-once delivery
-contract. The test does not identify the Windows cause of the original startup
-symptom, does not exercise native application wiring, and is not an Explorer
-or Windows acceptance harness; those remain open.
+Successful cases assert exact-once delivery. The component suite does not itself
+exercise Explorer or the complete player; see the separate package evidence below.
+
+## Windows package evidence, 28 September 2026
+
+Traces reproduced three distinct causes: notification emitted before receiver
+registration, unequal identities for short/long executable paths, and player
+construction taking longer than the existing client timeout. Production now
+receives complete frames on a dedicated socket thread while retaining the
+native election mutex on its acquiring thread. Startup messages are buffered
+until initial player arguments are applied. GUI delivery stays on the GUI thread.
+Acknowledgement is in-memory acceptance, not crash-persistent storage.
+
+Opt-in `NULLOY_STARTUP_TRACE_DIR` writes per-PID JSONL into a pre-existing
+directory. With it unset, no diagnostic files are created.
+
+- `36426673584`: all 12 Qt6 startup results passed; the listen/identity
+  regressions failed against the old implementation.
+- `36426674095`: Linux and Windows Qt5/Qt6 builds and real Explorer acceptance
+  passed. Player construction took 5671ms; both clients were acknowledged before
+  construction completed, and all three files reached one player.
+- `36430784792`: **9/9 real Explorer scenarios passed**, covering cold/warm-empty
+  starts, all enqueue/play-enqueued combinations and a 12-file selection. Checks
+  correlate successful client acknowledgements, complete received frames,
+  exact-once player delivery, actual playlist order and one settled main window.
+  All nine cleanup checks passed. Probe-only path/order defects from preceding
+  runs were corrected with regressions before this final run.
+
+These package runs use combined source `fd7e416` (including the separate #24
+playlist-burst candidate); the startup source and regression files transplanted
+here are byte-identical to that candidate. ZIP SHA-256:
+`e668066d1e82fc72dc4edef67270323a0d09b3194541da48e7b277349fd61c2a`.
+This does not certify #24 playback-position/nonempty-state or independent-rapid-
+open semantics. PR-head CI must also pass before merging the startup changes.
 
 The subprocesses use RAII cleanup and bounded waits so a failed assertion does
 not leave a running `QProcess` behind. The release files are unique per test,
