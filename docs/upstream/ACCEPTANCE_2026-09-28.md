@@ -293,6 +293,20 @@ PR16 head `c7ce989`, with acceptance references in `docs/upstream/236.md`.
 PR-head checks passed: Linux `36431008436` and Windows Qt5/Qt6 `36431008472`.
 Mixed-DPI and physical hotplug remain outstanding.
 
+Manual follow-up reported by the user on **1 October 2026**: all supplied #16
+checklist items passed with the corrected test package, including removal of the
+second monitor with normal/minimized/maximized windows, reachability after
+restoration, differing per-monitor scaling, restart, and all four skins. This
+is user-reported hardware acceptance; exact scaling values, hardware details
+and screenshots were not supplied. It completes the previously outstanding
+manual hotplug/mixed-DPI slice, not an additional automated CI run.
+
+The user also reports having already accepted the #24 manual playlist/playback
+slice (populated playlists in playing/paused states, content/order/current title/
+position). The tested package/source identity has not yet been supplied. That
+report is retained, but package attribution is required before the PR24 merge
+decision; independently rapid opens were not explicitly named in the report.
+
 ## Current merge decision (updated 1 October 2026)
 
 **Fork PR29 merged into integration** on 1 October 2026 at
@@ -304,7 +318,14 @@ sources were compared against that accepted head with no differences.
 Post-merge integration verification passed: Linux `36840684870` and Windows
 Qt5/Qt6 `36840717002` (no opt-in package retention requested).
 
-PR24, PR15, PR16 and PR28 remain draft/open. Their outstanding playback,
-recycling, physical-hotplug/mixed-DPI or independent-tooling acceptance is not
-waived by PR29's startup acceptance. Integration has **not** been promoted to
-master. Original-project PRs were not changed.
+**Fork PR16 merged into integration** on 1 October 2026 at
+`bcd9b63709d373bd932a1e419a299f04b8a44ae6`, following the user's manual hardware
+acceptance and the existing green PR-head/native/package evidence. Integrated
+geometry/regression sources were compared against accepted head `c7ce989` with
+no differences. Post-merge checks are running: Linux `36843441580` and Windows
+Qt5/Qt6 `36843462281`.
+
+PR24, PR15 and PR28 remain draft/open. PR24 manual acceptance needs package
+attribution; its independent-rapid-open slice was not explicitly confirmed.
+PR15 recycling and PR28 independent-tooling gaps remain. Integration has **not**
+been promoted to master. Original-project PRs were not changed.
