@@ -188,8 +188,11 @@ private slots:
         const bool externallyLocked = operation == "locked" || operation == "locked-current";
         if (externallyLocked) {
             locked.value = CreateFileW(reinterpret_cast<LPCWSTR>(files[current ? 0 : 1].utf16()), GENERIC_READ,
-                FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-            QVERIFY(locked.value != INVALID_HANDLE_VALUE);
+                // TagLib can already hold read/write access to the current
+                // file. Allow both, but deliberately deny FILE_SHARE_DELETE.
+                FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+            QVERIFY2(locked.value != INVALID_HANDLE_VALUE,
+                qPrintable(QString("Could not create external delete lock: Win32 %1").arg(GetLastError())));
         }
         int confirmations = 0, fallbacks = 0, unexpected = 0;
         QSet<QMessageBox *> seen;
