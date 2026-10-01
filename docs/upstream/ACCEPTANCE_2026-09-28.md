@@ -208,8 +208,22 @@ link the changed IPC/startup sources. Its setup populated the playlist before
 showing/sizing the layout, although `setFiles()` immediately preloads visible
 and prefetched rows. PR29 follow-up `9d8b352` moves population after the bounded
 viewport is established, retaining the offscreen-row/unread-metadata assertions.
-New head checks `36433117692` / `36433117685` are pending. No desktop-probe
-workflow or #24 playlist policy was transplanted into that PR.
+Head `9d8b352` passed Windows `36433117685` but Linux `36433117692` still failed
+all four unread-final-row assumptions. Moving population after layout alone did
+not solve that assumption: `processVisibleItems()` can prefetch the full list.
+
+Follow-up on 1 October 2026, head `be7a766`, explicitly marks the target metadata
+unread immediately before each activation, without an intervening event-loop
+wait, and retains the real-file metadata checks inside the activation signal.
+Reverse traversal still seeds a stale cached title. This tests refresh rather
+than assuming which rows startup painting did/did not cache. New full-head
+checks `36839437749` (Linux) and `36839437766` (Windows) are pending. A separate
+pinned-head workflow repeats the metadata test three times offscreen and once
+under XCB, then requires the stale-title check to fail with forced refresh
+disabled. Initial setup run `36839704026` stopped at Git's container ownership
+check before compilation; the provenance command now scopes `safe.directory`
+to the checkout path for that invocation only. No desktop-probe workflow or
+#24 playlist policy was transplanted into PR29.
 
 PR15 player-action tests run separately on `test/windows-trash-player-acceptance`
 at `bdc812e`: generated disposable WAV files, real player action and Windows
