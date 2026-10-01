@@ -1,0 +1,11 @@
+********* Start testing of TestMetadata146 *********
+Config: Using QtTest library 6.8.2, Qt 6.8.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 14.2.0), debian 13
+PASS   : TestMetadata146::initTestCase()
+PASS   : TestMetadata146::shortcutsRefreshMetadata(custom-arrows-scroll)
+PASS   : TestMetadata146::shortcutsRefreshMetadata(custom-arrows-no-scroll)
+PASS   : TestMetadata146::shortcutsRefreshMetadata(default-z-b-scroll)
+PASS   : TestMetadata146::shortcutsRefreshMetadata(default-z-b-no-scroll)
+PASS   : TestMetadata146::unboundArrowsKeepPlayback()
+PASS   : TestMetadata146::cleanupTestCase()
+Totals: 7 passed, 0 failed, 0 skipped, 0 blacklisted, 16851ms
+********* Finished testing of TestMetadata146 *********

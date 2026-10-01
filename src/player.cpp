@@ -443,11 +443,15 @@ void NPlayer::loadDefaultPlaylist()
     }
 
     QStringList playlistRowValues = m_settings->value("PlaylistRow").toStringList();
-    if (!playlistRowValues.isEmpty()) {
-        int row = playlistRowValues.at(0).toInt();
-        qreal pos = playlistRowValues.at(1).toFloat();
+    if (playlistRowValues.size() == 2) {
+        bool rowOk = false;
+        bool posOk = false;
+        int row = playlistRowValues.at(0).toInt(&rowOk);
+        qreal pos = playlistRowValues.at(1).toFloat(&posOk);
 
-        if (row < 0 || row > m_playlistWidget->count() - 1) {
+        // Ignore a damaged session instead of selecting or playing an unintended track.
+        if (!rowOk || !posOk || !qIsFinite(pos) || pos < 0.0 || pos > 1.0 ||
+            row < 0 || row >= m_playlistWidget->count()) {
             return;
         }
 

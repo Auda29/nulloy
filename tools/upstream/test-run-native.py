@@ -44,9 +44,9 @@ class RunnerContract(unittest.TestCase):
 
     def test_steps_are_configure_build_test_with_bounded_parallelism(self):
         steps = runner.commands(Path("tests/upstream/255"), Path("build/255"))
-        self.assertEqual(steps[0], ["cmake", "-S", "tests/upstream/255", "-B", "build/255", "-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release"])
-        self.assertEqual(steps[1], ["cmake", "--build", "build/255", "--parallel", "1"])
-        self.assertEqual(steps[2], ["ctest", "--test-dir", "build/255", "--output-on-failure", "--no-tests=error", "--timeout", "180"])
+        self.assertEqual(steps[0], ["cmake", "-S", str(Path("tests/upstream/255")), "-B", str(Path("build/255")), "-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release"])
+        self.assertEqual(steps[1], ["cmake", "--build", str(Path("build/255")), "--parallel", "1"])
+        self.assertEqual(steps[2], ["ctest", "--test-dir", str(Path("build/255")), "--output-on-failure", "--no-tests=error", "--timeout", "180"])
 
     @unittest.skipUnless(shutil.which("cmake") and shutil.which("ninja"), "Native runner tools absent")
     def test_reused_output_cannot_execute_deleted_test_registrations(self):

@@ -46,6 +46,22 @@
 #include <QDir>
 
 #include "qtlockedfile.h"
+#include <QThread>
+
+// Receives and acknowledges frames independently of slow GUI construction.
+class QtLocalPeerReceiver : public QObject
+{
+    Q_OBJECT
+public:
+    explicit QtLocalPeerReceiver(QLocalServer *listener);
+    static bool readMessage(QLocalSocket *socket, QString *message);
+public Q_SLOTS:
+    void drainConnections();
+Q_SIGNALS:
+    void messageReceived(const QString &message);
+private:
+    QLocalServer *server;
+};
 
 class QtLocalPeer : public QObject
 {
@@ -53,7 +69,9 @@ class QtLocalPeer : public QObject
 
 public:
     QtLocalPeer(QObject *parent = 0, const QString &appId = QString());
+    ~QtLocalPeer() override;
     bool isClient();
+    void startBackgroundReceiver();
     bool sendMessage(const QString &message, int timeout);
     QString applicationId() const
         { return id; }
@@ -71,7 +89,7 @@ protected:
     QtLP_Private::QtLockedFile lockFile;
 
 private:
-    static const char* ack;
+    QThread *receiverThread = nullptr;
 };
 
 #endif // QTLOCALPEER_H

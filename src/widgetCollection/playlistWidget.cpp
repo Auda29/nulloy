@@ -245,7 +245,9 @@ void NPlaylistWidget::removeSelected()
     }
     NPlaylistWidgetItem *newCurrentItem = itemAtRow(newCurrentRow);
 
-    if (playingItemRemoved && m_playbackEngine->state() != N::PlaybackStopped) {
+    // Removing a paused track must not implicitly resume playback. Keep the
+    // loaded media/position, as when stopped; only advance active playback.
+    if (playingItemRemoved && m_playbackEngine->state() == N::PlaybackPlaying) {
         playItem(newCurrentItem);
     }
     // sets keyboard focus:

@@ -22,6 +22,8 @@ jobs:
   test:
     needs: validate
     uses: ./.github/workflows/windows-cmake.yml
+    with:
+      upload_packages: true
 
   publish:
     needs: [validate, test]

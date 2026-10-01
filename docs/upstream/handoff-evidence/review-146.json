@@ -1,0 +1,67 @@
+{
+  "pr": 25,
+  "issue": 146,
+  "gate_head": "7bcc139562a7a207c5030ca1f629ebeb3f2542d7",
+  "base": "2d54d7d4ebd132add13cbdf1a64159357df5b42a",
+  "blocking": false,
+  "findings": [],
+  "conclusion": "No blocking or actionable defects found in the four-file test/docs-only change. Local metadata-shortcut characterization is supported; this is not a production fix or closure of original/native/global acceptance.",
+  "scope": [
+    "docs/upstream/146.md",
+    "tests/upstream/146/CMakeLists.txt",
+    "tests/upstream/146/nativeShortcutSeam.cpp",
+    "tests/upstream/146/testMetadata146.cpp"
+  ],
+  "review_observations": [
+    "Harness compiles real NAction/QAction, playlist, GStreamer and TagLib components; native shortcut methods abort rather than falsely reporting registration success.",
+    "Twenty distinct generated MP3 files have unique Unicode metadata and IDs. Four traversal cases cover custom arrows/default Z-B and scrolling on/off; default unbound arrows preserve current playback in the tested path.",
+    "Assertions inside playingItemChanged check metadata before queued repaint can repair it; reverse traversal injects nonempty stale cached display text to require the existing forced refresh.",
+    "Existing worker sensitivity log records stale cached metadata at testMetadata146.cpp:48 when forced refresh was disabled. Independently inspected this evidence; did not mutate production code or rerun sabotage.",
+    "Documentation explicitly separates generated local tests from original Windows packages/files, native global hooks, physical input, full NPlayer labels, Qt5 and other outstanding acceptance. No unqualified Fixed claim."
+  ],
+  "evidence": {
+    "repository": "/home/hermes/workspace/nulloy-swarm/issue-146",
+    "status_before": "clean",
+    "status_after": "clean",
+    "head_before_and_after": "7bcc139562a7a207c5030ca1f629ebeb3f2542d7",
+    "diff_check": "git diff --check base..HEAD passed",
+    "production_diff": "git diff --exit-code base..HEAD -- src 3rdParty passed; no production changes relative to stated base",
+    "build_directory": "/home/hermes/workspace/nulloy-swarm/build-146",
+    "build_directory_note": "Requested evidence/146/build does not exist. Discovered existing build-146 from filesystem and ready manifest; verified CMakeCache points to this worktree/tests/upstream/146, Qt6, Release with O0/DNDEBUG flags. No new build tree created.",
+    "serialization": "Build, offscreen CTest and XCB/Xvfb run executed consecutively under flock -w 180 /home/hermes/workspace/nulloy-swarm/build.lock",
+    "build": {
+      "command": "cmake --build /home/hermes/workspace/nulloy-swarm/build-146 -j1",
+      "exit_code": 0,
+      "result": "Recompiled current playlistWidget.cpp and relinked before test execution, incorporating inherited parent changes rather than testing a stale executable.",
+      "log": "/home/hermes/workspace/nulloy-swarm/evidence/146/review-build.txt"
+    },
+    "ctest": {
+      "command": "ctest --test-dir /home/hermes/workspace/nulloy-swarm/build-146 --output-on-failure --no-tests=error -V",
+      "exit_code": 0,
+      "suites_passed": 1,
+      "suites_total": 1,
+      "qt_passed": 7,
+      "qt_failed": 0,
+      "qt_skipped": 0,
+      "duration_seconds": 16.83,
+      "log": "/home/hermes/workspace/nulloy-swarm/evidence/146/review-ctest.txt"
+    },
+    "xcb": {
+      "command": "QT_QPA_PLATFORM=xcb xvfb-run -a /home/hermes/workspace/nulloy-swarm/build-146/testMetadata146",
+      "exit_code": 0,
+      "qt_passed": 7,
+      "qt_failed": 0,
+      "qt_skipped": 0,
+      "duration_ms": 16851,
+      "log": "/home/hermes/workspace/nulloy-swarm/evidence/146/review-xcb.txt"
+    },
+    "inspected_worker_mutation_log": "/home/hermes/workspace/nulloy-swarm/evidence/146/sensitivity.txt",
+    "warnings": [
+      "Existing Qt QDropEvent::pos deprecation during rebuild.",
+      "Expected offscreen propagateSizeHints warnings; absent in XCB run."
+    ],
+    "github_touched": false,
+    "ci_polled": false,
+    "repository_files_modified": false
+  }
+}
