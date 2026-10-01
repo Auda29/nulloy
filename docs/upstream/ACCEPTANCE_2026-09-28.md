@@ -381,7 +381,7 @@ workflow adds explicit `native_trash_player=false` inputs for dispatch/call;
 real trash actions never run on ordinary PR triggers. Local 49 probe tests and
 7 CI/5 upstream retention contracts pass. Final Windows PR `36853085000` passed
 on exact head `9a88d43`, including Qt5/Qt6 and artifact policy. Linux `36853084955`
-and explicit native/package `36853083884` checks are pending.
+also passed on that exact head. Explicit native/package `36853083884` is pending.
 PR15 remains draft until those final-head checks pass. Native macOS and VLC
 remain unverified; the original macOS crash is not declared resolved.
 
