@@ -18,6 +18,8 @@
 #include "common.h"
 #include "player.h"
 #include "settings.h"
+#include "singleInstanceStartup.h"
+#include <qtlocalpeertrace.h>
 
 #if !defined(_N_NO_SKINS_) && QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 #include "skinFileSystem.h"
@@ -129,6 +131,8 @@ int main(int argc, char *argv[])
     instance.setQuitOnLastWindowClosed(false);
 
     qInstallMessageHandler(messageHandler);
+    startupTrace("main-start", {{"arguments", QJsonArray::fromStringList(instance.arguments())},
+                                {"settings", NCore::settingsPath()}});
 
     QStringList argList = instance.arguments();
     argList.takeFirst();
@@ -167,28 +171,46 @@ int main(int argc, char *argv[])
 
     // construct message
     QString msg = (options + files).join(MSG_SPLITTER);
+    QStringList startupMessages;
+    const auto startupConnection = QObject::connect(
+        &instance, &QtSingleApplication::messageReceived, &instance,
+        [&startupMessages](const QString &message) { startupMessages << message; });
     if (NSettings::instance()->value("SingleInstance").toBool()) {
-        // try to send it to an already running instrance
-        if (instance.sendMessage(msg)) {
-            return 0; // return if delivered
+        const auto startup = singleInstanceStartup(instance, msg);
+        if (startup == SingleInstanceStartupResult::MessageDelivered) {
+            startupTrace("main-exit", {{"exit_code", 0}, {"role", "client"}});
+            return 0;
         }
+        if (startup == SingleInstanceStartupResult::MessageDeliveryFailed) {
+            startupTrace("main-exit", {{"exit_code", 1}, {"role", "client"}});
+            print_err("A running Nulloy instance did not acknowledge the startup message; no second player was started");
+            return 1;
+        }
+        instance.startBackgroundReceiver();
     }
 
 #if !defined(_N_NO_SKINS_) && QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
     NSkinFileSystem::init();
 #endif
 
+    startupTrace("player-construct-begin");
     NPlayer p;
-    QObject::connect(&instance, SIGNAL(messageReceived(const QString &)), &p,
-                     SLOT(readMessage(const QString &)));
+    startupTrace("player-construct-end");
     QObject::connect(&instance, SIGNAL(aboutToQuit()), &p, SLOT(quit()));
+    startupTrace("player-connected");
 
     // manually read the message
     if (!msg.isEmpty()) {
         p.readMessage(msg);
     }
+    while (!startupMessages.isEmpty())
+        p.readMessage(startupMessages.takeFirst());
+    QObject::disconnect(startupConnection);
+    QObject::connect(&instance, &QtSingleApplication::messageReceived, &p, &NPlayer::readMessage);
 
     instance.installEventFilter(&p);
 
-    return instance.exec();
+    const int exitCode = instance.exec();
+    startupTrace("main-exit", {{"exit_code", exitCode}, {"role", "primary"}});
+    return exitCode;
 }
