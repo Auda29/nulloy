@@ -21,14 +21,16 @@
 
 #include "global.h"
 #include "playbackEngineInterface.h"
+#include "playbackFileAccessInterface.h"
 #include "plugin.h"
 
 class QTimer;
 
-class NPlaybackEngineGStreamer : public NPlaybackEngineInterface, public NPlugin
+class NPlaybackEngineGStreamer : public NPlaybackEngineInterface, public NPlugin,
+                                public NPlaybackFileAccessInterface
 {
     Q_OBJECT
-    Q_INTERFACES(NPlaybackEngineInterface NPlugin)
+    Q_INTERFACES(NPlaybackEngineInterface NPlugin NPlaybackFileAccessInterface)
 
 private:
     GstElement *m_playbin;
@@ -85,6 +87,9 @@ public:
     Q_INVOKABLE qreal pitch() const;
 
     void _handleAboutToFinish();
+    void suspendFileAccess();
+    void restoreFileAccess(const QString &file, int context, qreal position,
+                           N::PlaybackState state);
 
 public slots:
     Q_INVOKABLE void setMedia(const QString &file, int context);

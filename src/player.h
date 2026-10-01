@@ -66,6 +66,7 @@ private:
     QTimer *m_settingsSaveTimer;
     QTimer *m_writeDefaultPlaylistTimer;
     bool m_trayIconDoubleClickCheck;
+    bool m_trashInProgress = false;
 
     bool eventFilter(QObject *obj, QEvent *event);
     void writePlaylist(const QString &file, N::M3uExtention ext);
@@ -102,6 +103,7 @@ private slots:
     void trayIconCountClicks(int clicks);
 
 public slots:
+    void moveSelectedFilesToTrash();
     void quit();
     void playPause();
     void toggleWindowVisibility();

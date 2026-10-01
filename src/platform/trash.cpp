@@ -23,10 +23,29 @@
 #include <QMessageBox>
 #include <QProcess>
 
-int _trash(const QString &file, QString *error);
-
-QStringList NTrash::moveToTrash(QStringList files)
+namespace
 {
+    struct OperationGuard
+    {
+        const NTrash::OperationHooks &hooks;
+        QString file;
+        bool deleted = false;
+        OperationGuard(const NTrash::OperationHooks &hooks, const QString &file)
+            : hooks(hooks), file(file)
+        {
+            if (hooks.before) hooks.before(file);
+        }
+        ~OperationGuard()
+        {
+            if (hooks.after) hooks.after(file, deleted);
+        }
+    };
+}
+
+QStringList NTrash::moveToTrash(QStringList files, const OperationHooks &hooks)
+{
+    files.removeDuplicates();
+    QStringList deleted;
     foreach (QString file, files) {
         if (NSettings::instance()->value("DisplayMoveToTrashConfirmDialog").toBool()) {
             QCheckBox *checkBox = new QCheckBox(QObject::tr("Don't show this dialog anymore"));
@@ -42,15 +61,20 @@ QStringList NTrash::moveToTrash(QStringList files)
             int res = msgBox.exec();
 
             if (res != QMessageBox::Yes) {
-                return files;
+                return deleted;
             }
 
             NSettings::instance()->setValue("DisplayMoveToTrashConfirmDialog",
                                             !checkBox->isChecked());
         }
 
+        OperationGuard operation(hooks, file);
         QString error;
-        if (_trash(file, &error) != 0) {
+        const NativeResult result = _trash(file, &error);
+        if (result.cancelled) {
+            break;
+        }
+        if (result.errorCode != 0) {
             QMessageBox box(QMessageBox::Warning, QObject::tr("Trash Error"), "",
                             QMessageBox::Yes | QMessageBox::Cancel, NULL);
             box.setDefaultButton(QMessageBox::Cancel);
@@ -59,6 +83,8 @@ QStringList NTrash::moveToTrash(QStringList files)
                 (error.isEmpty() ? "" : " <br>" + error));
             box.setInformativeText(QObject::tr("Do you want to delete permanently?"));
             if (box.exec() == QMessageBox::Yes) {
+                // The modal question may have allowed GUI readers to reopen.
+                if (hooks.before) hooks.before(file);
                 if (!QFile::remove(file)) {
                     QMessageBox::critical(NULL, QObject::tr("File Delete Error"),
                                           QObject::tr("Failed to delete <b>%1</b>.").arg(file));
@@ -69,8 +95,9 @@ QStringList NTrash::moveToTrash(QStringList files)
             }
         }
 
-        files.removeAt(files.indexOf(file));
+        deleted << file;
+        operation.deleted = true;
     }
 
-    return files;
+    return deleted;
 }

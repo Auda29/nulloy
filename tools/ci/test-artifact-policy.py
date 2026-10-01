@@ -112,6 +112,16 @@ class ArtifactPolicy(unittest.TestCase):
         self.assertIn('$result.cleanup_verified', commands)
         self.assertNotIn('--trace-startup', commands)
 
+    def test_native_trash_player_requires_explicit_opt_in(self):
+        for event in ('workflow_dispatch', 'workflow_call'):
+            spec = self.windows['on'][event]['inputs']['native_trash_player']
+            self.assertEqual(spec['type'], 'boolean')
+            self.assertEqual(spec['default'], 'false')
+        step = self.steps['Verify real player trash matrix']
+        self.assertEqual(step['if'], 'inputs.native_trash_player == true')
+        self.assertIn('--native-trash-root C:/nulloy-player-trash-', step['run'])
+        self.assertIn('${{ github.run_id }}-qt${{ matrix.qt }}', step['run'])
+
 
 if __name__ == '__main__':
     unittest.main()

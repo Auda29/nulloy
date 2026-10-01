@@ -410,6 +410,47 @@ void NPlaybackEngineGStreamer::stop()
     m_gstBusPopTimer->stop();
 }
 
+void NPlaybackEngineGStreamer::suspendFileAccess()
+{
+    // Unlike stop(), preserve the user's visible state and seek position.
+    // NULL also closes a successor already handed to playbin for gapless playback.
+    m_checkStatusTimer->stop();
+    m_gstBusPopTimer->stop();
+    m_emitStateTimer->stop();
+    const gint64 duration = m_durationNsec;
+    resetPipeline();
+    m_durationNsec = duration;
+}
+
+void NPlaybackEngineGStreamer::restoreFileAccess(const QString &file, int context,
+                                               qreal position, N::PlaybackState state)
+{
+    const bool changed = file != m_currentMedia || context != m_currentContext;
+    resetPipeline();
+    if (!gstSetFile(file, context)) {
+        return;
+    }
+    m_position = position;
+    m_positionPostponed = position > 0.0;
+    m_requestedState = state == N::PlaybackPlaying ? GST_STATE_PLAYING
+                     : state == N::PlaybackPaused ? GST_STATE_PAUSED : GST_STATE_NULL;
+    m_gstState = m_requestedState;
+    // Restore an existing row without counting another playback activation.
+    // A replacement row is published once now, not again at STREAM_START.
+    m_initialStreamStart = false;
+    m_suppressStreamStart = true;
+    if (changed) {
+        emit mediaChanged(file, context);
+    }
+    emit stateChanged(state);
+    emit positionChanged(position);
+    if (state != N::PlaybackStopped) {
+        m_checkStatusTimer->start(LONG_TICK_MSEC);
+        m_gstBusPopTimer->start();
+        gst_element_set_state(m_playbin, m_requestedState);
+    }
+}
+
 bool NPlaybackEngineGStreamer::hasMedia() const
 {
     return !m_currentMedia.isEmpty();
