@@ -349,7 +349,10 @@ additional trace check because integration lacks the combined branch's
 failures, not delivery acceptance. Follow-up head `da34a2b` separates the native
 tooling scope (real Explorer, exact UI rows, one observed owned main window and
 cleanup) from the combined-only trace/order check. Independent run `36849863449`
-is pending. The local rebuild branch tracks `origin/test/windows-desktop-probe`.
+passed **4/4** native scenarios, each with 497 verified package hashes and full
+process/registry/Explorer cleanup. Linux `36849868639` and Windows Qt5/Qt6
+`36849868714` also passed on that exact head. The local rebuild branch tracks
+`origin/test/windows-desktop-probe`.
 
 PR15 candidate `ef10249` on `test/windows-trash-player-acceptance` incorporates
 current accepted integration and post-confirmation file-reader lifetime hooks.
@@ -360,8 +363,14 @@ positions, an externally locked current track, hook cancellation ordering and si
 standalone engine state/replacement rows. Linux `36849432582` passed on exact
 source `ef10249`: trash contract 31/0/0 and playback-file-access 8/0/0 (six data
 rows plus init/cleanup), with no skipped capability test. The serial packaged
-Qt5/Qt6 four-skin run `36849430723` is pending. This is a candidate, not a verified
-fix; it has not been transferred into PR15. Native macOS and VLC remain unverified.
+Qt5/Qt6 four-skin run `36849430723` failed: every skin/toolkit returned 26 passed,
+3 failed, no skips. All original current-track Play/Pause/Stop rows passed; the
+three new `locked-current` rows failed before the operation when constructing
+their external handle (it denied write sharing needed by the metadata reader).
+Fixture-only follow-up `ba1490e` permits READ/WRITE sharing while still denying
+DELETE, with no skipped assertion or product-source change. Repeat `36851212173`
+is pending. This is a candidate, not a verified fix; it has not been transferred
+into PR15. Native macOS and VLC remain unverified.
 
 ## Current merge decision (updated 1 October 2026)
 
@@ -381,7 +390,13 @@ geometry/regression sources were compared against accepted head `c7ce989` with
 no differences. Post-merge checks passed: Linux `36843441580` and Windows
 Qt5/Qt6 `36843462281`.
 
-PR24, PR15 and PR28 remain draft/open. PR24 manual acceptance must use a package
+**Fork PR28 merged into integration** on 1 October 2026 at
+`c96ea63a127abd30cdfd83997c6e90e108cfccc1`, following independent tooling-only
+acceptance on head `da34a2b`. The merged diff was checked to leave accepted
+product/test sources unchanged and exclude PR24. Post-merge Linux `36851355719`
+and Windows Qt5/Qt6 `36851357922` are pending, without opt-in package retention.
+
+PR24 and PR15 remain draft/open. PR24 manual acceptance must use a package
 containing its fix; its independent-rapid-open slice was not explicitly confirmed.
-PR15 recycling and PR28 independent-tooling gaps remain. Integration has **not**
+PR15 recycling acceptance remains. Integration has **not**
 been promoted to master. Original-project PRs were not changed.
