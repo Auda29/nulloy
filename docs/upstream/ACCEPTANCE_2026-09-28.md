@@ -422,10 +422,9 @@ without opt-in package retention.
 `0ecd3aa0563bb31ba3797d50f5aacfc76ad49f58`, after exact-head Linux, Windows and
 native packaged-player acceptance on `9a88d43`. Merged product/test/workflow/
 package-verification sources match the accepted head. PR24 ancestry remains
-excluded. Post-merge Linux `36854838195` passed on exact integration head
-`0ecd3aa`; Windows Qt5/Qt6 `36854840934` is pending. No opt-in package retention
-or native trash actions were requested for
-these general integration checks.
+excluded. Post-merge Linux `36854838195` and Windows Qt5/Qt6 `36854840934` passed
+on exact integration head `0ecd3aa`. No opt-in package retention or native trash
+actions were requested for these general integration checks.
 
 PR24 remains draft/open. PR24 manual acceptance must use a package
 containing its fix; its independent-rapid-open slice was not explicitly confirmed.
