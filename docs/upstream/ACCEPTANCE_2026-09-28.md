@@ -301,8 +301,8 @@ Windows Qt5/Qt6 `36839437766` passed on exact PR head `be7a766`, and the repeate
 fixture/sensitivity check `36839972967` passed. Integrated startup/regression
 sources were compared against that accepted head with no differences.
 
-Post-merge integration verification is running: Linux `36840684870` and
-Windows Qt5/Qt6 `36840717002` (no opt-in package retention requested).
+Post-merge integration Linux verification `36840684870` passed. Windows
+Qt5/Qt6 `36840717002` is running (no opt-in package retention requested).
 
 PR24, PR15, PR16 and PR28 remain draft/open. Their outstanding playback,
 recycling, physical-hotplug/mixed-DPI or independent-tooling acceptance is not
