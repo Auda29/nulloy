@@ -381,9 +381,17 @@ workflow adds explicit `native_trash_player=false` inputs for dispatch/call;
 real trash actions never run on ordinary PR triggers. Local 49 probe tests and
 7 CI/5 upstream retention contracts pass. Final Windows PR `36853085000` passed
 on exact head `9a88d43`, including Qt5/Qt6 and artifact policy. Linux `36853084955`
-also passed on that exact head. Explicit native/package `36853083884` is pending.
-PR15 remains draft until those final-head checks pass. Native macOS and VLC
-remain unverified; the original macOS crash is not declared resolved.
+also passed on that exact head. Explicit native/package `36853083884` passed:
+all eight final-head Qt5/Qt6 skin matrices returned **29/0/0**, including the
+locked-current cancellation rows. Both native-mode `verified.json` files were
+checked (Qt5: 419 hashes; Qt6: 497). The final Qt6 package was independently
+downloaded/extracted and all 497 hashes verified against source `9a88d43`.
+ZIP SHA-256: `d54071678013eeebc8c2a1a75026721517f821756fb4651b9bed5d211248fd06`;
+EXE SHA-256: `080020ed634ee339a4c8d6fd6f1a1b92c03b590113481912a07a329682e03037`.
+It is retained in `pr15-final-package`/`pr15-final-player` under the acceptance
+temp root, without starting the local player or modifying user settings.
+Native macOS and VLC remain unverified; the original macOS crash is not declared
+resolved. These boundaries are retained in the accepted PR's body.
 
 ## Current merge decision (updated 1 October 2026)
 
@@ -410,7 +418,16 @@ product/test sources unchanged and exclude PR24. Post-merge Windows Qt5/Qt6
 `36851357922` and Linux `36851355719` passed on exact integration head `c96ea63`,
 without opt-in package retention.
 
-PR24 and PR15 remain draft/open. PR24 manual acceptance must use a package
+**Fork PR15 merged into integration** on 1 October 2026 at
+`0ecd3aa0563bb31ba3797d50f5aacfc76ad49f58`, after exact-head Linux, Windows and
+native packaged-player acceptance on `9a88d43`. Merged product/test/workflow/
+package-verification sources match the accepted head. PR24 ancestry remains
+excluded. Post-merge Linux `36854838195` and Windows Qt5/Qt6 `36854840934` are
+pending; no opt-in package retention or native trash actions were requested for
+these general integration checks.
+
+PR24 remains draft/open. PR24 manual acceptance must use a package
 containing its fix; its independent-rapid-open slice was not explicitly confirmed.
-PR15 recycling acceptance remains. Integration has **not**
+The original macOS trash crash remains outside the verified Windows slice.
+Integration has **not**
 been promoted to master. Original-project PRs were not changed.
