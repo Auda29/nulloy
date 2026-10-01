@@ -455,15 +455,7 @@ NActionManager::NActionManager(NPlayer *player) : QObject(player)
         trashSelectedAction->setObjectName("MoveToTrashAction");
         trashSelectedAction->setStatusTip(tr("Move selected files to trash bin"));
         trashSelectedAction->setCustomizable(true);
-        connect(trashSelectedAction, &NAction::triggered, [player]() {
-            QStringList files = player->playlistWidget()->selectedFiles();
-            if (files.isEmpty()) {
-                return;
-            }
-
-            QStringList deleted = NTrash::moveToTrash(files);
-            player->playlistWidget()->removeFiles(deleted);
-        });
+        connect(trashSelectedAction, &NAction::triggered, player, &NPlayer::moveSelectedFilesToTrash);
         m_playlistContextMenu->addAction(trashSelectedAction);
     }
 

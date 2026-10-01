@@ -10,10 +10,18 @@ on:
         description: 'Retain downloadable packages for 3 days; archive acceptance references separately'
         type: boolean
         default: false
+      native_trash_player:
+        description: 'Opt in to real player recycle tests using generated disposable files only'
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       upload_packages:
         description: 'Retain packages for downstream consumers such as the release workflow'
+        type: boolean
+        default: false
+      native_trash_player:
+        description: 'Opt in to native player trash acceptance; never enable for untrusted PR code'
         type: boolean
         default: false
 
@@ -100,6 +108,11 @@ jobs:
           for mode in missing corrupt changed-plugin; do
             python tools/phase2/verify-package.py --prefix "$(cygpath -m /mingw64)" --build ${{ matrix.build }} --headless-audio --trace-startup --registry-fallback "$mode"
           done
+      - name: Verify real player trash matrix
+        if: inputs.native_trash_player == true
+        shell: msys2 {0}
+        run: |
+          python tools/phase2/verify-package.py --prefix "$(cygpath -m /mingw64)" --build ${{ matrix.build }} --headless-audio --native-trash-root C:/nulloy-player-trash-${{ github.run_id }}-qt${{ matrix.qt }}
       - name: Verify audio formats and Unicode tag roundtrips
         shell: msys2 {0}
         run: |

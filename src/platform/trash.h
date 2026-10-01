@@ -17,6 +17,7 @@
 #define N_TRASH_H
 
 #include <QStringList>
+#include <functional>
 
 namespace NTrash
 {
@@ -27,10 +28,18 @@ namespace NTrash
         bool cancelled;
     };
 
+    struct OperationHooks
+    {
+        // Called only after confirmation, again before explicit permanent delete.
+        std::function<void(const QString &)> before;
+        // Exactly once per confirmed file, including failure/native cancellation.
+        std::function<void(const QString &, bool)> after;
+    };
+
     // Returns unique paths successfully trashed or explicitly permanently deleted,
     // in input order. Cancellation/failure returns only earlier successes; failed
     // and unattempted paths remain in the playlist. Duplicate paths are tried once.
-    QStringList moveToTrash(QStringList files);
+    QStringList moveToTrash(QStringList files, const OperationHooks &hooks = OperationHooks());
 } // namespace NTrash
 
 NTrash::NativeResult _trash(const QString &file, QString *error);

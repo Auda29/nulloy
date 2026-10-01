@@ -23,7 +23,26 @@
 #include <QMessageBox>
 #include <QProcess>
 
-QStringList NTrash::moveToTrash(QStringList files)
+namespace
+{
+    struct OperationGuard
+    {
+        const NTrash::OperationHooks &hooks;
+        QString file;
+        bool deleted = false;
+        OperationGuard(const NTrash::OperationHooks &hooks, const QString &file)
+            : hooks(hooks), file(file)
+        {
+            if (hooks.before) hooks.before(file);
+        }
+        ~OperationGuard()
+        {
+            if (hooks.after) hooks.after(file, deleted);
+        }
+    };
+}
+
+QStringList NTrash::moveToTrash(QStringList files, const OperationHooks &hooks)
 {
     files.removeDuplicates();
     QStringList deleted;
@@ -49,6 +68,7 @@ QStringList NTrash::moveToTrash(QStringList files)
                                             !checkBox->isChecked());
         }
 
+        OperationGuard operation(hooks, file);
         QString error;
         const NativeResult result = _trash(file, &error);
         if (result.cancelled) {
@@ -63,6 +83,8 @@ QStringList NTrash::moveToTrash(QStringList files)
                 (error.isEmpty() ? "" : " <br>" + error));
             box.setInformativeText(QObject::tr("Do you want to delete permanently?"));
             if (box.exec() == QMessageBox::Yes) {
+                // The modal question may have allowed GUI readers to reopen.
+                if (hooks.before) hooks.before(file);
                 if (!QFile::remove(file)) {
                     QMessageBox::critical(NULL, QObject::tr("File Delete Error"),
                                           QObject::tr("Failed to delete <b>%1</b>.").arg(file));
@@ -74,6 +96,7 @@ QStringList NTrash::moveToTrash(QStringList files)
         }
 
         deleted << file;
+        operation.deleted = true;
     }
 
     return deleted;
