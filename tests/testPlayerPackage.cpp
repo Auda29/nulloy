@@ -58,8 +58,16 @@ class TestPlayerPackage : public QObject
 {
     Q_OBJECT
 private slots:
+    void trashHandleOwnership_data()
+    {
+        QTest::addColumn<QString>("state");
+        for (const QString &state : {QString("playing"), QString("paused"), QString("stopped")})
+            QTest::newRow(qPrintable(state)) << state;
+    }
+
     void trashHandleOwnership()
     {
+        QFETCH(QString, state);
         const QString root = qEnvironmentVariable("NULLOY_NATIVE_TRASH_PLAYER_ROOT");
         if (root.isEmpty()) QSKIP("Explicit disposable native test root required");
         QTemporaryDir directory(root + "/handle-probe-XXXXXX");
@@ -87,17 +95,21 @@ private slots:
         player->playlistWidget()->setFiles({file});
         player->playlistWidget()->playRow(0);
         QTRY_COMPARE(player->playbackEngine()->state(), N::PlaybackPlaying);
+        QTRY_VERIFY(player->playbackEngine()->position() > 0.05);
         check("playing");
-        player->tagReader()->setSource(QString());
-        check("tag-reader-released");
+        if (state == "paused") player->playbackEngine()->pause();
+        if (state == "stopped") player->playbackEngine()->stop();
+        check(qPrintable("requested-state-" + state));
+        // Reverse the former release order to identify residual ownership:
+        // playback NULL alone is not evidence that metadata/waveform are closed.
+        player->playbackEngine()->stop();
+        check("playback-stopped-before-reader-release");
         auto *waveform = dynamic_cast<NWaveformBuilderInterface *>(NPluginLoader::getPlugin(N::WaveformBuilder));
         QVERIFY(waveform);
         waveform->stop();
         check("waveform-stopped");
-        player->playbackEngine()->stop();
-        check("playback-stopped");
         player->tagReader()->setSource(QString());
-        check("tag-reader-released-again");
+        QCOMPARE(check("all-player-readers-released"), DWORD(0));
         player.reset();
         QCOMPARE(check("player-destroyed"), DWORD(0));
     }
@@ -109,7 +121,7 @@ private slots:
         for (const QString &state : {QString("playing"), QString("paused"), QString("stopped")})
             for (const QString &operation : {QString("cancel"), QString("partial"),
                      QString("duplicates"), QString("current"), QString("cancel-current"),
-                     QString("next"), QString("locked")})
+                     QString("next"), QString("locked"), QString("locked-current")})
                 QTest::newRow(qPrintable(state + "-" + operation)) << state << operation;
     }
 
@@ -153,12 +165,15 @@ private slots:
         QCOMPARE(list->count(), 4);
         list->playRow(0);
         QTRY_COMPARE(engine->state(), N::PlaybackPlaying);
+        // Cancellation at position zero does not establish seek/resume safety.
+        QTRY_VERIFY(engine->position() > 0.05);
         if (state == "paused") engine->pause();
         if (state == "stopped") engine->stop();
         const auto initialState = engine->state();
         const qreal initialPosition = engine->position();
         const QString initialMedia = engine->currentMedia();
-        const bool current = operation == "current" || operation == "cancel-current";
+        const bool current = operation == "current" || operation == "cancel-current" ||
+                             operation == "locked-current";
         list->clearSelection();
         list->item(current ? 0 : 1)->setSelected(true);
         if (operation == "partial") list->item(3)->setSelected(true);
@@ -170,8 +185,9 @@ private slots:
             HANDLE value = INVALID_HANDLE_VALUE;
             ~OwnedHandle() { if (value != INVALID_HANDLE_VALUE) CloseHandle(value); }
         } locked;
-        if (operation == "locked") {
-            locked.value = CreateFileW(reinterpret_cast<LPCWSTR>(files[1].utf16()), GENERIC_READ,
+        const bool externallyLocked = operation == "locked" || operation == "locked-current";
+        if (externallyLocked) {
+            locked.value = CreateFileW(reinterpret_cast<LPCWSTR>(files[current ? 0 : 1].utf16()), GENERIC_READ,
                 FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
             QVERIFY(locked.value != INVALID_HANDLE_VALUE);
         }
@@ -207,7 +223,7 @@ private slots:
         // Validate retained bytes and player state even when the current-track
         // recycle expectation fails. Never let an early assertion hide these.
         const bool removed = operation != "cancel" && operation != "cancel-current"
-                             && operation != "locked" && fallbacks == 0;
+                             && !externallyLocked && fallbacks == 0;
         const int removedFile = current ? 0 : 1;
         QStringList expected = {files[0], files[1], files[1], files[2]};
         if (removed) expected.removeAll(files[removedFile]);
@@ -231,7 +247,23 @@ private slots:
             QCOMPARE(engine->currentMedia(), initialMedia);
             if (state != "playing")
                 QCOMPARE(engine->position(), initialPosition);
+            if (state == "paused" && externallyLocked) {
+                // Check settled preroll and the actual subsequent resumed seek,
+                // not merely the engine's cached position immediately on return.
+                QTest::qWait(300);
+                QTRY_COMPARE(engine->state(), N::PlaybackPaused);
+                QVERIFY(qAbs(engine->position() - initialPosition) < 0.015);
+                engine->play();
+                QTRY_COMPARE(engine->state(), N::PlaybackPlaying);
+                QTRY_VERIFY(engine->position() >= initialPosition - 0.015);
+                engine->pause();
+            }
             qInfo() << "cancelled-trash-retained-bytes-playback-state-and-paused-position";
+        }
+        if (removed && current) {
+            QCOMPARE(engine->currentMedia(), files[1]);
+            QCOMPARE(list->playingRow(), 0);
+            QCOMPARE(engine->position(), qreal(0.0));
         }
         list->playNextItem();
         QTRY_COMPARE(engine->state(), N::PlaybackPlaying);
@@ -240,7 +272,7 @@ private slots:
         QVERIFY(expected.contains(engine->currentMedia()));
         engine->stop();
         player->quit();
-        QCOMPARE(fallbacks, operation == "locked" ? 1 : 0);
+        QCOMPARE(fallbacks, externallyLocked ? 1 : 0);
     }
 
     void portableProcesses()

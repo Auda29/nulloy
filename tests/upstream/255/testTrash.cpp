@@ -140,6 +140,52 @@ private slots:
         QCOMPARE(moved, files);
     }
 
+    void operationHooks_data()
+    {
+        QTest::addColumn<QString>("mode");
+        for (const QString &mode : {QString("confirm-cancel"), QString("native-cancel"),
+                 QString("failure-cancel"), QString("permanent-yes"), QString("success")})
+            QTest::newRow(qPrintable(mode)) << mode;
+    }
+
+    void operationHooks()
+    {
+        QFETCH(QString, mode);
+        const QString file = makeFile("hook-" + mode);
+        NSettings::instance()->setValue("DisplayMoveToTrashConfirmDialog", true);
+        m_answers << (mode == "confirm-cancel" ? QMessageBox::Cancel : QMessageBox::Yes);
+        if (mode == "native-cancel") cancelled.insert(file);
+        if (mode == "failure-cancel" || mode == "permanent-yes") {
+            refused.insert(file);
+            m_answers << (mode == "permanent-yes" ? QMessageBox::Yes : QMessageBox::Cancel);
+        }
+        QStringList events;
+        NTrash::OperationHooks hooks;
+        hooks.before = [&](const QString &path) {
+            QCOMPARE(path, file);
+            QCOMPARE(m_dialogTitles.first(), QString("Confirmation"));
+            QVERIFY(QFile::exists(file));
+            events << "before";
+        };
+        hooks.after = [&](const QString &path, bool deleted) {
+            QCOMPARE(path, file);
+            QCOMPARE(QFile::exists(file), !deleted);
+            events << (deleted ? "after-success" : "after-failure");
+        };
+        const bool success = mode == "success" || mode == "permanent-yes";
+        QCOMPARE(NTrash::moveToTrash({file, file}, hooks), success ? QStringList{file} : QStringList{});
+        if (mode == "confirm-cancel") {
+            QVERIFY(events.isEmpty());
+            QVERIFY(attempted.isEmpty());
+        } else {
+            QStringList expected{"before"};
+            if (mode == "permanent-yes") expected << "before";
+            expected << (success ? "after-success" : "after-failure");
+            QCOMPARE(events, expected);
+            QCOMPARE(attempted, QStringList{file});
+        }
+    }
+
     void cancellationReturnsOnlyEarlierSuccesses_data()
     {
         QTest::addColumn<int>("successes");
