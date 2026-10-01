@@ -357,8 +357,10 @@ An optional GStreamer capability closes native readers while retaining logical
 state/position, then restores the same or a surviving replacement track. The
 existing playback interface ABI is unchanged. Tests now include nonzero paused
 positions, an externally locked current track, hook cancellation ordering and six
-standalone engine state/replacement rows. Linux `36849432582` and serial packaged
-Qt5/Qt6 four-skin run `36849430723` are pending. This is a candidate, not a verified
+standalone engine state/replacement rows. Linux `36849432582` passed on exact
+source `ef10249`: trash contract 31/0/0 and playback-file-access 8/0/0 (six data
+rows plus init/cleanup), with no skipped capability test. The serial packaged
+Qt5/Qt6 four-skin run `36849430723` is pending. This is a candidate, not a verified
 fix; it has not been transferred into PR15. Native macOS and VLC remain unverified.
 
 ## Current merge decision (updated 1 October 2026)
