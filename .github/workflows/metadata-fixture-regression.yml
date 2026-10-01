@@ -1,0 +1,60 @@
+name: Metadata fixture repeat and sensitivity
+
+on:
+  push:
+    branches: ['test/windows-open-acceptance']
+    paths: ['.github/workflows/metadata-fixture-regression.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  metadata:
+    runs-on: ubuntu-24.04
+    container: debian:13-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc4017c709b6259bc132
+    timeout-minutes: 12
+    steps:
+      - name: Install real metadata harness dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates git g++ cmake ninja-build pkg-config python3 \
+            qt6-base-dev qt6-5compat-dev libgstreamer1.0-dev \
+            libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-base \
+            gstreamer1.0-plugins-good libtag1-dev ffmpeg xvfb xauth fonts-dejavu-core
+      - uses: actions/checkout@v4
+        with:
+          ref: be7a766f8deb6431cb2aaec5c343c290492e0f34
+          persist-credentials: false
+      - name: Repeat exact PR29 metadata fixture and verify sensitivity
+        run: |
+          mkdir -p /tmp/metadata-evidence
+          git rev-parse HEAD > /tmp/metadata-evidence/source-sha.txt
+          cmake -S tests/upstream/146 -B /tmp/metadata-build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/metadata-build --parallel 2
+          for attempt in 1 2 3; do
+            QT_QPA_PLATFORM=offscreen /tmp/metadata-build/testMetadata146 -o /tmp/metadata-evidence/offscreen-$attempt.txt,txt
+          done
+          QT_QPA_PLATFORM=xcb xvfb-run -a /tmp/metadata-build/testMetadata146 -o /tmp/metadata-evidence/xcb.txt,txt
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path('src/widgetCollection/playlistWidget.cpp')
+          text = source.read_text()
+          old = 'true); // with force'
+          assert text.count(old) == 1
+          source.write_text(text.replace(old, 'false); // sensitivity: disable forced refresh'))
+          PY
+          cmake --build /tmp/metadata-build --parallel 2
+          if QT_QPA_PLATFORM=offscreen /tmp/metadata-build/testMetadata146 shortcutsRefreshMetadata:custom-arrows-no-scroll -o /tmp/metadata-evidence/sensitivity.txt,txt; then
+            echo 'Sensitivity run unexpectedly passed without forced refresh'
+            exit 1
+          fi
+          grep 'stale cached metadata' /tmp/metadata-evidence/sensitivity.txt
+      - name: Preserve repeated tests and sensitivity evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: metadata-fixture-evidence
+          path: /tmp/metadata-evidence/
+          retention-days: 7
