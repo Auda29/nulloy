@@ -393,8 +393,9 @@ Qt5/Qt6 `36843462281`.
 **Fork PR28 merged into integration** on 1 October 2026 at
 `c96ea63a127abd30cdfd83997c6e90e108cfccc1`, following independent tooling-only
 acceptance on head `da34a2b`. The merged diff was checked to leave accepted
-product/test sources unchanged and exclude PR24. Post-merge Linux `36851355719`
-and Windows Qt5/Qt6 `36851357922` are pending, without opt-in package retention.
+product/test sources unchanged and exclude PR24. Post-merge Windows Qt5/Qt6
+`36851357922` passed on exact integration head `c96ea63`, without opt-in package
+retention. Linux `36851355719` is pending.
 
 PR24 and PR15 remain draft/open. PR24 manual acceptance must use a package
 containing its fix; its independent-rapid-open slice was not explicitly confirmed.
