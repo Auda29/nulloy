@@ -330,7 +330,7 @@ Qt5/Qt6 `36840717002` (no opt-in package retention requested).
 `bcd9b63709d373bd932a1e419a299f04b8a44ae6`, following the user's manual hardware
 acceptance and the existing green PR-head/native/package evidence. Integrated
 geometry/regression sources were compared against accepted head `c7ce989` with
-no differences. Post-merge checks are running: Linux `36843441580` and Windows
+no differences. Post-merge checks passed: Linux `36843441580` and Windows
 Qt5/Qt6 `36843462281`.
 
 PR24, PR15 and PR28 remain draft/open. PR24 manual acceptance must use a package
