@@ -293,9 +293,18 @@ PR16 head `c7ce989`, with acceptance references in `docs/upstream/236.md`.
 PR-head checks passed: Linux `36431008436` and Windows Qt5/Qt6 `36431008472`.
 Mixed-DPI and physical hotplug remain outstanding.
 
-## Current merge decision
+## Current merge decision (updated 1 October 2026)
 
-All five functional/test PRs remain drafts. No functional PR was merged into
-integration, and integration was not promoted to master. Original-project PRs
-were not changed. Native component success narrows the remaining work but does
-not override the unexecuted acceptance cases or the player-trash recycling gap.
+**Fork PR29 merged into integration** on 1 October 2026 at
+`783dd82b61cf7450df40518c0658e84bb9911e1d`, after Linux `36839437749` and
+Windows Qt5/Qt6 `36839437766` passed on exact PR head `be7a766`, and the repeated
+fixture/sensitivity check `36839972967` passed. Integrated startup/regression
+sources were compared against that accepted head with no differences.
+
+Post-merge integration verification is running: Linux `36840684870` and
+Windows Qt5/Qt6 `36840717002` (no opt-in package retention requested).
+
+PR24, PR15, PR16 and PR28 remain draft/open. Their outstanding playback,
+recycling, physical-hotplug/mixed-DPI or independent-tooling acceptance is not
+waived by PR29's startup acceptance. Integration has **not** been promoted to
+master. Original-project PRs were not changed.
