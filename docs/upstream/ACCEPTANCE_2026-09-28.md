@@ -333,6 +333,34 @@ not a failed test or a waiver. PR24 remains draft/open and must not be merged on
 the automated checks alone. Resume with the identified combined package (or an
 equivalently verified rebuild) when a suitable machine is available.
 
+## Independent PR28 rebuild and PR15 investigation — 1 October 2026
+
+The user authorized continuing these two tasks while PR24 manual acceptance is
+deferred, and explicitly chose a rebuilt existing PR28 with a leased force-push.
+Former PR28 head `f34c6fd` was preserved on the remote before replacement as
+`archive/2026-10-01/windows-desktop-probe-before-rebuild`.
+
+PR28 was rebuilt on accepted integration `bcd9b63`, with no product-source
+changes or PR24 ancestry. The corrected probe and optional monitor helper are
+tooling only. Source `47274d0` passed 49 local/native-registry contracts and
+serial Qt5/Qt6 builds in run `36848055700`; its four Explorer cases failed the
+additional trace check because integration lacks the combined branch's
+`player-message` events. All four cleanups passed. Those trace failures remain
+failures, not delivery acceptance. Follow-up head `da34a2b` separates the native
+tooling scope (real Explorer, exact UI rows, one observed owned main window and
+cleanup) from the combined-only trace/order check. Independent run `36849863449`
+is pending. The local rebuild branch tracks `origin/test/windows-desktop-probe`.
+
+PR15 candidate `ef10249` on `test/windows-trash-player-acceptance` incorporates
+current accepted integration and post-confirmation file-reader lifetime hooks.
+An optional GStreamer capability closes native readers while retaining logical
+state/position, then restores the same or a surviving replacement track. The
+existing playback interface ABI is unchanged. Tests now include nonzero paused
+positions, an externally locked current track, hook cancellation ordering and six
+standalone engine state/replacement rows. Linux `36849432582` and serial packaged
+Qt5/Qt6 four-skin run `36849430723` are pending. This is a candidate, not a verified
+fix; it has not been transferred into PR15. Native macOS and VLC remain unverified.
+
 ## Current merge decision (updated 1 October 2026)
 
 **Fork PR29 merged into integration** on 1 October 2026 at
