@@ -431,3 +431,17 @@ containing its fix; its independent-rapid-open slice was not explicitly confirme
 The original macOS trash crash remains outside the verified Windows slice.
 Integration has **not**
 been promoted to master. Original-project PRs were not changed.
+
+## User-authorized branch retirement — 1 October 2026
+
+Following the completed integration checks, the user authorized local/remote
+removal of the four merged PR branches (PR29, PR16, PR15, PR28) and the two
+completed geometry/trash package-test branches. The merged heads are preserved
+in integration `0ecd3aa`. The test heads were first preserved by pushed and
+independently verified annotated tags:
+`archive/2026-10-01/windows-geometry-player-acceptance` (`5f82eee`) and
+`archive/2026-10-01/windows-trash-player-acceptance` (`ba1490e`).
+All six branches and their local equivalents are retired; the local PR28 alias
+was `rebuild/windows-desktop-probe`. PR24 branches, integration, master, qml and
+the inspection branch remain. Packages and evidence were retained. See
+`CLEANUP_2026-09-28.md` for exact deleted heads and retained references.
