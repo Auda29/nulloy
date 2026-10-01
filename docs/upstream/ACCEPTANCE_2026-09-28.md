@@ -379,8 +379,9 @@ Final head `9a88d4324acf97dd7118c90bd263c2540c0c1bf4` has product/test/package-
 verification sources identical to candidate `ba1490e`. Its supported Windows
 workflow adds explicit `native_trash_player=false` inputs for dispatch/call;
 real trash actions never run on ordinary PR triggers. Local 49 probe tests and
-7 CI/5 upstream retention contracts pass. Final Linux `36853084955`, Windows
-PR `36853085000`, and explicit native/package `36853083884` checks are pending.
+7 CI/5 upstream retention contracts pass. Final Windows PR `36853085000` passed
+on exact head `9a88d43`, including Qt5/Qt6 and artifact policy. Linux `36853084955`
+and explicit native/package `36853083884` checks are pending.
 PR15 remains draft until those final-head checks pass. Native macOS and VLC
 remain unverified; the original macOS crash is not declared resolved.
 
