@@ -152,8 +152,17 @@ private slots:
             next->setShortcuts({"Down"});
         }
         QVERIFY(!playlist->viewport()->rect().intersects(playlist->visualItemRect(playlist->item(19))));
-        // This row has not been loaded by the visible-item metadata pass.
-        QCOMPARE(playlist->item(19)->data(N::DurationRole).toInt(), -1);
+        // Offscreen does not imply unread: the production visible-item pass
+        // prefetches beyond the viewport, and can populate the whole list.
+        // Establish unread metadata immediately before activation instead of
+        // depending on layout/timer ordering during fixture construction.
+        auto markUnread = [this](int row) {
+            auto *item = playlist->itemAtRow(row);
+            item->setData(N::DurationRole, -1);
+            item->setData(N::TitleFormatRole, QString());
+            item->setText("unread metadata");
+            QCOMPARE(item->data(N::DurationRole).toInt(), -1);
+        };
         QSet<int> ids;
         for (int row = 0; row < 20; ++row)
             ids.insert(playlist->item(row)->data(N::IdRole).toInt());
@@ -166,6 +175,7 @@ private slots:
             ++observed;
             verifyCurrent(expectedRow);
         });
+        markUnread(0);
         playlist->playRow(0);
         QTRY_COMPARE(engine->state(), N::PlaybackPlaying);
         verifyCurrent(0);
@@ -174,6 +184,7 @@ private slots:
         QSignalSpy prevTriggered(previous, &QAction::triggered);
         for (int row = 1; row < 20; ++row) {
             expectedRow = row;
+            markUnread(row);
             QTest::keyClick(playlist, arrows ? Qt::Key_Down : Qt::Key_B);
             // Decode/STREAM_START is asynchronous; metadata must already be
             // correct inside playingItemChanged above, not after a paint wait.
