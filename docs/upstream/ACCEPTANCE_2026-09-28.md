@@ -303,9 +303,17 @@ manual hotplug/mixed-DPI slice, not an additional automated CI run.
 
 The user also reports having already accepted the #24 manual playlist/playback
 slice (populated playlists in playing/paused states, content/order/current title/
-position). The tested package/source identity has not yet been supplied. That
-report is retained, but package attribution is required before the PR24 merge
-decision; independently rapid opens were not explicitly named in the report.
+position), then identified it as the **same version/package used for #16**.
+The supplied corrected geometry package is source `5f82eee`; inspection confirms
+it is not descended from PR24 head `21848c1` and does not contain
+`src/fileOpenBurst.h`. The report is therefore baseline/package-behavior evidence,
+not manual acceptance of the PR24 implementation. Independently rapid opens were
+not explicitly named in the report. PR24 is not merged on that evidence.
+
+To remove the package mismatch, merge `22ed03e` assembles the current accepted
+integration (PR29 and PR16) with the existing PR24 test candidate and diagnostic
+probe on `test/windows-open-acceptance`. A fresh combined package will give the
+user the accepted geometry implementation plus the actual PR24 policy to test.
 
 ## Current merge decision (updated 1 October 2026)
 
@@ -325,7 +333,7 @@ geometry/regression sources were compared against accepted head `c7ce989` with
 no differences. Post-merge checks are running: Linux `36843441580` and Windows
 Qt5/Qt6 `36843462281`.
 
-PR24, PR15 and PR28 remain draft/open. PR24 manual acceptance needs package
-attribution; its independent-rapid-open slice was not explicitly confirmed.
+PR24, PR15 and PR28 remain draft/open. PR24 manual acceptance must use a package
+containing its fix; its independent-rapid-open slice was not explicitly confirmed.
 PR15 recycling and PR28 independent-tooling gaps remain. Integration has **not**
 been promoted to master. Original-project PRs were not changed.
