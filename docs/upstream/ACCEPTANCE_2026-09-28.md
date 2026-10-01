@@ -323,7 +323,8 @@ EXE SHA-256: `a231f27777954ced66ba349998863c59bc415f866bda727bd72e84368ec282f2`.
 Manual executable: `%LOCALAPPDATA%/Temp/opencode/nulloy-acceptance-20260928/`
 `pr24-manual-player/NulloyFork/NulloyFork.exe`. It was extracted into a new
 disposable portable directory without starting it or changing user settings.
-Nine-scenario matrix `36845642787` is running against this exact package;
+Nine-scenario matrix `36845642787` passed **9/9** against this exact package,
+with matching source identity and all nine cleanup checks verified;
 manual populated-playlist/position and independent-open acceptance is pending.
 
 ## Current merge decision (updated 1 October 2026)
