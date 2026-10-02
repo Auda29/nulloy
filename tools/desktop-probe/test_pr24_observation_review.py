@@ -6,6 +6,15 @@ from unittest.mock import patch
 import pr24_playback as p
 
 class ReviewTests(unittest.TestCase):
+    def test_trace_path_identity_resolves_short_long_aliases(self):
+        with patch.object(p.os.path,'samefile',return_value=True):
+            self.assertTrue(hasattr(p,'same_message'),'path identity comparator missing')
+            self.assertTrue(p.same_message('C:/Users/RUNNER~1/a.wav','C:/Users/runneradmin/a.wav'))
+        with patch.object(p.os.path,'samefile',side_effect=OSError()):
+            self.assertFalse(p.same_message('C:/a.wav','C:/b.wav'))
+        self.assertTrue(p.same_message('--next','--next'))
+        self.assertFalse(p.same_message('--next','--stop'))
+
     def test_restored_cases_cover_all_preferences_and_states(self):
         specs=[p.CASE_SPECS[name] for name in p.CASES_BY_GROUP['restored']]
         self.assertEqual({(s.enqueue,s.play_enqueued,s.initial_state) for s in specs},

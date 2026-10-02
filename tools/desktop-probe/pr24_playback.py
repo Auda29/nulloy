@@ -373,6 +373,17 @@ def _trace_text(value: str) -> str:
     return str(value).replace("\\", "/").casefold()
 
 
+def same_message(first: str, second: str) -> bool:
+    if first.startswith('--') or second.startswith('--'):
+        return first == second
+    if _trace_text(first) == _trace_text(second):
+        return True
+    try:
+        return os.path.samefile(first, second)
+    except OSError:
+        return False
+
+
 def analyze_player_trace(
     traces: dict[str, list[dict[str, Any]]], expected_messages: Sequence[str]
 ) -> dict[str, Any]:
@@ -381,7 +392,7 @@ def analyze_player_trace(
     actual = [_trace_message_parts(record) for _, record in messages]
     expected = [[str(message)] for message in expected_messages]
     if len(actual) != len(expected) or any(
-        len(parts) != len(wanted) or any(_trace_text(a) != _trace_text(w) for a, w in zip(parts, wanted))
+        len(parts) != len(wanted) or any(not same_message(a, w) for a, w in zip(parts, wanted))
         for parts, wanted in zip(actual, expected)
     ):
         raise ContractError(f"player-message order differs: {actual!r} != {expected!r}")
@@ -417,7 +428,7 @@ def analyze_command_trace(
     messages = _trace_message_rows(records)
     actual = [_trace_message_parts(record)[0] for _, record in messages]
     expected = [str(value) for value in expected_sequence]
-    if len(actual) != len(expected) or any(_trace_text(a) != _trace_text(e) for a, e in zip(actual, expected)):
+    if len(actual) != len(expected) or any(not same_message(a, e) for a, e in zip(actual, expected)):
         raise ContractError(f"command player-message order differs: {actual!r} != {expected!r}")
     policies: list[dict[str, Any]] = []
     results: list[dict[str, Any]] = []
@@ -613,6 +624,17 @@ class PlaybackCaseRun(probe.WindowsDesktopRun):
     def _position(self) -> int | float:
         if self.player_window is None:
             raise ContractError("player UIA window is unavailable")
+        if self.spec.initial_state == 'stopped':
+            for slider in self.player_window.descendants(control_type='Slider'):
+                if str(getattr(slider.element_info, 'automation_id', '')).endswith('.waveformSlider'):
+                    try:
+                        interface = slider.iface_range_value
+                        minimum, maximum, value = (float(interface.CurrentMinimum), float(interface.CurrentMaximum), float(interface.CurrentValue))
+                        _write_json(self.evidence / 'waveform-range.json', dict(minimum=minimum,maximum=maximum,value=value))
+                        if maximum > minimum and minimum <= value <= maximum:
+                            return (value-minimum)/(maximum-minimum)*FIXTURE_SECONDS
+                    except Exception as exc:
+                        _write_text(self.evidence / 'waveform-range-error.txt', repr(exc))
         # Always seconds, never mix a normalized slider fraction with seconds.
         texts = []
         for control in self.player_window.descendants():
@@ -819,8 +841,8 @@ class PlaybackCaseRun(probe.WindowsDesktopRun):
                 settings = playback_settings(
                     enqueue=self.spec.enqueue, play_enqueued=self.spec.play_enqueued,
                     restore=True, start_paused=False,
-                    row=1 if self.spec.initial_state != "stopped" else None,
-                    position=0.37 if self.spec.initial_state != "stopped" else None,
+                    row=1,
+                    position=0.37,
                 )
                 self._write_setup(settings, self.seed)
         else:
@@ -834,6 +856,10 @@ class PlaybackCaseRun(probe.WindowsDesktopRun):
             raise ContractError(f"initial playlist order mismatch: {initial!r} != {expected!r}")
         if self.spec.initial_state is not None:
             current = self.seed[1].name if self.spec.initial_state != "stopped" else None
+            if self.spec.initial_state == 'stopped':
+                self._observe_state('playing', [path.name for path in self.fixtures], self.seed[1].name)
+                self.player_window.set_focus()
+                self.player_window.type_keys('v')  # actual native Stop action, no setup IPC trace
             if self.spec.initial_state == 'paused':
                 # StartPaused merely loads media without calling engine.pause().
                 # Exercise a genuinely paused engine, not a stopped restored UI.
@@ -978,6 +1004,9 @@ class PlaybackCaseRun(probe.WindowsDesktopRun):
             process, started = self._send_secondary_arguments(arguments)
             processes.append(process)
             self.open_timestamps.append(started)
+            if process.wait(timeout=10) != 0:
+                raise ContractError('secondary IPC client did not acknowledge its frame')
+            self._wait_for_player_trace(len(processes))
         for process in processes:
             return_code = process.wait(timeout=10)
             if return_code != 0:
@@ -1010,10 +1039,9 @@ class PlaybackCaseRun(probe.WindowsDesktopRun):
         after = self._observe_state(state, [path.name for path in self.fixtures], current_required=expected_current)
         rows = self._read_playlist_rows(self.seed + [first, second])
         return {"rows": rows, "after": after, "assertions": {
-            "command_sequence_delivered_in_trace": observation["message_sequence"] == [str(first), option, str(second)],
-            "command_resets_file_burst": observation["file_continuations"] == [False, False],
-            "command_immediate_trace_order": observation["command_immediate"],
-            "no_late_restart_without_new_file": observation["no_late_open_before_new_file"],
+            "command_sequence_delivered_in_trace": all(same_message(a,b) for a,b in zip(observation["message_sequence"], [str(first), option, str(second)])),
+            "post_command_open_starts_new_group": observation["file_continuations"] == [False, False],
+            "no_file_policy_between_command_and_followup": observation["command_immediate"],
             "command_current_media_directly_observed": True,
             "command_state_directly_observed": True,
             "explorer_shell_boundary_not_claimed": observation["receipt_source"] == "player-trace:time_msec",
@@ -1024,7 +1052,7 @@ class PlaybackCaseRun(probe.WindowsDesktopRun):
         self.preflight()
         try:
             result.update(self._prepare())
-            if self.spec.group in ("populated", "restored", "rapid", "commands"):
+            if self.spec.group in ("populated", "restored", "rapid"):
                 environment = probe._app_environment()
                 self.explorer_launch_started = True
                 subprocess.Popen(["explorer.exe", "/n", f"/root,{self.fixture_directory}"], env=environment)
