@@ -55,6 +55,113 @@ private slots:
         player->playbackEngine()->stop();
         player.reset();
     }
+    void optionalPlayerTrace_data()
+    {
+        QTest::addColumn<QString>("mode");
+        QTest::newRow("enabled") << QString("enabled");
+        QTest::newRow("disabled") << QString("disabled");
+        QTest::newRow("unavailable-directory") << QString("unavailable");
+    }
+    void optionalPlayerTrace()
+    {
+        QFETCH(QString, mode);
+        QTemporaryDir trace;
+        QVERIFY(trace.isValid());
+        const bool hadVariable = qEnvironmentVariableIsSet("NULLOY_STARTUP_TRACE_DIR");
+        const QByteArray oldValue = qgetenv("NULLOY_STARTUP_TRACE_DIR");
+        const auto restore = qScopeGuard([&]() {
+            if (hadVariable) qputenv("NULLOY_STARTUP_TRACE_DIR", oldValue);
+            else qunsetenv("NULLOY_STARTUP_TRACE_DIR");
+        });
+        const QString directory = mode == "unavailable" ? trace.filePath("missing/child") : trace.path();
+        qputenv("NULLOY_STARTUP_TRACE_DIR", directory.toUtf8());
+        if (mode == "disabled") qunsetenv("NULLOY_STARTUP_TRACE_DIR");
+        player->readMessage(files[0]);
+        player->readMessage(files[1]);
+        player->readMessage("");
+        player->readMessage(media.filePath("missing.wav"));
+        auto *list = player->playlistWidget();
+        QCOMPARE(list->count(), 2);
+        QCOMPARE(list->itemAtRow(0)->data(N::PathRole).toString(), files[0]);
+        QCOMPARE(list->itemAtRow(1)->data(N::PathRole).toString(), files[1]);
+        QTRY_COMPARE(list->playingRow(), 0);
+        QTRY_COMPARE(player->playbackEngine()->state(), N::PlaybackPlaying);
+        player->readMessage("--stop");
+        QTRY_COMPARE(player->playbackEngine()->state(), N::PlaybackStopped);
+        QFile log(QDir(directory).filePath(QString::number(QCoreApplication::applicationPid()) + ".jsonl"));
+        if (mode != "enabled") {
+            QVERIFY(!log.exists());
+            return;
+        }
+        QVERIFY(log.open(QIODevice::ReadOnly));
+        QList<QJsonObject> records;
+        while (!log.atEnd()) {
+            const QByteArray line = log.readLine();
+            QJsonParseError parseError;
+            const QJsonDocument document = QJsonDocument::fromJson(line, &parseError);
+            QCOMPARE(parseError.error, QJsonParseError::NoError);
+            QVERIFY(document.isObject());
+            const QJsonObject record = document.object();
+            if (record["event"].toString().startsWith("player-")) records << record;
+        }
+        QCOMPARE(records.size(), 9);
+        QCOMPARE(records[0]["event"].toString(), QString("player-message"));
+        QCOMPARE(records[0]["message"].toString(), files[0]);
+        QCOMPARE(records[0]["rows_before"].toInt(), 0);
+        QCOMPARE(records[1]["event"].toString(), QString("player-open-policy"));
+        QCOMPARE(records[1]["enqueue"].toBool(), false);
+        QCOMPARE(records[1]["play_enqueued"].toBool(), true);
+        QVERIFY(records[1]["continuation"].isBool());
+        QCOMPARE(records[1]["continuation"].toBool(), false);
+        QCOMPARE(records[2]["event"].toString(), QString("player-open-result"));
+        QCOMPARE(records[2]["rows"].toArray(), QJsonArray::fromStringList({files[0]}));
+        QVERIFY(records[2]["playing_row"].isDouble());
+        QCOMPARE(records[3]["event"].toString(), QString("player-message"));
+        QCOMPARE(records[3]["message"].toString(), files[1]);
+        QCOMPARE(records[3]["rows_before"].toInt(), 1);
+        QCOMPARE(records[4]["event"].toString(), QString("player-open-policy"));
+        QCOMPARE(records[4]["continuation"].toBool(), true);
+        QCOMPARE(records[5]["event"].toString(), QString("player-open-result"));
+        QCOMPARE(records[5]["rows"].toArray(), QJsonArray::fromStringList({files[0], files[1]}));
+        QCOMPARE(records[6]["event"].toString(), QString("player-message"));
+        QCOMPARE(records[6]["message"].toString(), QString());
+        QCOMPARE(records[7]["event"].toString(), QString("player-message"));
+        QCOMPARE(records[7]["message"].toString(), media.filePath("missing.wav"));
+        QCOMPARE(records[8]["event"].toString(), QString("player-message"));
+        QCOMPARE(records[8]["message"].toString(), QString("--stop"));
+        // Turning tracing off must stop writes even when the output already exists.
+        const qint64 previousSize = log.size();
+        qunsetenv("NULLOY_STARTUP_TRACE_DIR");
+        player->readMessage(files[2]);
+        QCOMPARE(log.size(), previousSize);
+        QCOMPARE(list->count(), 1);
+        QCOMPARE(list->itemAtRow(0)->data(N::PathRole).toString(), files[2]);
+    }
+    void traceWritesAfterPlaylistAction()
+    {
+        QTemporaryDir trace;
+        QVERIFY(trace.isValid());
+        const bool hadVariable = qEnvironmentVariableIsSet("NULLOY_STARTUP_TRACE_DIR");
+        const QByteArray oldValue = qgetenv("NULLOY_STARTUP_TRACE_DIR");
+        const auto restore = qScopeGuard([&]() {
+            if (hadVariable) qputenv("NULLOY_STARTUP_TRACE_DIR", oldValue);
+            else qunsetenv("NULLOY_STARTUP_TRACE_DIR");
+        });
+        qputenv("NULLOY_STARTUP_TRACE_DIR", trace.path().toUtf8());
+        const QString logPath = QDir(trace.path()).filePath(
+            QString::number(QCoreApplication::applicationPid()) + ".jsonl");
+        bool traceSeenDuringPlaylistChange = false;
+        int changesObserved = 0;
+        const auto connection = QObject::connect(player->playlistWidget(), &NPlaylistWidget::itemsChanged, this, [&]() {
+            ++changesObserved;
+            traceSeenDuringPlaylistChange = traceSeenDuringPlaylistChange || QFile::exists(logPath);
+        });
+        const auto disconnect = qScopeGuard([&]() { QObject::disconnect(connection); });
+        player->readMessage(files[0]);
+        QVERIFY(changesObserved > 0);
+        QVERIFY(!traceSeenDuringPlaylistChange);
+        QVERIFY(QFile::exists(logPath));
+    }
     void boundedPolicy()
     {
         NFileOpenBurst burst;
