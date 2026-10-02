@@ -11,9 +11,10 @@ This policy changes package retention, not package construction or testing.
   the Qt6 package and evidence and publishes validated release assets. Existing
   release assets and tags are untouched; published assets are not subject to this
   Actions-artifact retention setting.
-- Test evidence is still uploaded with `always()`, including failed runs. Its
-  existing repository-default retention and all paths are unchanged. This patch
-  does not shorten the lifetime of reports, logs or screenshots.
+- Test evidence is uploaded with `always()`, including failed runs, with the
+  integration branch's **7-day** retention. All evidence paths are preserved.
+- Windows Qt5/Qt6 jobs run serially (`max-parallel: 1`), preserving integration's
+  existing scheduling policy and both sets of checks.
 
 ## Acceptance and reference packages
 
@@ -31,10 +32,12 @@ silently substituting another build.
 
 ## Branch boundaries
 
-This change targets `master` only. The existing integration policy already has
-package opt-in and three-day package retention; it is not reimplemented or changed
-here. Its Windows evidence has seven-day retention, unlike master's preserved
-default. Linux evidence retention is intentionally left unchanged as well.
+The policy originally landed on `master` in PR #31. On 2026-09-28, `master` was
+merged into `integration/upstream-issues`. The combined policy retains integration's
+serial Windows matrix and seven-day evidence retention, and adds master's
+lightweight policy-contract CI job. Both policies use explicit package opt-in and
+three-day package retention. Linux evidence retention is unchanged. `master`
+itself still has its earlier policy until integration is accepted and merged back.
 
 Active fix/test branches retain their own workflow copies until a separately
 reviewed policy-only update is applied. In particular the Explorer probe consumes
@@ -48,6 +51,7 @@ an acceptance workflow. No product/test branches are merged by this change.
 ```sh
 python -m pip install PyYAML==6.0.2
 python tools/ci/test-artifact-policy.py
+python tools/upstream/test-artifact-policy.py
 python tools/release/test-alpha.py
 python tools/phase4/test-import-profile.py
 ```

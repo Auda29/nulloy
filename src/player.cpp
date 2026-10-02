@@ -21,10 +21,13 @@
 #include "actionManager.h"
 #include "common.h"
 #include "coverWidget.h"
+#include "fileOpenBurst.h"
 #include "i18nLoader.h"
 #include "logDialog.h"
 #include "mainWindow.h"
 #include "playbackEngineInterface.h"
+#include "playbackFileAccessInterface.h"
+#include "platform/trash.h"
 #include "playlistDataItem.h"
 #include "playlistStorage.h"
 #include "playlistWidget.h"
@@ -39,6 +42,9 @@
 #include "tagEditorDialog.h"
 #include "trackInfoReader.h"
 #include "trackInfoWidget.h"
+#include "tagReaderInterface.h"
+#include "coverReaderInterface.h"
+#include "waveformBuilderInterface.h"
 #ifndef _N_NO_UPDATE_CHECK_
 #include "updateChecker.h"
 #endif
@@ -68,10 +74,13 @@
 #include <QMessageBox>
 #include <QMetaObject>
 #include <QResizeEvent>
+#include <QScopedValueRollback>
 #include <QToolTip>
+#include <qtlocalpeertrace.h>
 
 NPlayer::NPlayer()
 {
+    m_fileOpenBurst = new NFileOpenBurst(this);
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     preserveLegacyWindowsAppearance();
 #endif
@@ -386,10 +395,28 @@ bool NPlayer::eventFilter(QObject *obj, QEvent *event)
 
 void NPlayer::readMessage(const QString &str)
 {
+    // Opt-in local diagnostics only; avoid collecting playlist paths when off.
+    const bool traceEnabled = !qEnvironmentVariableIsEmpty("NULLOY_STARTUP_TRACE_DIR");
+    const int rowsBefore = traceEnabled ? m_playlistWidget->count() : 0;
+    QJsonObject policy;
+    QJsonObject result;
+    bool hasPolicy = false;
+    bool hasResult = false;
+    const auto emitTrace = [&]() {
+        if (!traceEnabled)
+            return;
+        // Keep entry data and the event order, but do all file IO after processing.
+        startupTrace("player-message", {{"message", str}, {"rows_before", rowsBefore}});
+        if (hasPolicy)
+            startupTrace("player-open-policy", policy);
+        if (hasResult)
+            startupTrace("player-open-result", result);
+    };
     if (str.isEmpty()) {
         m_mainWindow->show();
         m_mainWindow->activateWindow();
         m_mainWindow->raise();
+        emitTrace();
         return;
     }
     QStringList argList = str.split(MSG_SPLITTER);
@@ -405,26 +432,45 @@ void NPlayer::readMessage(const QString &str)
 
     foreach (QString arg, options) {
         if (arg == "--next") {
+            m_fileOpenBurst->reset();
             m_playlistWidget->playNextItem();
+            emitTrace();
             return;
         } else if (arg == "--prev") {
+            m_fileOpenBurst->reset();
             m_playlistWidget->playPrevItem();
+            emitTrace();
             return;
         } else if (arg == "--stop") {
+            m_fileOpenBurst->reset();
             m_playbackEngine->stop();
+            emitTrace();
             return;
         } else if (arg == "--pause") {
+            m_fileOpenBurst->reset();
             m_playbackEngine->play();
+            emitTrace();
             return;
         }
     }
 
     if (!files.isEmpty()) {
-        if (NSettings::instance()->value("EnqueueFiles").toBool()) {
+        const bool enqueue = NSettings::instance()->value("EnqueueFiles").toBool();
+        const bool playEnqueued = NSettings::instance()->value("PlayEnqueued").toBool();
+        // Shell selections can arrive as several launches/messages. Apply the
+        // original policy immediately once, then append this bounded burst.
+        const bool continuation = m_fileOpenBurst->isContinuation(enqueue, playEnqueued);
+        if (traceEnabled) {
+            policy = {{"enqueue", enqueue}, {"play_enqueued", playEnqueued},
+                      {"continuation", continuation}};
+            hasPolicy = true;
+        }
+        if (continuation) {
+            m_playlistWidget->addFiles(files);
+        } else if (enqueue) {
             int lastRow = m_playlistWidget->count();
             m_playlistWidget->addFiles(files);
-            if (m_playbackEngine->state() == N::PlaybackStopped ||
-                NSettings::instance()->value("PlayEnqueued").toBool()) {
+            if (m_playbackEngine->state() == N::PlaybackStopped || playEnqueued) {
                 m_playlistWidget->playRow(lastRow);
                 m_playbackEngine->setPosition(0); // overrides setPosition() in loadDefaultPlaylist()
             }
@@ -432,7 +478,16 @@ void NPlayer::readMessage(const QString &str)
             m_playlistWidget->setFiles(files);
             m_playlistWidget->playRow(0);
         }
+        if (traceEnabled) {
+            QStringList rows;
+            for (int row = 0; row < m_playlistWidget->count(); ++row)
+                rows << m_playlistWidget->item(row)->data(N::PathRole).toString();
+            result = {{"rows", QJsonArray::fromStringList(rows)},
+                      {"playing_row", m_playlistWidget->playingRow()}};
+            hasResult = true;
+        }
     }
+    emitTrace();
 }
 
 void NPlayer::loadDefaultPlaylist()
@@ -443,11 +498,15 @@ void NPlayer::loadDefaultPlaylist()
     }
 
     QStringList playlistRowValues = m_settings->value("PlaylistRow").toStringList();
-    if (!playlistRowValues.isEmpty()) {
-        int row = playlistRowValues.at(0).toInt();
-        qreal pos = playlistRowValues.at(1).toFloat();
+    if (playlistRowValues.size() == 2) {
+        bool rowOk = false;
+        bool posOk = false;
+        int row = playlistRowValues.at(0).toInt(&rowOk);
+        qreal pos = playlistRowValues.at(1).toFloat(&posOk);
 
-        if (row < 0 || row > m_playlistWidget->count() - 1) {
+        // Ignore a damaged session instead of selecting or playing an unintended track.
+        if (!rowOk || !posOk || !qIsFinite(pos) || pos < 0.0 || pos > 1.0 ||
+            row < 0 || row >= m_playlistWidget->count()) {
             return;
         }
 
@@ -727,6 +786,67 @@ void NPlayer::playPause()
             m_playbackEngine->play();
         }
     }
+}
+
+void NPlayer::moveSelectedFilesToTrash()
+{
+    if (m_trashInProgress) return;
+    const QStringList files = m_playlistWidget->selectedFiles();
+    if (files.isEmpty()) return;
+    QScopedValueRollback<bool> inProgress(m_trashInProgress, true);
+    auto *access = qobject_cast<NPlaybackFileAccessInterface *>(m_playbackEngine);
+    auto *waveform = dynamic_cast<NWaveformBuilderInterface *>(NPluginLoader::getPlugin(N::WaveformBuilder));
+    QString media;
+    int context = 0, row = -1;
+    qreal position = 0.0;
+    N::PlaybackState state = N::PlaybackStopped;
+    bool suspended = false;
+    NTrash::OperationHooks hooks;
+    hooks.before = [&](const QString &) {
+        if (access && (!suspended || m_playbackEngine->currentMedia() != media ||
+                       m_playbackEngine->state() != state ||
+                       m_playbackEngine->position() != position)) {
+            media = m_playbackEngine->currentMedia();
+            row = m_playlistWidget->playingRow();
+            context = row >= 0 ? m_playlistWidget->item(row)->data(N::IdRole).toInt() : 0;
+            position = m_playbackEngine->position();
+            state = m_playbackEngine->state();
+            access->suspendFileAccess();
+            suspended = true;
+        }
+        if (waveform) waveform->stop();
+        tagReader()->setSource(QString());
+        if (m_coverReader) m_coverReader->setSource(QString());
+    };
+    hooks.after = [&](const QString &file, bool deleted) {
+        const bool restore = suspended && m_playbackEngine->currentMedia() == media &&
+                             m_playbackEngine->state() == state &&
+                             m_playbackEngine->position() == position;
+        if (deleted) m_playlistWidget->removeFiles({file});
+        if (restore) {
+            if (deleted && media == file) {
+                // Continue with the surviving row at the old index, or the last
+                // remaining row. A paused/stopped player must not start playing.
+                const int nextRow = qMin(row, m_playlistWidget->count() - 1);
+                if (nextRow >= 0) {
+                    auto *next = m_playlistWidget->item(nextRow);
+                    access->restoreFileAccess(next->data(N::PathRole).toString(),
+                        next->data(N::IdRole).toInt(), 0.0, state);
+                } else {
+                    m_playbackEngine->setMedia(QString(), 0);
+                }
+            } else {
+                access->restoreFileAccess(media, context, position, state);
+            }
+        }
+        suspended = false;
+        const QString current = m_playbackEngine->currentMedia();
+        if (!current.isEmpty() && QFileInfo::exists(current)) {
+            tagReader()->setSource(current);
+            m_waveformSlider->setMedia(current);
+        }
+    };
+    NTrash::moveToTrash(files, hooks);
 }
 
 void NPlayer::showAboutDialog()

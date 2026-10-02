@@ -10,10 +10,18 @@ on:
         description: 'Retain downloadable packages for 3 days; archive acceptance references separately'
         type: boolean
         default: false
+      native_trash_player:
+        description: 'Opt in to real player recycle tests using generated disposable files only'
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       upload_packages:
         description: 'Retain packages for downstream consumers such as the release workflow'
+        type: boolean
+        default: false
+      native_trash_player:
+        description: 'Opt in to native player trash acceptance; never enable for untrusted PR code'
         type: boolean
         default: false
 
@@ -33,10 +41,12 @@ jobs:
         run: |
           python -m pip install PyYAML==6.0.2
           python tools/ci/test-artifact-policy.py
+          python tools/upstream/test-artifact-policy.py
 
   windows:
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         include:
           - qt: 5
@@ -98,6 +108,11 @@ jobs:
           for mode in missing corrupt changed-plugin; do
             python tools/phase2/verify-package.py --prefix "$(cygpath -m /mingw64)" --build ${{ matrix.build }} --headless-audio --trace-startup --registry-fallback "$mode"
           done
+      - name: Verify real player trash matrix
+        if: inputs.native_trash_player == true
+        shell: msys2 {0}
+        run: |
+          python tools/phase2/verify-package.py --prefix "$(cygpath -m /mingw64)" --build ${{ matrix.build }} --headless-audio --native-trash-root C:/nulloy-player-trash-${{ github.run_id }}-qt${{ matrix.qt }}
       - name: Verify audio formats and Unicode tag roundtrips
         shell: msys2 {0}
         run: |
@@ -125,6 +140,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Windows-Qt${{ matrix.qt }}-test-evidence
+          retention-days: 7
           path: |
             ${{ matrix.build }}/*-results.txt
             ${{ matrix.build }}/toolchain.txt

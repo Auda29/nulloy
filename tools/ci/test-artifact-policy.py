@@ -48,10 +48,10 @@ class ArtifactPolicy(unittest.TestCase):
             'master', 'codex/phase-2-*', 'codex/phase-3-*', 'codex/phase-4-*']})
         self.assertEqual(load('alpha-release.yml')['on']['push']['tags'], ['v*-alpha.*'])
 
-    def test_evidence_is_not_gated_or_shortened(self):
+    def test_evidence_is_not_gated_and_keeps_integration_retention(self):
         evidence = self.steps['Upload test evidence']
         self.assertEqual(evidence['if'], 'always()')
-        self.assertNotIn('retention-days', evidence['with'])
+        self.assertEqual(evidence['with'].get('retention-days'), '7')
         self.assertEqual(evidence['with']['name'], 'Windows-Qt${{ matrix.qt }}-test-evidence')
         self.assertEqual(evidence['with']['path'].splitlines(), [
             '${{ matrix.build }}/*-results.txt', '${{ matrix.build }}/toolchain.txt',
@@ -63,7 +63,7 @@ class ArtifactPolicy(unittest.TestCase):
     def test_build_matrix_and_checks_are_not_upload_gated(self):
         job = self.windows['jobs']['windows']
         self.assertNotIn('if', job)
-        self.assertNotIn('max-parallel', job['strategy'])
+        self.assertEqual(job['strategy'].get('max-parallel'), '1')
         self.assertEqual(job['strategy']['fail-fast'], 'false')
         matrix = job['strategy']['matrix']['include']
         self.assertEqual([(m['qt'], m['preset'], m['build']) for m in matrix], [
@@ -90,6 +90,37 @@ class ArtifactPolicy(unittest.TestCase):
         commands = '\n'.join(s.get('run', '') for s in job['steps'])
         self.assertIn('python -m pip install PyYAML==6.0.2', commands)
         self.assertIn('python tools/ci/test-artifact-policy.py', commands)
+
+    def test_desktop_tooling_is_dispatch_only_and_separate_from_pr24(self):
+        workflow = load('desktop-probe.yml')
+        self.assertNotIn('push', workflow['on'])
+        self.assertEqual(workflow['permissions'], {'contents': 'read'})
+        jobs = workflow['jobs']
+        for name in ('build', 'explorer'):
+            self.assertEqual(jobs[name]['if'], "github.event_name == 'workflow_dispatch'")
+        self.assertEqual(jobs['build']['uses'], './.github/workflows/windows-cmake.yml')
+        self.assertEqual(jobs['build']['with'], {'upload_packages': 'true'})
+        steps = jobs['explorer']['steps']
+        checkout = next(step for step in steps if step.get('uses') == 'actions/checkout@v4')
+        self.assertEqual(checkout['with']['persist-credentials'], 'false')
+        upload = next(step for step in steps if step.get('uses') == 'actions/upload-artifact@v4')
+        self.assertEqual(upload['if'], 'always()')
+        self.assertEqual(upload['with']['retention-days'], '7')
+        commands = '\n'.join(step.get('run', '') for step in steps)
+        self.assertIn("'--enqueue', 'true', '--play-enqueued', 'false'", commands)
+        self.assertIn('@(3, 12)', commands)
+        self.assertIn('$result.cleanup_verified', commands)
+        self.assertNotIn('--trace-startup', commands)
+
+    def test_native_trash_player_requires_explicit_opt_in(self):
+        for event in ('workflow_dispatch', 'workflow_call'):
+            spec = self.windows['on'][event]['inputs']['native_trash_player']
+            self.assertEqual(spec['type'], 'boolean')
+            self.assertEqual(spec['default'], 'false')
+        step = self.steps['Verify real player trash matrix']
+        self.assertEqual(step['if'], 'inputs.native_trash_player == true')
+        self.assertIn('--native-trash-root C:/nulloy-player-trash-', step['run'])
+        self.assertIn('${{ github.run_id }}-qt${{ matrix.qt }}', step['run'])
 
 
 if __name__ == '__main__':

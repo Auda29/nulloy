@@ -18,19 +18,20 @@
 #include <QProcess>
 
 #include "settings.h"
+#include "trash.h"
 
-int _trash(const QString &file, QString *error)
+NTrash::NativeResult _trash(const QString &file, QString *error)
 {
     bool customTrash = NSettings::instance()->value("CustomTrash").toBool();
     if (!customTrash) {
         *error = QString(QObject::tr("Custom Trash Command is not configured."));
-        return -1;
+        return {-1, false};
     }
 
     QString cmd = NSettings::instance()->value("CustomTrashCommand").toString();
     if (cmd.isEmpty()) {
         *error = QString(QObject::tr("Custom Trash Command is enabled but not configured."));
-        return -1;
+        return {-1, false};
     }
 
     QFileInfo fileInfo(file);
@@ -52,8 +53,8 @@ int _trash(const QString &file, QString *error)
     if (res != 0) {
         *error =
             QString(QObject::tr("Custom Trash Command failed with exit code <b>%1</b>.")).arg(res);
-        return -1;
+        return {-1, false};
     }
 
-    return 0;
+    return {0, false};
 }

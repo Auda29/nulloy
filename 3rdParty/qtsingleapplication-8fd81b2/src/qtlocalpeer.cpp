@@ -41,9 +41,11 @@
 
 
 #include "qtlocalpeer.h"
+#include "qtlocalpeertrace.h"
 #include <QCoreApplication>
 #include <QTime>
 #include <QDataStream>
+#include <QElapsedTimer>
 
 #if defined(Q_OS_WIN)
 #include <QLibrary>
@@ -66,7 +68,7 @@ namespace QtLP_Private {
 #endif
 }
 
-const char* QtLocalPeer::ack = "ack";
+static const char* ack = "ack";
 
 QtLocalPeer::QtLocalPeer(QObject* parent, const QString &appId)
     : QObject(parent), id(appId)
@@ -75,6 +77,21 @@ QtLocalPeer::QtLocalPeer(QObject* parent, const QString &appId)
     if (id.isEmpty()) {
         id = QCoreApplication::applicationFilePath();
 #if defined(Q_OS_WIN)
+        // A short 8.3 launch path and Explorer's long path identify the same
+        // executable. Keep distinct installed/portable copies independent.
+        const QString canonical = QFileInfo(id).canonicalFilePath();
+        if (!canonical.isEmpty())
+            id = canonical;
+        // QFileInfo resolves links but preserves Windows 8.3 spelling.
+        const QString native = QDir::toNativeSeparators(id);
+        const DWORD length = GetLongPathNameW(reinterpret_cast<LPCWSTR>(native.utf16()), nullptr, 0);
+        if (length) {
+            QVector<wchar_t> buffer(length);
+            const DWORD written = GetLongPathNameW(
+                reinterpret_cast<LPCWSTR>(native.utf16()), buffer.data(), length);
+            if (written && written < length)
+                id = QDir::fromNativeSeparators(QString::fromWCharArray(buffer.constData(), written));
+        }
         id = id.toLower();
 #endif
         prefix = id.section(QLatin1Char('/'), -1);
@@ -111,18 +128,55 @@ QtLocalPeer::QtLocalPeer(QObject* parent, const QString &appId)
                        + QLatin1String("-lockfile");
     lockFile.setFileName(lockName);
     lockFile.open(QIODevice::ReadWrite);
+    startupTrace("peer-created", {{"id", id}, {"socket", socketName},
+                                 {"lock", lockName}, {"lock_open", lockFile.isOpen()}});
 }
 
 
+
+QtLocalPeer::~QtLocalPeer()
+{
+    if (receiverThread) {
+        receiverThread->requestInterruption();
+        receiverThread->quit();
+        receiverThread->wait();
+    }
+}
+
+void QtLocalPeer::startBackgroundReceiver()
+{
+    Q_ASSERT(QThread::currentThread() == thread());
+    if (receiverThread || !lockFile.isLocked() || !server->isListening())
+        return;
+    disconnect(server, nullptr, this, nullptr);
+    // Keep the native election mutex on its acquiring thread; only transfer
+    // socket IO. Pending connections migrate together with their server.
+    server->setParent(nullptr);
+    auto *receiver = new QtLocalPeerReceiver(server);
+    receiverThread = new QThread(this);
+    connect(receiver, &QtLocalPeerReceiver::messageReceived,
+            this, &QtLocalPeer::messageReceived, Qt::QueuedConnection);
+    connect(receiverThread, &QThread::finished, receiver, &QObject::deleteLater);
+    receiver->moveToThread(receiverThread);
+    receiverThread->start();
+    QMetaObject::invokeMethod(receiver, "drainConnections", Qt::QueuedConnection);
+}
 
 bool QtLocalPeer::isClient()
 {
     if (lockFile.isLocked())
         return false;
 
-    if (!lockFile.lock(QtLP_Private::QtLockedFile::WriteLock, false))
+    if (!lockFile.lock(QtLP_Private::QtLockedFile::WriteLock, false)) {
+        startupTrace("peer-client", {{"socket", socketName}});
         return true;
+    }
 
+    // On Windows listen() can accept a pipe and emit newConnection before it
+    // returns. Subscribe first, and defer delivery until the caller has wired
+    // its application receiver; otherwise that initial notification is lost.
+    QObject::connect(server, SIGNAL(newConnection()), this, SLOT(receiveConnection()),
+                     Qt::QueuedConnection);
     bool res = server->listen(socketName);
 #if defined(Q_OS_UNIX) && (QT_VERSION >= QT_VERSION_CHECK(4,5,0))
     // ### Workaround
@@ -133,13 +187,16 @@ bool QtLocalPeer::isClient()
 #endif
     if (!res)
         qWarning("QtSingleCoreApplication: listen on local socket failed, %s", qPrintable(server->errorString()));
-    QObject::connect(server, SIGNAL(newConnection()), SLOT(receiveConnection()));
+    startupTrace("peer-primary", {{"socket", socketName}, {"listening", res},
+                                 {"pending", server->hasPendingConnections()},
+                                 {"error", server->errorString()}});
     return false;
 }
 
 
 bool QtLocalPeer::sendMessage(const QString &message, int timeout)
 {
+    startupTrace("send-begin", {{"message", message}, {"timeout", timeout}, {"socket", socketName}});
     if (!isClient())
         return false;
 
@@ -159,51 +216,110 @@ bool QtLocalPeer::sendMessage(const QString &message, int timeout)
         nanosleep(&ts, NULL);
 #endif
     }
+    startupTrace("send-connected", {{"connected", connOk}, {"error", socket.errorString()}});
     if (!connOk)
         return false;
 
     QByteArray uMsg(message.toUtf8());
     QDataStream ds(&socket);
     ds.writeBytes(uMsg.constData(), uMsg.size());
-    bool res = socket.waitForBytesWritten(timeout);
+    bool res = !socket.bytesToWrite() || socket.waitForBytesWritten(timeout);
     if (res) {
-        res &= socket.waitForReadyRead(timeout);   // wait for ack
+        QElapsedTimer timer;
+        timer.start();
+        while (socket.bytesAvailable() < qint64(qstrlen(ack))) {
+            const int remaining = timeout - int(timer.elapsed());
+            if (remaining <= 0 || !socket.waitForReadyRead(remaining)) {
+                res = false;
+                break;
+            }
+        }
         if (res)
-            res &= (socket.read(qstrlen(ack)) == ack);
+            res = (socket.read(qstrlen(ack)) == ack);
     }
+    startupTrace("send-end", {{"acknowledged", res}, {"error", socket.errorString()}});
     return res;
 }
 
 
 void QtLocalPeer::receiveConnection()
 {
+    // A queued notification from before migration may still reach this slot.
+    if (receiverThread)
+        return;
     QLocalSocket* socket = server->nextPendingConnection();
     if (!socket)
         return;
+    QString message;
+    if (QtLocalPeerReceiver::readMessage(socket, &message))
+        emit messageReceived(message);
+}
 
-    while (socket->bytesAvailable() < (int)sizeof(quint32))
-        socket->waitForReadyRead();
+QtLocalPeerReceiver::QtLocalPeerReceiver(QLocalServer *listener) : server(listener)
+{
+    server->setParent(this);
+    connect(server, &QLocalServer::newConnection,
+            this, &QtLocalPeerReceiver::drainConnections, Qt::QueuedConnection);
+}
+
+void QtLocalPeerReceiver::drainConnections()
+{
+    while (!QThread::currentThread()->isInterruptionRequested()) {
+        QLocalSocket *socket = server->nextPendingConnection();
+        if (!socket)
+            break;
+        QString message;
+        if (readMessage(socket, &message))
+            emit messageReceived(message);
+    }
+}
+
+bool QtLocalPeerReceiver::readMessage(QLocalSocket *socket, QString *message)
+{
+    startupTrace("receive-connection", {{"available", double(socket->bytesAvailable())}});
+    QElapsedTimer deadline;
+    deadline.start();
+    auto waitForData = [&] {
+        const int remaining = 2000 - int(deadline.elapsed());
+        return remaining > 0 && socket->waitForReadyRead(remaining);
+    };
+    while (socket->bytesAvailable() < (int)sizeof(quint32)) {
+        if (!waitForData()) {
+            qWarning("QtLocalPeer: Incomplete message header: %s", qPrintable(socket->errorString()));
+            delete socket;
+            return false;
+        }
+    }
     QDataStream ds(socket);
     QByteArray uMsg;
     quint32 remaining;
     ds >> remaining;
+    // Bound an untrusted local frame before allocating or waiting for it.
+    if (remaining > 1024 * 1024) {
+        delete socket;
+        return false;
+    }
     uMsg.resize(remaining);
     int got = 0;
     char* uMsgBuf = uMsg.data();
     do {
         got = ds.readRawData(uMsgBuf, remaining);
+        if (got < 0)
+            break;
         remaining -= got;
         uMsgBuf += got;
-    } while (remaining && got >= 0 && socket->waitForReadyRead(2000));
-    if (got < 0) {
+    } while (remaining && waitForData());
+    if (got < 0 || remaining) {
         qWarning("QtLocalPeer: Message reception failed %s", socket->errorString().toLatin1().constData());
         delete socket;
-        return;
+        return false;
     }
-    QString message(QString::fromUtf8(uMsg));
+    *message = QString::fromUtf8(uMsg);
+    startupTrace("receive-frame", {{"message", *message}, {"remaining", double(remaining)}});
     socket->write(ack, qstrlen(ack));
     socket->waitForBytesWritten(1000);
     socket->waitForDisconnected(1000); // make sure client reads ack
     delete socket;
-    emit messageReceived(message); //### (might take a long time to return)
+    startupTrace("receive-dispatch", {{"message", *message}});
+    return true;
 }

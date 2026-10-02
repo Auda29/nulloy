@@ -58,6 +58,226 @@ class TestPlayerPackage : public QObject
 {
     Q_OBJECT
 private slots:
+    void trashHandleOwnership_data()
+    {
+        QTest::addColumn<QString>("state");
+        for (const QString &state : {QString("playing"), QString("paused"), QString("stopped")})
+            QTest::newRow(qPrintable(state)) << state;
+    }
+
+    void trashHandleOwnership()
+    {
+        QFETCH(QString, state);
+        const QString root = qEnvironmentVariable("NULLOY_NATIVE_TRASH_PLAYER_ROOT");
+        if (root.isEmpty()) QSKIP("Explicit disposable native test root required");
+        QTemporaryDir directory(root + "/handle-probe-XXXXXX");
+        QVERIFY(directory.isValid());
+        const QString file = directory.filePath("owned-tone.wav");
+        QVERIFY(QFile::copy(QCoreApplication::applicationDirPath() + "/tests/01.wav", file));
+        auto *settings = NSettings::instance();
+        settings->setValue("RestorePlaylist", false);
+        settings->setValue("DisplayLogDialog", false);
+        settings->setValue("Volume", 0.0);
+#if !defined(_N_NO_SKINS_) && QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+        NSkinFileSystem::init();
+#endif
+        auto player = std::make_unique<NPlayer>();
+        auto check = [&](const char *stage) {
+            HANDLE handle = CreateFileW(reinterpret_cast<LPCWSTR>(file.utf16()), DELETE,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+            const DWORD error = handle == INVALID_HANDLE_VALUE ? GetLastError() : 0;
+            if (handle != INVALID_HANDLE_VALUE) CloseHandle(handle);
+            qInfo() << "delete-access" << stage << "win32-error" << error;
+            return error;
+        };
+        QCOMPARE(check("before-load"), DWORD(0));
+        player->playlistWidget()->setFiles({file});
+        player->playlistWidget()->playRow(0);
+        QTRY_COMPARE(player->playbackEngine()->state(), N::PlaybackPlaying);
+        QTRY_VERIFY(player->playbackEngine()->position() > 0.05);
+        check("playing");
+        if (state == "paused") player->playbackEngine()->pause();
+        if (state == "stopped") player->playbackEngine()->stop();
+        check(qPrintable("requested-state-" + state));
+        // Reverse the former release order to identify residual ownership:
+        // playback NULL alone is not evidence that metadata/waveform are closed.
+        player->playbackEngine()->stop();
+        check("playback-stopped-before-reader-release");
+        auto *waveform = dynamic_cast<NWaveformBuilderInterface *>(NPluginLoader::getPlugin(N::WaveformBuilder));
+        QVERIFY(waveform);
+        waveform->stop();
+        check("waveform-stopped");
+        player->tagReader()->setSource(QString());
+        QCOMPARE(check("all-player-readers-released"), DWORD(0));
+        player.reset();
+        QCOMPARE(check("player-destroyed"), DWORD(0));
+    }
+
+    void trashPlayer_data()
+    {
+        QTest::addColumn<QString>("state");
+        QTest::addColumn<QString>("operation");
+        for (const QString &state : {QString("playing"), QString("paused"), QString("stopped")})
+            for (const QString &operation : {QString("cancel"), QString("partial"),
+                     QString("duplicates"), QString("current"), QString("cancel-current"),
+                     QString("next"), QString("locked"), QString("locked-current")})
+                QTest::newRow(qPrintable(state + "-" + operation)) << state << operation;
+    }
+
+    void trashPlayer()
+    {
+        const QString testRoot = qEnvironmentVariable("NULLOY_NATIVE_TRASH_PLAYER_ROOT");
+        if (testRoot.isEmpty())
+            QSKIP("Native player recycling requires an explicit disposable test root");
+        QFETCH(QString, state);
+        QFETCH(QString, operation);
+        QTemporaryDir directory(testRoot + "/player-trash-XXXXXX");
+        QVERIFY(directory.isValid());
+        const QString sample = QCoreApplication::applicationDirPath() + "/tests/01.wav";
+        QFile original(sample);
+        QVERIFY(original.open(QIODevice::ReadOnly));
+        const QByteArray bytes = original.readAll();
+        QStringList files;
+        for (int i = 0; i < 3; ++i) {
+            const QString file = directory.filePath(QString::fromUtf8("tone-ä-%1.wav").arg(i));
+            QVERIFY(QFile::copy(sample, file));
+            files << file;
+        }
+        auto *settings = NSettings::instance();
+        settings->clear();
+        delete settings;
+        settings = NSettings::instance();
+        settings->setValue("Skin", qEnvironmentVariable("NULLOY_TEST_SKIN", "Slim/0.9")
+            .replace("Native/", "Native (Built-in)/"));
+        settings->setValue("Language", "en");
+        settings->setValue("RestorePlaylist", false);
+        settings->setValue("DisplayMoveToTrashConfirmDialog", true);
+        settings->setValue("DisplayLogDialog", false);
+        settings->setValue("Volume", 0.0);
+#if !defined(_N_NO_SKINS_) && QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+        NSkinFileSystem::init();
+#endif
+        auto player = std::make_unique<NPlayer>();
+        auto *list = player->playlistWidget();
+        auto *engine = player->playbackEngine();
+        list->addFiles({files[0], files[1], files[1], files[2]});
+        QCOMPARE(list->count(), 4);
+        list->playRow(0);
+        QTRY_COMPARE(engine->state(), N::PlaybackPlaying);
+        // Cancellation at position zero does not establish seek/resume safety.
+        QTRY_VERIFY(engine->position() > 0.05);
+        if (state == "paused") engine->pause();
+        if (state == "stopped") engine->stop();
+        const auto initialState = engine->state();
+        const qreal initialPosition = engine->position();
+        const QString initialMedia = engine->currentMedia();
+        const bool current = operation == "current" || operation == "cancel-current" ||
+                             operation == "locked-current";
+        list->clearSelection();
+        list->item(current ? 0 : 1)->setSelected(true);
+        if (operation == "partial") list->item(3)->setSelected(true);
+        if (operation == "duplicates") list->item(2)->setSelected(true);
+
+        // A Windows handle without FILE_SHARE_DELETE forces a real recycle
+        // failure; cancelling the player's permanent-delete question must retain bytes.
+        struct OwnedHandle {
+            HANDLE value = INVALID_HANDLE_VALUE;
+            ~OwnedHandle() { if (value != INVALID_HANDLE_VALUE) CloseHandle(value); }
+        } locked;
+        const bool externallyLocked = operation == "locked" || operation == "locked-current";
+        if (externallyLocked) {
+            locked.value = CreateFileW(reinterpret_cast<LPCWSTR>(files[current ? 0 : 1].utf16()), GENERIC_READ,
+                // TagLib can already hold read/write access to the current
+                // file. Allow both, but deliberately deny FILE_SHARE_DELETE.
+                FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+            QVERIFY2(locked.value != INVALID_HANDLE_VALUE,
+                qPrintable(QString("Could not create external delete lock: Win32 %1").arg(GetLastError())));
+        }
+        int confirmations = 0, fallbacks = 0, unexpected = 0;
+        QSet<QMessageBox *> seen;
+        QTimer dialogs;
+        connect(&dialogs, &QTimer::timeout, [&]() {
+            auto *box = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
+            if (!box || seen.contains(box)) return;
+            seen.insert(box);
+            connect(box, &QObject::destroyed, [&seen, box]() { seen.remove(box); });
+            QMessageBox::StandardButton answer = QMessageBox::Cancel;
+            if (box->windowTitle() == "Confirmation") {
+                ++confirmations;
+                if (operation != "cancel" && operation != "cancel-current"
+                    && !(operation == "partial" && confirmations == 2))
+                    answer = QMessageBox::Yes;
+            } else if (box->windowTitle() == "Trash Error") {
+                ++fallbacks;
+                qInfo() << "native-trash-error" << box->text() << box->informativeText();
+            } else {
+                ++unexpected;
+            }
+            box->done(answer);
+        });
+        dialogs.start(10);
+        auto *action = player->findChild<NAction *>("MoveToTrashAction");
+        QVERIFY(action);
+        action->trigger();
+        dialogs.stop();
+        QCOMPARE(unexpected, 0);
+        QCOMPARE(confirmations, operation == "partial" ? 2 : 1);
+        // Validate retained bytes and player state even when the current-track
+        // recycle expectation fails. Never let an early assertion hide these.
+        const bool removed = operation != "cancel" && operation != "cancel-current"
+                             && !externallyLocked && fallbacks == 0;
+        const int removedFile = current ? 0 : 1;
+        QStringList expected = {files[0], files[1], files[1], files[2]};
+        if (removed) expected.removeAll(files[removedFile]);
+        QCOMPARE(list->count(), expected.size());
+        for (int i = 0; i < expected.size(); ++i)
+            QCOMPARE(list->item(i)->data(N::PathRole).toString(), expected[i]);
+        for (int i = 0; i < files.size(); ++i) {
+            if (removed && i == removedFile) {
+                QVERIFY(!QFile::exists(files[i]));
+            } else {
+                QFile retained(files[i]);
+                QVERIFY(retained.open(QIODevice::ReadOnly));
+                QCOMPARE(retained.readAll(), bytes);
+            }
+        }
+        // Preserve pause/stop; require the next explicit play action to resolve
+        // to a surviving file after removing the playing item or its successor.
+        if (state != "playing" || !current || !removed)
+            QCOMPARE(engine->state(), initialState);
+        if (!removed) {
+            QCOMPARE(engine->currentMedia(), initialMedia);
+            if (state != "playing")
+                QCOMPARE(engine->position(), initialPosition);
+            if (state == "paused" && externallyLocked) {
+                // Check settled preroll and the actual subsequent resumed seek,
+                // not merely the engine's cached position immediately on return.
+                QTest::qWait(300);
+                QTRY_COMPARE(engine->state(), N::PlaybackPaused);
+                QVERIFY(qAbs(engine->position() - initialPosition) < 0.015);
+                engine->play();
+                QTRY_COMPARE(engine->state(), N::PlaybackPlaying);
+                QTRY_VERIFY(engine->position() >= initialPosition - 0.015);
+                engine->pause();
+            }
+            qInfo() << "cancelled-trash-retained-bytes-playback-state-and-paused-position";
+        }
+        if (removed && current) {
+            QCOMPARE(engine->currentMedia(), files[1]);
+            QCOMPARE(list->playingRow(), 0);
+            QCOMPARE(engine->position(), qreal(0.0));
+        }
+        list->playNextItem();
+        QTRY_COMPARE(engine->state(), N::PlaybackPlaying);
+        QVERIFY(list->playingRow() >= 0);
+        QVERIFY(QFile::exists(list->item(list->playingRow())->data(N::PathRole).toString()));
+        QVERIFY(expected.contains(engine->currentMedia()));
+        engine->stop();
+        player->quit();
+        QCOMPARE(fallbacks, externallyLocked ? 1 : 0);
+    }
+
     void portableProcesses()
     {
         const QString otherExe = qEnvironmentVariable("NULLOY_TEST_SECOND_PLAYER");
