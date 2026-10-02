@@ -174,11 +174,28 @@ def expected_final_state(messages: Sequence[str]) -> dict[str, Any]:
 def validate_file_results(
     observations: Sequence[dict[str, Any]], messages: Sequence[str], continuations=None,
 ) -> list[dict[str, Any]]:
-    """Require each result to be the independently expected replacement row."""
+    """Validate immediate rows; asynchronous media loading may still be pending.
+
+    NPlaylistWidget::playRow calls setMedia/play; mediaChanged subsequently sets
+    playingItem. The immediate result trace may therefore report -1, not zero.
+    Only -1 or the independent expected row is admissible here. This is NOT
+    settled playback evidence: the caller must still require the expected media
+    label and advancing position through _observe_state after the entire burst.
+    """
     expected = expected_file_results(messages, continuations)
-    actual = [dict(rows=observation.get('result',{}).get('rows'), playing_row=observation.get('result',{}).get('playing_row')) for observation in observations]
-    if len(actual) != len(expected) or any(a['playing_row'] != e['playing_row'] or not isinstance(a['rows'],list) or len(a['rows']) != len(e['rows']) or any(not _same_message(x,y) for x,y in zip(a['rows'],e['rows'])) for a,e in zip(actual,expected)):
-        raise ContractError(f"player-open-result rows differ: {actual!r} != {expected!r}")
+    actual = [dict(rows=observation.get('result', {}).get('rows'),
+                   playing_row=observation.get('result', {}).get('playing_row'))
+              for observation in observations]
+    if len(actual) != len(expected):
+        raise ContractError('player-open-result count differs')
+    for observed, wanted in zip(actual, expected):
+        rows = observed['rows']
+        if (type(observed['playing_row']) is not int
+                or observed['playing_row'] not in (-1, wanted['playing_row'])
+                or not isinstance(rows, list) or len(rows) != len(wanted['rows'])
+                or any(not isinstance(a, str) or not _same_message(a, b)
+                       for a, b in zip(rows, wanted['rows']))):
+            raise ContractError(f'player-open-result differs: {observed!r} != {wanted!r} (pending row -1 allowed)')
     return actual
 
 
@@ -419,7 +436,7 @@ def _write_summary(output: Path, cases: Sequence[dict[str, Any]]) -> dict[str, A
         "cases": list(cases),
         "counts": counts,
         "cleanup_verified": bool(cases) and all(
-            case.get("status") == "PASS" and case.get("cleanup_verified") is True
+            case.get("cleanup_verified") is True
             for case in cases
         ),
     }

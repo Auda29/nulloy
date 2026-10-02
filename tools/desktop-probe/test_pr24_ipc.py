@@ -177,6 +177,25 @@ class SetupAndRunnerContracts(unittest.TestCase):
         self.assertEqual(ipc.RESULT_SCHEMA_VERSION, 1)
 
 
+class NativeSnapshotContracts(unittest.TestCase):
+    def test_summary_cleanup_is_independent_of_acceptance(self):
+        with tempfile.TemporaryDirectory() as directory:
+            summary = ipc._write_summary(Path(directory), [
+                {'case': 'ipc_short', 'status': 'FAIL', 'cleanup_verified': True}])
+        self.assertEqual(summary['status'], 'FAIL')
+        self.assertTrue(summary['cleanup_verified'])
+
+
+    def test_result_allows_pending_media_but_not_wrong_playing_row(self):
+        # playRow initiates asynchronous media loading; mediaChanged sets playingRow.
+        observations = [{'result': {'rows': ['D:/fixtures/a.wav'], 'playing_row': -1}}]
+        actual = ipc.validate_file_results(observations, [r'D:\fixtures\a.wav'])
+        self.assertEqual(actual[0]['playing_row'], -1)
+        observations[0]['result']['playing_row'] = 1
+        with self.assertRaises(ipc.ContractError):
+            ipc.validate_file_results(observations, [r'D:\fixtures\a.wav'])
+
+
 class IndependentOracleReview(unittest.TestCase):
     def test_short_burst_keeps_all_rows_not_original_per_message_bug(self):
         expected=ipc.expected_file_results(['a','b','c'],[False,True,True])
