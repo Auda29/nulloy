@@ -65,7 +65,7 @@ jobs:
           $hash = (Get-FileHash $packages[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($hash -ne '039c21768668d69649ee6950b9039f16b6fde0ec0835e2f8f8278ba3a79fe9be') { throw 'Original package SHA256 mismatch' }
           @{run=$env:GITHUB_RUN_ID; probe=$env:GITHUB_SHA; package_run='36843804143'; zip_sha256=$hash; platform='windows-2022'; audio_hardware_tested=$false; windows11_tested=$false} | ConvertTo-Json | Set-Content evidence/runner.json
-          python tools/desktop-probe/pr24_playback.py --package $packages[0].FullName --source-sha be5b1e88286c1ff0bbe7e298e3585bbfb248aba5 --output evidence --group $env:CASE_GROUP
+          python tools/desktop-probe/pr24_playback.py --package $packages[0].FullName --source-sha be5b1e88286c1ff0bbe7e298e3585bbfb248aba5 --output evidence --group $env:CASE_GROUP --headless-audio --case-timeout 180
           exit $LASTEXITCODE
       - name: Preserve raw observations even on failure
         if: always()
