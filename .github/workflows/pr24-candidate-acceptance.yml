@@ -1,4 +1,4 @@
-name: PR24 updated-candidate acceptance preflight
+name: PR24 updated-candidate playback and IPC acceptance
 
 on:
   push:
@@ -29,12 +29,12 @@ jobs:
   windows:
     needs: contracts
     runs-on: windows-2022
-    timeout-minutes: 10
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       max-parallel: 2
       matrix:
-        probe: [playback, ipc]
+        probe: [populated, restored, commands, ipc]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,7 +46,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           github-token: ${{ github.token }}
-          run-id: '36991823896'
+          run-id: '36995053598'
           name: Nulloy-Qt6-windows-x64
           path: package
       - name: Observe exact unmodified PR candidate
@@ -58,12 +58,12 @@ jobs:
           $packages = @(Get-ChildItem package -Filter '*.zip' -Recurse)
           if ($packages.Count -ne 1) { throw 'Expected one candidate package' }
           $hash = (Get-FileHash $packages[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($hash -ne 'e9f94e6045333b111b492079df0584fc0a3f5834fa884fab3d261a005f15164e') { throw 'Candidate package mismatch' }
-          @{run=$env:GITHUB_RUN_ID; probe=$env:GITHUB_SHA; zip_sha256=$hash; package_run='36991823896'; candidate='aa78a3352497ca7ba431e9aa0ff50e820e95048a'; scope='observer compatibility preflight, not complete matrix'; audio_hardware_tested=$false; windows11_tested=$false} | ConvertTo-Json | Set-Content evidence/runner.json
+          if ($hash -ne '2327a4a5e5599e7788f595c4babb83595aef37939d2375b8c72cca1edf53614f') { throw 'Candidate package mismatch' }
+          @{run=$env:GITHUB_RUN_ID; probe=$env:GITHUB_SHA; zip_sha256=$hash; package_run='36995053598'; candidate='7b292852a85bd6a40a99cd7d7813660250ed5b3d'; scope='populated, settled restored, commands and IPC; manual risks accepted separately'; audio_hardware_tested=$false; windows11_tested=$false} | ConvertTo-Json | Set-Content evidence/runner.json
           if ($env:PROBE -eq 'ipc') {
-            python tools/desktop-probe/pr24_ipc.py --package $packages[0].FullName --source-sha aa78a3352497ca7ba431e9aa0ff50e820e95048a --output evidence --case ipc_short --headless-audio
+            python tools/desktop-probe/pr24_ipc.py --package $packages[0].FullName --source-sha 7b292852a85bd6a40a99cd7d7813660250ed5b3d --output evidence --case all --headless-audio
           } else {
-            python tools/desktop-probe/pr24_playback.py --package $packages[0].FullName --source-sha aa78a3352497ca7ba431e9aa0ff50e820e95048a --output evidence --case populated_enqueue_false_play_false_playing --headless-audio --case-timeout 180
+            python tools/desktop-probe/pr24_playback.py --package $packages[0].FullName --source-sha 7b292852a85bd6a40a99cd7d7813660250ed5b3d --output evidence --group $env:PROBE --headless-audio --case-timeout 180
           }
           exit $LASTEXITCODE
       - uses: actions/upload-artifact@v4
