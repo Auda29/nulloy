@@ -47,7 +47,7 @@ class CliAndMatrixContracts(unittest.TestCase):
 
     def test_matrix_is_twelve_populated_state_policy_cases_plus_restored_rapid_commands(self):
         self.assertEqual(len(probe.CASES_BY_GROUP["populated"]), 12)
-        self.assertEqual(len(probe.CASES_BY_GROUP["restored"]), 3)
+        self.assertEqual(len(probe.CASES_BY_GROUP["restored"]), 12)
         self.assertGreaterEqual(len(probe.CASES_BY_GROUP["rapid"]), 3)
         self.assertGreaterEqual(len(probe.CASES_BY_GROUP["commands"]), 4)
         self.assertEqual(set(probe.all_case_names()), set(sum(
@@ -108,9 +108,9 @@ class FixtureAndPersistenceContracts(unittest.TestCase):
             enqueue=False, play_enqueued=True, restore=True,
             start_paused=True, row=1, position=0.37,
         )
-        self.assertIn("PlaylistTrackInfo=%i|%F", settings)
+        self.assertIn("PlaylistTrackInfo=%i - %F", settings)
         self.assertIn("[TrackInfo]\n", settings)
-        self.assertIn("BottomRight=%T", settings)
+        self.assertIn("MiddleRight=%T", settings)
         self.assertIn("PlaylistRow=1,0.37", settings)
         self.assertEqual(probe.read_persisted_row(settings), (1, 0.37))
         with self.assertRaises(probe.ContractError):

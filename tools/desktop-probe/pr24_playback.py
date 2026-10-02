@@ -73,10 +73,12 @@ def _make_cases() -> tuple[dict[str, list[str]], dict[str, CaseSpec]]:
                 spec = CaseSpec(name, "populated", enqueue, play_enqueued, state)
                 groups["populated"].append(name)
                 specs[name] = spec
-    for state in ("playing", "paused", "stopped"):
-        name = f"restored_{state}"
-        groups["restored"].append(name)
-        specs[name] = CaseSpec(name, "restored", restored=True, initial_state=state)
+    for enqueue in (False, True):
+        for play_enqueued in (False, True):
+            for state in ("playing", "paused", "stopped"):
+                name = f"restored_enqueue_{str(enqueue).lower()}_play_{str(play_enqueued).lower()}_{state}"
+                groups['restored'].append(name)
+                specs[name] = CaseSpec(name, 'restored', enqueue, play_enqueued, state, restored=True)
     rapid = (
         ("rapid_open_boundary", "burst"),
         ("rapid_idle_boundary", "idle"),
@@ -177,7 +179,7 @@ def playback_settings(
         "TrayIcon=false",
         "MinimizeToTray=false",
         "QuitOnClose=true",
-        "PlaylistTrackInfo=%i|%F",
+        "PlaylistTrackInfo=%i - %F",
         "WindowTitleTrackInfo=%F",
 
     ]
@@ -187,14 +189,14 @@ def playback_settings(
         if row < 0 or not math.isfinite(position) or not 0 <= position <= 1:
             raise ContractError("invalid persisted playlist row")
         lines.append(f"PlaylistRow={row},{position:g}")
-    lines.extend(["[TrackInfo]", "TopLeft=%F", "MiddleCenter=%F", "BottomRight=%T"])
+    lines.extend(["[TrackInfo]", "MiddleCenter=%F", "MiddleRight=%T", "BottomRight="])
     return "\n".join(lines) + "\n"
 
 
 def indexed_rows(labels: Sequence[str]) -> list[str]:
     rows = []
     for index, label in enumerate(labels, 1):
-        match = re.fullmatch(r"(\d+)\|(.+)", label.strip())
+        match = re.fullmatch(r"(\d+) - (.+)", label.strip())
         if not match or int(match.group(1)) != index:
             raise ContractError(f"incorrect visible playlist index: {label!r}, expected {index}")
         rows.append(match.group(2))
@@ -293,6 +295,159 @@ def rapid_continuations(timestamps: Sequence[float]) -> list[bool]:
         if not continuation:
             burst_start = current
     return result
+
+
+def _primary_player_trace(traces: dict[str, list[dict[str, Any]]]) -> tuple[str, list[dict[str, Any]]]:
+    candidates = [
+        (name, records)
+        for name, records in traces.items()
+        if any(record.get("event") == "player-message" for record in records)
+    ]
+    if not candidates:
+        raise BlockedError("primary player trace has no player-message records")
+    if len(candidates) != 1:
+        raise BlockedError(f"primary player trace is ambiguous: {[name for name, _ in candidates]!r}")
+    return candidates[0]
+
+
+def _trace_message_parts(record: dict[str, Any]) -> list[str]:
+    message = record.get("message")
+    if not isinstance(message, str) or not message:
+        return []
+    return [part for part in message.split("<|>") if part]
+
+
+def _trace_clock_value(record: dict[str, Any]) -> tuple[str, float]:
+    # qtlocalpeertrace.h in the pinned package emits time_msec from
+    # QDateTime::currentMSecsSinceEpoch().  It does not emit a monotonic field.
+    # Keep the source explicit so wall-clock observations cannot become a timing
+    # acceptance by accident.
+    if isinstance(record.get("monotonic"), (int, float)) and math.isfinite(float(record["monotonic"])):
+        return "monotonic", float(record["monotonic"])
+    value = record.get("time_msec")
+    if isinstance(value, (int, float)) and math.isfinite(float(value)):
+        return "time_msec", float(value)
+    raise BlockedError("player trace record has no finite receipt clock")
+
+
+def _trace_clock(records: Sequence[dict[str, Any]]) -> tuple[str, list[float]]:
+    sources: list[str] = []
+    values: list[float] = []
+    for record in records:
+        source, value = _trace_clock_value(record)
+        sources.append(source)
+        values.append(value)
+    if not sources or len(set(sources)) != 1:
+        raise BlockedError("player trace mixes or omits receipt clock fields")
+    if any(current < previous for previous, current in zip(values, values[1:])):
+        raise ContractError("player trace receipt clock is not ordered")
+    return sources[0], values
+
+
+def _trace_message_rows(records: Sequence[dict[str, Any]]) -> list[tuple[int, dict[str, Any]]]:
+    return [
+        (index, record)
+        for index, record in enumerate(records)
+        if record.get("event") == "player-message" and _trace_message_parts(record)
+    ]
+
+
+def _trace_followup(records: Sequence[dict[str, Any]], message_index: int) -> tuple[dict[str, Any], dict[str, Any]]:
+    followups: list[dict[str, Any]] = []
+    for record in records[message_index + 1:]:
+        if record.get("event") == "player-message":
+            break
+        if record.get("event") in ("player-open-policy", "player-open-result"):
+            followups.append(record)
+    if [record.get("event") for record in followups] != ["player-open-policy", "player-open-result"]:
+        raise ContractError("player file message lacks one immediate policy/result pair")
+    policy, result = followups
+    if not isinstance(policy.get("continuation"), bool):
+        raise ContractError("player-open-policy lacks a boolean continuation field")
+    if not isinstance(result.get("rows"), list):
+        raise ContractError("player-open-result lacks a playlist rows array")
+    return policy, result
+
+
+def _trace_text(value: str) -> str:
+    return str(value).replace("\\", "/").casefold()
+
+
+def analyze_player_trace(
+    traces: dict[str, list[dict[str, Any]]], expected_messages: Sequence[str]
+) -> dict[str, Any]:
+    primary_name, records = _primary_player_trace(traces)
+    messages = _trace_message_rows(records)
+    actual = [_trace_message_parts(record) for _, record in messages]
+    expected = [[str(message)] for message in expected_messages]
+    if len(actual) != len(expected) or any(
+        len(parts) != len(wanted) or any(_trace_text(a) != _trace_text(w) for a, w in zip(parts, wanted))
+        for parts, wanted in zip(actual, expected)
+    ):
+        raise ContractError(f"player-message order differs: {actual!r} != {expected!r}")
+    message_records = [record for _, record in messages]
+    source, receipt_times = _trace_clock(message_records)
+    policies: list[dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
+    for message_index, _ in messages:
+        policy, result = _trace_followup(records, message_index)
+        policies.append(policy)
+        results.append(result)
+    return {
+        "primary_process": primary_name,
+        "messages": message_records,
+        "policies": policies,
+        "results": results,
+        "continuations": [bool(policy.get("continuation")) for policy in policies],
+        "receipt_times": receipt_times,
+        "receipt_intervals_msec": [int(round(current - previous))
+                                   for previous, current in zip(receipt_times, receipt_times[1:])],
+        "receipt_source": f"player-trace:{source}",
+        # A wall-clock trace is useful for ordering/evidence, but does not prove
+        # the strict 250ms/1000ms policy. The pinned header has no monotonic field.
+        "boundary_supported": source == "monotonic",
+        "trace_order_exact": True,
+    }
+
+
+def analyze_command_trace(
+    traces: dict[str, list[dict[str, Any]]], expected_sequence: Sequence[str]
+) -> dict[str, Any]:
+    primary_name, records = _primary_player_trace(traces)
+    messages = _trace_message_rows(records)
+    actual = [_trace_message_parts(record)[0] for _, record in messages]
+    expected = [str(value) for value in expected_sequence]
+    if len(actual) != len(expected) or any(_trace_text(a) != _trace_text(e) for a, e in zip(actual, expected)):
+        raise ContractError(f"command player-message order differs: {actual!r} != {expected!r}")
+    policies: list[dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
+    command_positions = [index for index, value in enumerate(expected) if value.startswith("--")]
+    if len(command_positions) != 1:
+        raise ContractError("command trace must contain exactly one command message")
+    command_position = command_positions[0]
+    command_index = messages[command_position][0]
+    next_message_index = messages[command_position + 1][0] if command_position + 1 < len(messages) else len(records)
+    command_followups = [record for record in records[command_index + 1:next_message_index]
+                         if record.get("event") in ("player-open-policy", "player-open-result")]
+    for position, (message_index, _) in enumerate(messages):
+        if position == command_position:
+            continue
+        policy, result = _trace_followup(records, message_index)
+        policies.append(policy)
+        results.append(result)
+    source, receipt_times = _trace_clock([record for _, record in messages])
+    return {
+        "primary_process": primary_name,
+        "message_sequence": actual,
+        "policies": policies,
+        "results": results,
+        "file_continuations": [bool(policy.get("continuation")) for policy in policies],
+        "receipt_times": receipt_times,
+        "receipt_source": f"player-trace:{source}",
+        "command_immediate": not command_followups,
+        "no_late_open_before_new_file": not command_followups,
+        "boundary_supported": source == "monotonic",
+    }
 
 
 def validate_command_observation(observation: Any) -> None:
@@ -462,7 +617,7 @@ class PlaybackCaseRun(probe.WindowsDesktopRun):
         texts = []
         for control in self.player_window.descendants():
             identifier = str(getattr(control.element_info, 'automation_id', ''))
-            if identifier.endswith('BottomRight'):
+            if identifier.endswith('MiddleRight'):
                 texts.append(control.window_text())
         return float(choose_position_text(texts))
 
@@ -588,42 +743,63 @@ class PlaybackCaseRun(probe.WindowsDesktopRun):
         for index, file in enumerate(files):
             if separate and self.spec.rapid_mode == "idle" and index == 1:
                 time.sleep(IDLE_BOUNDARY_SECONDS + 0.05)
-            if separate and self.spec.rapid_mode == "total" and index == 2 and self.open_timestamps:
-                remaining = (MAXIMUM_BURST_SECONDS + 0.05) - (
-                    time.monotonic() - self.open_timestamps[0]
-                )
-                if remaining > 0:
-                    time.sleep(remaining)
+            if separate and self.spec.rapid_mode == "total":
+                # Pace the controller near 180ms so the primary trace can
+                # characterize the absolute-cap component. These are only
+                # dispatch timestamps; they are never the acceptance clock.
+                target = self.open_timestamps[0] + index * 0.18 if self.open_timestamps else time.monotonic()
+                delay = target - time.monotonic()
+                if delay > 0:
+                    time.sleep(delay)
             self._select_files([file])
             self._activate_selection()
-            if separate:
-                # The normal path deliberately does not wait for UI settling;
-                # this is the independent Explorer-open boundary being tested.
-                continue
         if not separate:
             return
-        self.open_continuations = rapid_continuations(self.open_timestamps)
         _write_json(self.evidence / "rapid-timing.json", {
-            "timestamps": self.open_timestamps,
-            "relative": [stamp - self.open_timestamps[0] for stamp in self.open_timestamps],
-            "continuations": self.open_continuations,
+            "transport": "Explorer separate context-menu activations",
+            "controller_timestamps": self.open_timestamps,
+            "controller_relative": ([stamp - self.open_timestamps[0] for stamp in self.open_timestamps]
+                                     if self.open_timestamps else []),
+            "controller_clock": "time.monotonic; diagnostic dispatch timing only",
             "idle_limit_seconds": IDLE_BOUNDARY_SECONDS,
             "maximum_burst_seconds": MAXIMUM_BURST_SECONDS,
+            "boundary_source": "pending primary player trace",
         })
+
+    def _wait_for_player_trace(self, expected_messages: int) -> dict[str, list[dict[str, Any]]]:
+        deadline = time.monotonic() + 10
+        last: dict[str, list[dict[str, Any]]] = {}
+        while time.monotonic() < deadline:
+            last = self._snapshot_traces()
+            try:
+                _, records = _primary_player_trace(last)
+            except BlockedError:
+                time.sleep(0.05)
+                continue
+            if len(_trace_message_rows(records)) >= expected_messages:
+                return last
+            time.sleep(0.05)
+        raise BlockedError(
+            f"primary player trace did not receive {expected_messages} file messages; "
+            f"observed={len(_trace_message_rows(_primary_player_trace(last)[1])) if last else 0}"
+        )
+
+    def _send_secondary_arguments(self, arguments: Sequence[str]) -> tuple[Any, float]:
+        environment = probe._app_environment()
+        if self.trace_directory is not None:
+            environment["NULLOY_STARTUP_TRACE_DIR"] = str(self.trace_directory)
+        if self.headless_audio:
+            environment["GST_PLUGIN_FEATURE_RANK"] = (
+                "directsoundsink:0,waveformsink:0,wasapisink:0,wasapi2sink:0"
+            )
+        started = time.monotonic()
+        process = subprocess.Popen([str(self.package.executable), *arguments], env=environment)
+        return process, started
 
     def _prepare(self) -> dict[str, Any]:
         self.temp_root = Path(tempfile.mkdtemp(prefix=f"nulloy-pr24-{self.run_id}-"))
         self.fixture_directory = self.temp_root / "fixtures"
-        if self.spec.group == "restored":
-            self.fixtures = make_long_fixtures(self.fixture_directory, 3, "restore")
-            row = 1 if self.spec.initial_state != "stopped" else None
-            position = 0.37 if row is not None else None
-            settings = playback_settings(
-                enqueue=True, play_enqueued=False, restore=True,
-                start_paused=self.spec.initial_state == "paused", row=row, position=position,
-            )
-            self._write_setup(settings, self.fixtures)
-        elif self.spec.group in ("populated", "rapid", "commands"):
+        if self.spec.group in ("populated", "restored", "rapid", "commands"):
             self.seed = make_long_fixtures(self.fixture_directory, 3, "seed")
             self.incoming = make_long_fixtures(self.fixture_directory, 3, "open")
             self.fixtures = self.seed + self.incoming
@@ -642,7 +818,7 @@ class PlaybackCaseRun(probe.WindowsDesktopRun):
             else:
                 settings = playback_settings(
                     enqueue=self.spec.enqueue, play_enqueued=self.spec.play_enqueued,
-                    restore=True, start_paused=self.spec.initial_state == "paused",
+                    restore=True, start_paused=False,
                     row=1 if self.spec.initial_state != "stopped" else None,
                     position=0.37 if self.spec.initial_state != "stopped" else None,
                 )
@@ -652,14 +828,21 @@ class PlaybackCaseRun(probe.WindowsDesktopRun):
         self.trace_directory.mkdir(parents=True, exist_ok=True)
         self._registry_install()
         self._launch_player()
-        expected = [path.name for path in (self.fixtures if self.spec.group == "restored" else self.seed)]
-        initial = self._read_playlist_rows(self.fixtures if self.spec.group == "restored" else self.seed)
+        expected = [path.name for path in self.seed]
+        initial = self._read_playlist_rows(self.seed)
         if initial != expected:
             raise ContractError(f"initial playlist order mismatch: {initial!r} != {expected!r}")
         if self.spec.initial_state is not None:
-            current = self.fixtures[1].name if self.spec.initial_state != "stopped" and self.spec.group == "restored" else (
-                self.seed[1].name if self.spec.initial_state != "stopped" else None
-            )
+            current = self.seed[1].name if self.spec.initial_state != "stopped" else None
+            if self.spec.initial_state == 'paused':
+                # StartPaused merely loads media without calling engine.pause().
+                # Exercise a genuinely paused engine, not a stopped restored UI.
+                self._observe_state('playing', [path.name for path in self.fixtures], current)
+                buttons = [control for control in self.player_window.descendants(control_type='Button')
+                           if str(getattr(control.element_info, 'automation_id', '')).endswith('.playButton')]
+                if len(buttons) != 1:
+                    raise ContractError('unique owned play/pause button not found')
+                buttons[0].click_input()
             self.initial_observation = self._observe_state(
                 self.spec.initial_state,
                 [path.name for path in self.fixtures],
@@ -731,63 +914,109 @@ class PlaybackCaseRun(probe.WindowsDesktopRun):
         }}
 
     def _result_restored(self) -> dict[str, Any]:
-        rows = self._read_playlist_rows(self.fixtures)
-        observation = self._observe_state(
-            self.spec.initial_state or "stopped", [path.name for path in self.fixtures],
-            current_required=(self.fixtures[1].name if self.spec.initial_state != "stopped" else None),
-        )
-        self._capture_player("restored")
-        return {"rows": rows, "after": observation, "assertions": {
-            "restored_playlist_exact": True,
-            "restored_current_media_directly_observed": self.spec.initial_state == "stopped" or bool(observation["current_media"]),
-            "restored_state_directly_observed": True,
-        }}
+        result = self._result_populated()
+        result['restore_scope'] = 'external open after restored startup has settled; synchronous cold-start engine-state decision not observed'
+        return result
 
     def _result_rapid(self) -> dict[str, Any]:
-        self._open_files(self.incoming, separate=True)
-        mode = self.spec.rapid_mode
-        if mode == "burst":
-            if not all(self.open_continuations[1:]):
-                raise ContractError("rapid burst did not remain inside strict 250ms/1000ms boundary")
-        elif mode == "idle":
-            if self.open_continuations != [False, False, True]:
-                raise ContractError(
-                    f"rapid idle boundary produced unexpected continuation sequence: {self.open_continuations!r}"
-                )
-        elif mode == "total":
-            if self.open_continuations != [False, True, False]:
-                raise ContractError(
-                    f"rapid total boundary produced unexpected continuation sequence: {self.open_continuations!r}"
-                )
-        rows = self._read_playlist_rows(self.seed + self.incoming)
+        files = list(self.incoming)
+        if self.spec.rapid_mode == "total":
+            # Reuse real fixture paths intentionally: schedule eight messages
+            # near 180ms apart to isolate the one-second cap. The primary
+            # player trace, not this controller schedule, decides acceptance.
+            files = (files * ((8 + len(files) - 1) // len(files)))[:8]
+        self._open_files(files, separate=True)
+        traces = self._wait_for_player_trace(len(files))
+        try:
+            observation = analyze_player_trace(traces, [str(path) for path in files])
+        except ContractError as exc:
+            raise BlockedError(f"rapid player-trace characterization is incomplete: {exc}") from exc
+        _write_json(self.evidence / "rapid-timing.json", {
+            "transport": "Explorer separate context-menu activations",
+            "controller_timestamps": self.open_timestamps,
+            "controller_clock": "time.monotonic; diagnostic dispatch timing only",
+            "trace_receipt_times": observation["receipt_times"],
+            "trace_receipt_intervals_msec": observation["receipt_intervals_msec"],
+            "trace_receipt_source": observation["receipt_source"],
+            "trace_continuations": observation["continuations"],
+            "boundary_supported": observation["boundary_supported"],
+            "idle_limit_seconds": IDLE_BOUNDARY_SECONDS,
+            "maximum_burst_seconds": MAXIMUM_BURST_SECONDS,
+        })
+        if not observation["boundary_supported"]:
+            raise BlockedError(
+                "rapid boundary is BLOCKED: qtlocalpeertrace.h records wall-clock "
+                "time_msec only; controller timing cannot substitute for a monotonic player receipt clock"
+            )
+        expected = {
+            "burst": [False] + [True] * (len(files) - 1),
+            "idle": [False, False, True],
+            "total": rapid_continuations([index * 0.18 for index in range(len(files))]),
+        }[self.spec.rapid_mode or ""]
+        if observation["continuations"] != expected:
+            raise ContractError(
+                f"player trace boundary sequence differs: {observation['continuations']!r} != {expected!r}"
+            )
+        expected_rows = [path.name for path in self.seed + files]
+        rows = self._read_playlist_rows(self.seed + files)
         after = self._observe_state("playing", [path.name for path in self.fixtures], current_required=self.seed[1].name)
         return {"rows": rows, "after": after, "assertions": {
-            "separate_explorer_activations": len(self.open_timestamps) == len(self.incoming),
-            "boundary_observed": True,
-            "playlist_order_exact": rows == [path.name for path in self.seed + self.incoming],
+            "separate_explorer_activations": len(self.open_timestamps) == len(files),
+            "boundary_observed_from_player_trace": True,
+            "player_trace_order_exact": observation["trace_order_exact"],
+            "grouping_observed_in_policy_trace": len(observation["policies"]) == len(files),
+            "playlist_order_exact": rows == expected_rows,
         }}
 
     def _result_command(self) -> dict[str, Any]:
-        if self.trigger is None:
-            self.trigger = self.incoming[0]
-        self._select_files([self.trigger])
-        self._activate_selection()
-        expected = {
+        first = self.trigger or self.incoming[0]
+        second = self.incoming[1] if len(self.incoming) > 1 else self.incoming[0]
+        option = self.spec.command or ""
+        processes: list[Any] = []
+        self.open_timestamps = []
+        for arguments in ((str(first),), (option,), (str(second),)):
+            process, started = self._send_secondary_arguments(arguments)
+            processes.append(process)
+            self.open_timestamps.append(started)
+        for process in processes:
+            return_code = process.wait(timeout=10)
+            if return_code != 0:
+                raise ContractError(f"secondary IPC client failed with exit code {return_code}")
+        traces = self._wait_for_player_trace(3)
+        observation = analyze_command_trace(
+            traces, [str(first), option, str(second)]
+        )
+        _write_json(self.evidence / "command-trace.json", {
+            "transport": "QtSingleApplication IPC via secondary processes",
+            "controller_timestamps": self.open_timestamps,
+            "controller_clock": "time.monotonic; dispatch diagnostic only",
+            "trace_receipt_times": observation["receipt_times"],
+            "trace_receipt_source": observation["receipt_source"],
+            "message_sequence": observation["message_sequence"],
+            "file_continuations": observation["file_continuations"],
+            "command_immediate": observation["command_immediate"],
+            "no_late_open_before_new_file": observation["no_late_open_before_new_file"],
+            "boundary_supported": observation["boundary_supported"],
+            "limitation": "This is an IPC characterization; it does not prove Explorer shell timing boundaries.",
+        })
+        if not observation["command_immediate"] or not observation["no_late_open_before_new_file"]:
+            raise ContractError("command trace contains a late file-open policy/result before the new file")
+        expected_current = second.name if option == "--stop" else {
             "--next": self.seed[2].name,
             "--prev": self.seed[0].name,
-            "--stop": self.seed[1].name,
             "--pause": self.seed[1].name,
-        }[self.spec.command or ""]
-        state = "stopped" if self.spec.command == "--stop" else "playing"
-        after = self._observe_state(state, [path.name for path in self.fixtures], current_required=expected)
-        rows = self._read_playlist_rows(self.seed)
-        if rows != [path.name for path in self.seed]:
-            raise ContractError("command boundary changed playlist membership/order")
+        }[option]
+        state = "playing"
+        after = self._observe_state(state, [path.name for path in self.fixtures], current_required=expected_current)
+        rows = self._read_playlist_rows(self.seed + [first, second])
         return {"rows": rows, "after": after, "assertions": {
-            "command_option_delivered": True,
+            "command_sequence_delivered_in_trace": observation["message_sequence"] == [str(first), option, str(second)],
+            "command_resets_file_burst": observation["file_continuations"] == [False, False],
+            "command_immediate_trace_order": observation["command_immediate"],
+            "no_late_restart_without_new_file": observation["no_late_open_before_new_file"],
             "command_current_media_directly_observed": True,
             "command_state_directly_observed": True,
-            "pause_option_maps_to_play": self.spec.command != "--pause" or state == "playing",
+            "explorer_shell_boundary_not_claimed": observation["receipt_source"] == "player-trace:time_msec",
         }}
 
     def execute(self) -> dict[str, Any]:
@@ -795,7 +1024,7 @@ class PlaybackCaseRun(probe.WindowsDesktopRun):
         self.preflight()
         try:
             result.update(self._prepare())
-            if self.spec.group in ("populated", "rapid", "commands"):
+            if self.spec.group in ("populated", "restored", "rapid", "commands"):
                 environment = probe._app_environment()
                 self.explorer_launch_started = True
                 subprocess.Popen(["explorer.exe", "/n", f"/root,{self.fixture_directory}"], env=environment)
@@ -847,6 +1076,14 @@ class PlaybackCaseRun(probe.WindowsDesktopRun):
                 try:
                     persisted = config.read_text(encoding="utf-8")
                     persisted_row = read_persisted_row(persisted)
+                    after = result.get('after', {})
+                    if after.get('current_media'):
+                        expected_row = result['rows'].index(after['current_media'])
+                        if persisted_row[0] != expected_row:
+                            raise ContractError('persisted playing row differs from observed current media')
+                        saved_seconds = persisted_row[1] * FIXTURE_SECONDS
+                        elapsed = time.monotonic() - after['samples'][-1]['monotonic']
+                        validate_preserved_position(after['position'], saved_seconds, after['state'], elapsed)
                     _write_json(self.evidence / "persisted-after-close.json", {
                         "row": persisted_row[0], "position": persisted_row[1],
                         "source": "portable settings read after owned player close",
@@ -1005,10 +1242,10 @@ def run_group(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
             if (case_output / "result.json").is_file() else None,
             "error": record.get("error"),
         })
-        if record.get("status") != "PASS" or record.get("cleanup_verified") is not True:
+        if record.get("cleanup_verified") is not True:
             for skipped in names[index + 1:]:
                 cases.append(_case_result_base(skipped, "SKIPPED",
-                                               error="sequential safety stop after failed/blocked case"))
+                                               error="sequential safety stop after unverified cleanup"))
             break
     summary = write_summary(output, cases, args.group)
     return (0 if summary["status"] == "PASS" else 2 if summary["status"] == "BLOCKED" else 1), summary
