@@ -21,6 +21,7 @@
 #include "actionManager.h"
 #include "common.h"
 #include "coverWidget.h"
+#include "fileOpenBurst.h"
 #include "i18nLoader.h"
 #include "logDialog.h"
 #include "mainWindow.h"
@@ -75,9 +76,11 @@
 #include <QResizeEvent>
 #include <QScopedValueRollback>
 #include <QToolTip>
+#include <qtlocalpeertrace.h>
 
 NPlayer::NPlayer()
 {
+    m_fileOpenBurst = new NFileOpenBurst(this);
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     preserveLegacyWindowsAppearance();
 #endif
@@ -392,10 +395,28 @@ bool NPlayer::eventFilter(QObject *obj, QEvent *event)
 
 void NPlayer::readMessage(const QString &str)
 {
+    // Opt-in local diagnostics only; avoid collecting playlist paths when off.
+    const bool traceEnabled = !qEnvironmentVariableIsEmpty("NULLOY_STARTUP_TRACE_DIR");
+    const int rowsBefore = traceEnabled ? m_playlistWidget->count() : 0;
+    QJsonObject policy;
+    QJsonObject result;
+    bool hasPolicy = false;
+    bool hasResult = false;
+    const auto emitTrace = [&]() {
+        if (!traceEnabled)
+            return;
+        // Keep entry data and the event order, but do all file IO after processing.
+        startupTrace("player-message", {{"message", str}, {"rows_before", rowsBefore}});
+        if (hasPolicy)
+            startupTrace("player-open-policy", policy);
+        if (hasResult)
+            startupTrace("player-open-result", result);
+    };
     if (str.isEmpty()) {
         m_mainWindow->show();
         m_mainWindow->activateWindow();
         m_mainWindow->raise();
+        emitTrace();
         return;
     }
     QStringList argList = str.split(MSG_SPLITTER);
@@ -411,26 +432,45 @@ void NPlayer::readMessage(const QString &str)
 
     foreach (QString arg, options) {
         if (arg == "--next") {
+            m_fileOpenBurst->reset();
             m_playlistWidget->playNextItem();
+            emitTrace();
             return;
         } else if (arg == "--prev") {
+            m_fileOpenBurst->reset();
             m_playlistWidget->playPrevItem();
+            emitTrace();
             return;
         } else if (arg == "--stop") {
+            m_fileOpenBurst->reset();
             m_playbackEngine->stop();
+            emitTrace();
             return;
         } else if (arg == "--pause") {
+            m_fileOpenBurst->reset();
             m_playbackEngine->play();
+            emitTrace();
             return;
         }
     }
 
     if (!files.isEmpty()) {
-        if (NSettings::instance()->value("EnqueueFiles").toBool()) {
+        const bool enqueue = NSettings::instance()->value("EnqueueFiles").toBool();
+        const bool playEnqueued = NSettings::instance()->value("PlayEnqueued").toBool();
+        // Shell selections can arrive as several launches/messages. Apply the
+        // original policy immediately once, then append this bounded burst.
+        const bool continuation = m_fileOpenBurst->isContinuation(enqueue, playEnqueued);
+        if (traceEnabled) {
+            policy = {{"enqueue", enqueue}, {"play_enqueued", playEnqueued},
+                      {"continuation", continuation}};
+            hasPolicy = true;
+        }
+        if (continuation) {
+            m_playlistWidget->addFiles(files);
+        } else if (enqueue) {
             int lastRow = m_playlistWidget->count();
             m_playlistWidget->addFiles(files);
-            if (m_playbackEngine->state() == N::PlaybackStopped ||
-                NSettings::instance()->value("PlayEnqueued").toBool()) {
+            if (m_playbackEngine->state() == N::PlaybackStopped || playEnqueued) {
                 m_playlistWidget->playRow(lastRow);
                 m_playbackEngine->setPosition(0); // overrides setPosition() in loadDefaultPlaylist()
             }
@@ -438,7 +478,16 @@ void NPlayer::readMessage(const QString &str)
             m_playlistWidget->setFiles(files);
             m_playlistWidget->playRow(0);
         }
+        if (traceEnabled) {
+            QStringList rows;
+            for (int row = 0; row < m_playlistWidget->count(); ++row)
+                rows << m_playlistWidget->item(row)->data(N::PathRole).toString();
+            result = {{"rows", QJsonArray::fromStringList(rows)},
+                      {"playing_row", m_playlistWidget->playingRow()}};
+            hasResult = true;
+        }
     }
+    emitTrace();
 }
 
 void NPlayer::loadDefaultPlaylist()
