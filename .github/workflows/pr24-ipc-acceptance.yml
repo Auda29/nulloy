@@ -1,0 +1,68 @@
+name: PR24 original-package IPC boundary acceptance
+
+on:
+  push:
+    branches: ['test/pr24-playback-acceptance']
+    paths:
+      - 'tools/desktop-probe/pr24_ipc.py'
+      - 'tools/desktop-probe/test_pr24_ipc.py'
+      - '.github/workflows/pr24-ipc-acceptance.yml'
+      - 'tools/ci/test-pr24-ipc-workflow.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install PyYAML==6.0.2
+      - run: python tools/ci/test-pr24-ipc-workflow.py
+      - run: python -B -m unittest discover -s tools/desktop-probe -p 'test_*.py' -v
+  windows:
+    needs: contracts
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pywinauto==0.6.9 Pillow==11.3.0 psutil==7.0.0
+      - run: python -B -m unittest discover -s tools/desktop-probe -p 'test_*.py' -v
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: '36843804143'
+          name: Nulloy-Qt6-windows-x64
+          path: package
+      - name: Observe IPC on unchanged original executable
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force evidence | Out-Null
+          $packages = @(Get-ChildItem package -Filter '*.zip' -Recurse)
+          if ($packages.Count -ne 1) { throw 'Expected one original package' }
+          $hash = (Get-FileHash $packages[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne '039c21768668d69649ee6950b9039f16b6fde0ec0835e2f8f8278ba3a79fe9be') { throw 'Original package mismatch' }
+          @{run=$env:GITHUB_RUN_ID; probe=$env:GITHUB_SHA; zip_sha256=$hash; package_run='36843804143'; explorer_test=$false; audio_hardware_tested=$false} | ConvertTo-Json | Set-Content evidence/runner.json
+          python tools/desktop-probe/pr24_ipc.py --package $packages[0].FullName --source-sha be5b1e88286c1ff0bbe7e298e3585bbfb248aba5 --output evidence --case all --headless-audio
+          exit $LASTEXITCODE
+      - name: Preserve all IPC evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr24-ipc-evidence
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 7

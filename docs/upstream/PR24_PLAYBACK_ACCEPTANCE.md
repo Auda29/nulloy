@@ -52,7 +52,49 @@ cleanup must never become a PASS.
 - The candidate is a bounded time-based policy, not arbitrary shell transaction
   detection. Automated behavior checks cannot make the user's policy decision.
 
-## Results
+## Recorded native results (original package)
 
-Pending native execution. No new player acceptance has been established by the
-workflow and contract implementation alone.
+[Run 36977902125](https://github.com/Auda29/nulloy/actions/runs/36977902125)
+executed probe `049bb4453cbcdbc6f2d6edf578191de9dccafaf4` against the original
+package above. All 31 downloaded case results were parsed, and each confirms
+497 manifest file hashes, the fixed source/ZIP/EXE identities, and verified
+cleanup. The reported verdicts were 28 PASS, one FAIL and two BLOCKED:
+
+- Populated playlist: 12 PASS (four preferences x playing/paused/stopped).
+- Settled restored playlist plus persistence readback: 12 PASS.
+- Sequential CLI command behavior: four PASS.
+- Separate Explorer timing: one menu-discovery timeout, two BLOCKED.
+
+These are scoped observations, not a merge decision. Restored cases open files
+only **after** startup has settled, not during the synchronous cold-start decision.
+Command cases establish sequential delivery/visible effects and a fresh group
+following a command; they do not prove that the command interrupted an otherwise
+live sub-250ms burst. No-delay-restart behavior over an extended idle interval is
+not established by an absence of file-policy records between two messages.
+
+The rapid Explorer observations had delivery gaps measured in seconds. Their
+wall-clock-only diagnostic timestamps cannot supply the missing tight monotonic
+boundary proof. Repeating the same slow context-menu loop is not a remedy.
+Historical failed runs `36976593005` and `36977166589` remain failed; corrected
+fixture/observer errors do not relabel their results.
+
+## Separate IPC boundary follow-up
+
+`pr24-ipc-acceptance.yml` and `pr24_ipc.py` reuse the exact original ZIP, without
+rebuilding or changing the executable. They are explicitly **not Explorer tests**.
+The controller brackets actual primary processing between monotonic timestamps
+before launching a secondary executable and after observing its complete trace
+result. Conservative differences between those brackets can prove that a whole
+interval lies on one side of the policy threshold without pretending the package
+emits a monotonic clock. A bracket that straddles a threshold is BLOCKED.
+
+Expected playlist contents and playing row must be derived independently from
+the planned scenario, with EnqueueFiles=false to make incorrect continuation
+visible as incorrect replacement/retention. Native UI rows, current media and
+playback observation remain required in addition to diagnostic policy records.
+A command-reset check must prove both file messages would otherwise have stayed
+inside the same grouping window; sequential command behavior alone is insufficient.
+
+IPC native results are pending. PR24 remains draft; fast independent Explorer
+interaction, Windows 11, audible output and synchronous restored startup are not
+certified by this follow-up.

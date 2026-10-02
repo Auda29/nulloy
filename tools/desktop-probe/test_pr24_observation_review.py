@@ -6,6 +6,10 @@ from unittest.mock import patch
 import pr24_playback as p
 
 class ReviewTests(unittest.TestCase):
+    def test_case_runner_accepts_explicit_runtime_factory(self):
+        import inspect
+        self.assertIn('runtime_factory', inspect.signature(p.run_case).parameters)
+
     def test_trace_path_identity_resolves_short_long_aliases(self):
         with patch.object(p.os.path,'samefile',return_value=True):
             self.assertTrue(hasattr(p,'same_message'),'path identity comparator missing')

@@ -1153,7 +1153,7 @@ def _case_result_base(case: str, status: str, **extra: Any) -> dict[str, Any]:
     return {"case": case, "status": status, "cleanup_verified": False, **extra}
 
 
-def run_case(args: argparse.Namespace, case: str) -> tuple[int, dict[str, Any]]:
+def run_case(args: argparse.Namespace, case: str, *, runtime_factory=None) -> tuple[int, dict[str, Any]]:
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     evidence: dict[str, Any] = _case_result_base(case, "BLOCKED", group=CASE_SPECS[case].group)
@@ -1176,7 +1176,8 @@ def run_case(args: argparse.Namespace, case: str) -> tuple[int, dict[str, Any]]:
             "executable": package.contract.executable,
             "audio_mode": "no-device-fallback" if args.headless_audio else "device",
         })
-        runtime = PlaybackCaseRun(package, output, run_id, CASE_SPECS[case], args.headless_audio)
+        factory = PlaybackCaseRun if runtime_factory is None else runtime_factory
+        runtime = factory(package, output, run_id, CASE_SPECS[case], args.headless_audio)
         result = runtime.execute()
         evidence.update(result)
         assertions = list(result.get("assertions", {}).values())
