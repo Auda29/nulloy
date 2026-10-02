@@ -95,6 +95,55 @@ playback observation remain required in addition to diagnostic policy records.
 A command-reset check must prove both file messages would otherwise have stayed
 inside the same grouping window; sequential command behavior alone is insufficient.
 
-IPC native results are pending. PR24 remains draft; fast independent Explorer
-interaction, Windows 11, audible output and synchronous restored startup are not
-certified by this follow-up.
+## Recorded IPC boundary results (original package)
+
+[Run 36985660394](https://github.com/Auda29/nulloy/actions/runs/36985660394)
+executed probe `cc4e749d8eba86f78febb840d6c3f30e172bc7a8` on Windows Server
+2022: **seven PASS**, verified by downloading and independently parsing all seven
+case results, receipt brackets, intermediate row snapshots, final media/position
+samples and cleanup records. Every case verifies the fixed ZIP/EXE/source
+identities and all 497 manifest file hashes. Initial state was a populated,
+playing playlist with `seed-02.wav` current, `EnqueueFiles=false`.
+
+The following values are conservative bounds from the same controller's monotonic
+clock, not exact player-receipt timestamps (displayed rounded to two decimals).
+
+| Case | Measured bound | Observed result |
+|---|---|---|
+| Short burst, three launches | Whole burst upper bound 128.54 ms | Three ordered rows retained; first incoming file playing |
+| Idle boundary | Gap lower bound 353.90 ms | Second file starts a fresh group; third appends; second file playing |
+| Absolute cap, 13 launches | Age lower bound 1050.72 ms; final gap upper bound 217.68 ms | Final file replaces the preceding group and plays |
+| File / `--next` / file | File-to-file upper bound 126.31 ms | Command resets group; second file alone and playing |
+| File / `--prev` / file | File-to-file upper bound 127.17 ms | Command resets group; second file alone and playing |
+| File / `--stop` / file | File-to-file upper bound 125.07 ms | Command resets group; second file alone and playing |
+| File / `--pause` / file | File-to-file upper bound 123.89 ms | Command resets group; second file alone and playing |
+
+All intermediate file-result rows are compared to independent scenario
+expectations, not expectations derived from the returned policy. Immediate
+`playing_row` may be -1 while asynchronous media loading is pending, or the
+expected row zero; other rows fail. Final playback is a separate mandatory
+observation: correct current-media label plus three UI position samples showing
+progress, not a selected row or the immediate trace. These tests do **not** prove
+settled playback after every individual message in the rapid burst.
+
+The command cases establish reset of an otherwise live grouping window, not each
+command's transient playback effect before the next file. CLI mapping is unchanged:
+`--pause` calls `play()` in this package. Exact equality at the 250/1000 ms edges,
+arbitrary shell grouping, audible output and Windows 11 are not established.
+
+Historical IPC run `36984639975` remains failed: its observer incorrectly required
+an already-set playing row in the immediate result trace. The corrected observer
+was regression-tested locally and rerun natively; this is not a retroactive PASS.
+Local contract suite at the passing probe: 96 tests run, three skipped on Linux.
+The duplicate legacy playback run `36985660284` was cancelled intentionally; no
+new populated/restored/Explorer result is attributed to that run.
+
+Raw evidence is retained in the run's `pr24-ipc-evidence` artifact (seven-day CI
+retention) and the local archive
+`/home/hermes/workspace/nulloy-acceptance/pr24-be5b1e8/run-36985660394/`.
+The local independent replay is `audit-ipc-evidence.py`, with machine-readable
+output `ipc-audit-36985660394.json`, both in that archive's parent directory.
+
+PR24 remains draft. Fast independent Explorer interaction, Windows 11, audible
+output, and opening files during synchronous restored startup remain open. These
+scoped IPC results do not constitute a full native acceptance or merge approval.
