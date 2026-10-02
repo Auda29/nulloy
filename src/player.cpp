@@ -26,6 +26,8 @@
 #include "logDialog.h"
 #include "mainWindow.h"
 #include "playbackEngineInterface.h"
+#include "playbackFileAccessInterface.h"
+#include "platform/trash.h"
 #include "playlistDataItem.h"
 #include "playlistStorage.h"
 #include "playlistWidget.h"
@@ -40,6 +42,9 @@
 #include "tagEditorDialog.h"
 #include "trackInfoReader.h"
 #include "trackInfoWidget.h"
+#include "tagReaderInterface.h"
+#include "coverReaderInterface.h"
+#include "waveformBuilderInterface.h"
 #ifndef _N_NO_UPDATE_CHECK_
 #include "updateChecker.h"
 #endif
@@ -69,6 +74,7 @@
 #include <QMessageBox>
 #include <QMetaObject>
 #include <QResizeEvent>
+#include <QScopedValueRollback>
 #include <QToolTip>
 
 NPlayer::NPlayer()
@@ -454,11 +460,15 @@ void NPlayer::loadDefaultPlaylist()
     }
 
     QStringList playlistRowValues = m_settings->value("PlaylistRow").toStringList();
-    if (!playlistRowValues.isEmpty()) {
-        int row = playlistRowValues.at(0).toInt();
-        qreal pos = playlistRowValues.at(1).toFloat();
+    if (playlistRowValues.size() == 2) {
+        bool rowOk = false;
+        bool posOk = false;
+        int row = playlistRowValues.at(0).toInt(&rowOk);
+        qreal pos = playlistRowValues.at(1).toFloat(&posOk);
 
-        if (row < 0 || row > m_playlistWidget->count() - 1) {
+        // Ignore a damaged session instead of selecting or playing an unintended track.
+        if (!rowOk || !posOk || !qIsFinite(pos) || pos < 0.0 || pos > 1.0 ||
+            row < 0 || row >= m_playlistWidget->count()) {
             return;
         }
 
@@ -738,6 +748,67 @@ void NPlayer::playPause()
             m_playbackEngine->play();
         }
     }
+}
+
+void NPlayer::moveSelectedFilesToTrash()
+{
+    if (m_trashInProgress) return;
+    const QStringList files = m_playlistWidget->selectedFiles();
+    if (files.isEmpty()) return;
+    QScopedValueRollback<bool> inProgress(m_trashInProgress, true);
+    auto *access = qobject_cast<NPlaybackFileAccessInterface *>(m_playbackEngine);
+    auto *waveform = dynamic_cast<NWaveformBuilderInterface *>(NPluginLoader::getPlugin(N::WaveformBuilder));
+    QString media;
+    int context = 0, row = -1;
+    qreal position = 0.0;
+    N::PlaybackState state = N::PlaybackStopped;
+    bool suspended = false;
+    NTrash::OperationHooks hooks;
+    hooks.before = [&](const QString &) {
+        if (access && (!suspended || m_playbackEngine->currentMedia() != media ||
+                       m_playbackEngine->state() != state ||
+                       m_playbackEngine->position() != position)) {
+            media = m_playbackEngine->currentMedia();
+            row = m_playlistWidget->playingRow();
+            context = row >= 0 ? m_playlistWidget->item(row)->data(N::IdRole).toInt() : 0;
+            position = m_playbackEngine->position();
+            state = m_playbackEngine->state();
+            access->suspendFileAccess();
+            suspended = true;
+        }
+        if (waveform) waveform->stop();
+        tagReader()->setSource(QString());
+        if (m_coverReader) m_coverReader->setSource(QString());
+    };
+    hooks.after = [&](const QString &file, bool deleted) {
+        const bool restore = suspended && m_playbackEngine->currentMedia() == media &&
+                             m_playbackEngine->state() == state &&
+                             m_playbackEngine->position() == position;
+        if (deleted) m_playlistWidget->removeFiles({file});
+        if (restore) {
+            if (deleted && media == file) {
+                // Continue with the surviving row at the old index, or the last
+                // remaining row. A paused/stopped player must not start playing.
+                const int nextRow = qMin(row, m_playlistWidget->count() - 1);
+                if (nextRow >= 0) {
+                    auto *next = m_playlistWidget->item(nextRow);
+                    access->restoreFileAccess(next->data(N::PathRole).toString(),
+                        next->data(N::IdRole).toInt(), 0.0, state);
+                } else {
+                    m_playbackEngine->setMedia(QString(), 0);
+                }
+            } else {
+                access->restoreFileAccess(media, context, position, state);
+            }
+        }
+        suspended = false;
+        const QString current = m_playbackEngine->currentMedia();
+        if (!current.isEmpty() && QFileInfo::exists(current)) {
+            tagReader()->setSource(current);
+            m_waveformSlider->setMedia(current);
+        }
+    };
+    NTrash::moveToTrash(files, hooks);
 }
 
 void NPlayer::showAboutDialog()

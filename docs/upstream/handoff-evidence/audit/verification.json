@@ -1,0 +1,54 @@
+{
+  "expected_issues": 80,
+  "verified_issues": 80,
+  "api_asserted_comments": 126,
+  "verified_comments": 126,
+  "per_issue_counts_match": true,
+  "states": {
+    "open": 80
+  },
+  "snapshot_sha256": "68a0e1e823be33199baa139b970f7aab51710c2fc648108077ee6a357be8648f",
+  "audit_records": 80,
+  "decision_counts": {
+    "platform": 12,
+    "needs-repro": 5,
+    "stabilize": 16,
+    "covered": 4,
+    "defer": 43
+  },
+  "comment_ids_unique": 126,
+  "audit_sha256": "ffc3aceeb23b8ecd6523c0546a27e83f312438fa230709e86f90716bf8856cff",
+  "source_commit": "027d81a583b07457a4fa5f18b3e7dcca50b05b58",
+  "prs": {
+    "Auda29-nulloy": {
+      "all": 6,
+      "open": 0
+    },
+    "nulloy-nulloy": {
+      "all": 17,
+      "open": 4
+    }
+  },
+  "threads_read_files": [
+    "threads-1.md",
+    "threads-2.md",
+    "threads-3.md",
+    "threads-4.md"
+  ],
+  "audit_generated_at": "2026-09-08T16:44:22.080054+00:00",
+  "prs_scope": "Frozen read-only corpus, predates parent-created fork PR #7. Open=0 is historical, not current.",
+  "prs_snapshot_files_mtime_utc": {
+    "prs-Auda29-nulloy.json": "2026-09-08T16:28:46.515301+00:00",
+    "prs-nulloy-nulloy.json": "2026-09-08T16:28:46.005297+00:00"
+  },
+  "schema_verified": true,
+  "source_ids_exact_match": true,
+  "original_status_and_priority_preserved": true,
+  "comment_ids_exact_match": true,
+  "duplicate_searches_verified": 80,
+  "source_worktree_clean_at_validation": true,
+  "source_worktree_status": "",
+  "snapshot_json_sha256": "59a47214c048cfffdd71df413d71ca1865de0cae2e7f8cdfce44ecc7c1ff96aa",
+  "linked_extra_comments_excluded_from_126": 3,
+  "verification_time": "2026-09-08T16:44:24.737337+00:00"
+}

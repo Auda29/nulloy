@@ -1,0 +1,47 @@
+[
+  {
+    "issue": 240,
+    "source": "/home/hermes/workspace/nulloy-swarm/issue-240/tests/upstream/240",
+    "steps": [
+      {
+        "command": [
+          "cmake",
+          "-S",
+          "/home/hermes/workspace/nulloy-swarm/issue-240/tests/upstream/240",
+          "-B",
+          "/home/hermes/workspace/nulloy-swarm/evidence/parent-240/240/run-1y76xjvf",
+          "-G",
+          "Ninja",
+          "-DCMAKE_BUILD_TYPE=Release"
+        ],
+        "exit_code": 0,
+        "log": "/home/hermes/workspace/nulloy-swarm/evidence/parent-240/240/run-1y76xjvf/step-0.log"
+      },
+      {
+        "command": [
+          "cmake",
+          "--build",
+          "/home/hermes/workspace/nulloy-swarm/evidence/parent-240/240/run-1y76xjvf",
+          "--parallel",
+          "1"
+        ],
+        "exit_code": 0,
+        "log": "/home/hermes/workspace/nulloy-swarm/evidence/parent-240/240/run-1y76xjvf/step-1.log"
+      },
+      {
+        "command": [
+          "ctest",
+          "--test-dir",
+          "/home/hermes/workspace/nulloy-swarm/evidence/parent-240/240/run-1y76xjvf",
+          "--output-on-failure",
+          "--no-tests=error",
+          "--timeout",
+          "180"
+        ],
+        "exit_code": 0,
+        "log": "/home/hermes/workspace/nulloy-swarm/evidence/parent-240/240/run-1y76xjvf/step-2.log"
+      }
+    ],
+    "passed": true
+  }
+]

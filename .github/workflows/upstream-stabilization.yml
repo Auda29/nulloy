@@ -33,6 +33,7 @@ jobs:
       - name: Verify runner and existing Python contracts
         run: |
           python3 tools/upstream/test-run-native.py
+          python3 tools/upstream/test-issue-register.py
           python3 tools/phase4/test-import-profile.py
           python3 tools/release/test-alpha.py
       - name: Exercise native issue harnesses
@@ -40,7 +41,7 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: |
           dpkg-query -W > /tmp/nulloy-toolchain.txt
-          python3 tools/upstream/run-native.py --allow-empty --output /tmp/nulloy-upstream-tests
+          python3 tools/upstream/run-native.py --output /tmp/nulloy-upstream-tests
       - name: Upload exact test evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
